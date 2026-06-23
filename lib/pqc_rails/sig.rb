@@ -1,12 +1,13 @@
 # frozen_string_literal: true
 
+require_relative "algorithms"
 require_relative "ffi/sig"
 
 module PqcRails
   # liboqsのGeneric SIG(署名)APIをRubyらしく包んだクラス。
   #
   # 使い方:
-  #   sig = PqcRails::Sig.new("ML-DSA-44")
+  #   sig = PqcRails::Sig.new(:ml_dsa_44) # またはliboqsの生の名前 "ML-DSA-44"
   #   keypair   = sig.generate_keypair
   #   signature = sig.sign("hello world", keypair.secret_key)
   #   sig.verify("hello world", signature, keypair.public_key) # => true
@@ -19,10 +20,11 @@ module PqcRails
 
     def initialize(alg_name)
       @alg_name = alg_name
-      @sig_ptr = Ffi::Sig.OQS_SIG_new(alg_name)
+      liboqs_alg_name = Algorithms.resolve_sig_name(alg_name)
+      @sig_ptr = Ffi::Sig.OQS_SIG_new(liboqs_alg_name)
       if @sig_ptr.null?
         raise PqcRails::Error,
-              "OQS_SIG_new failed for '#{alg_name}'. " \
+              "OQS_SIG_new failed for '#{liboqs_alg_name}'. " \
               "liboqsがこのアルゴリズムを有効にしてビルドされているか確認してください。"
       end
 

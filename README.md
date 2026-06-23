@@ -65,6 +65,26 @@ end
 
 ## 使い方
 
+### アルゴリズムの指定方法
+
+`PqcRails::Kem` / `PqcRails::Sig` は、liboqs の生のアルゴリズム名文字列（`"ML-KEM-512"` 等）に加えて、
+シンボル（`:ml_kem_512` 等）でも指定できます。シンボルは `PqcRails::Algorithms` レジストリ経由で
+liboqs 名に解決されます。
+
+```ruby
+PqcRails::Kem.new(:ml_kem_512)   # シンボル指定（推奨）
+PqcRails::Kem.new("ML-KEM-512")  # liboqsの生の名前を直接指定(レジストリ未登録の任意のアルゴリズムにも使えます)
+```
+
+現在レジストリに登録済みのアルゴリズム：
+
+| 種別 | シンボル                                      | NIST セキュリティレベル |
+| ---- | ---------------------------------------------- | ------------------------ |
+| KEM  | `:ml_kem_512` / `:ml_kem_768` / `:ml_kem_1024` | 1 / 3 / 5                 |
+| SIG  | `:ml_dsa_44` / `:ml_dsa_65` / `:ml_dsa_87`     | 2 / 3 / 5                 |
+
+未登録のシンボルを渡すと `PqcRails::Algorithms::UnknownAlgorithmError`（`PqcRails::Error` のサブクラス）が発生します。
+
 ### 鍵交換（KEM）の基本フロー
 
 ```ruby

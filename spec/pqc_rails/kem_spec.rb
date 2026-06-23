@@ -16,6 +16,20 @@ RSpec.describe PqcRails::Kem do
         described_class.new("NOT-A-REAL-ALGORITHM")
       end.to raise_error(PqcRails::Error, /OQS_KEM_new failed/)
     end
+
+    it "シンボルでもアルゴリズムを指定できる(アルゴリズム抽象化レイヤー経由)" do
+      kem = described_class.new(:ml_kem_512)
+      expect(kem.alg_name).to eq(:ml_kem_512)
+      expect(kem.length_public_key).to eq(800)
+    ensure
+      kem&.free
+    end
+
+    it "未知のシンボルを渡すとUnknownAlgorithmErrorを送出する" do
+      expect do
+        described_class.new(:not_a_real_kem)
+      end.to raise_error(PqcRails::Algorithms::UnknownAlgorithmError, /unknown KEM algorithm/)
+    end
   end
 
   describe "鍵長の参照" do

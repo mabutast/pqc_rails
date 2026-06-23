@@ -6,5 +6,6 @@ end
 
 require_relative "pqc_rails/version"
 require_relative "pqc_rails/configuration"
+require_relative "pqc_rails/algorithms"
 require_relative "pqc_rails/kem"
 require_relative "pqc_rails/sig"

@@ -17,6 +17,20 @@ RSpec.describe PqcRails::Sig do
         described_class.new("NOT-A-REAL-ALGORITHM")
       end.to raise_error(PqcRails::Error, /OQS_SIG_new failed/)
     end
+
+    it "シンボルでもアルゴリズムを指定できる(アルゴリズム抽象化レイヤー経由)" do
+      sig = described_class.new(:ml_dsa_44)
+      expect(sig.alg_name).to eq(:ml_dsa_44)
+      expect(sig.length_public_key).to eq(1312)
+    ensure
+      sig&.free
+    end
+
+    it "未知のシンボルを渡すとUnknownAlgorithmErrorを送出する" do
+      expect do
+        described_class.new(:not_a_real_sig)
+      end.to raise_error(PqcRails::Algorithms::UnknownAlgorithmError, /unknown SIG algorithm/)
+    end
   end
 
   describe "鍵長・署名長の参照" do

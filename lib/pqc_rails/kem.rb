@@ -1,12 +1,13 @@
 # frozen_string_literal: true
 
+require_relative "algorithms"
 require_relative "ffi/kem"
 
 module PqcRails
   # liboqsのGeneric KEM APIをRubyらしく包んだクラス。
   #
   # 使い方:
-  #   kem = PqcRails::Kem.new("ML-KEM-512")
+  #   kem = PqcRails::Kem.new(:ml_kem_512) # またはliboqsの生の名前 "ML-KEM-512"
   #   keypair = kem.generate_keypair
   #   encap   = kem.encapsulate(keypair.public_key)
   #   shared  = kem.decapsulate(encap.ciphertext, keypair.secret_key)
@@ -22,10 +23,11 @@ module PqcRails
 
     def initialize(alg_name)
       @alg_name = alg_name
-      @kem_ptr = Ffi::Kem.OQS_KEM_new(alg_name)
+      liboqs_alg_name = Algorithms.resolve_kem_name(alg_name)
+      @kem_ptr = Ffi::Kem.OQS_KEM_new(liboqs_alg_name)
       if @kem_ptr.null?
         raise PqcRails::Error,
-              "OQS_KEM_new failed for '#{alg_name}'. " \
+              "OQS_KEM_new failed for '#{liboqs_alg_name}'. " \
               "liboqsがこのアルゴリズムを有効にしてビルドされているか確認してください。"
       end
 
