@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "openssl"
+require_relative "blob_packing"
 require_relative "dh_kem"
 require_relative "kem"
 
@@ -49,20 +50,20 @@ module PqcRails
       pq_keypair = @pq.generate_keypair
 
       Keypair.new(
-        pack(classical_keypair.public_key, pq_keypair.public_key),
-        pack(classical_keypair.secret_key, pq_keypair.secret_key)
+        BlobPacking.pack(classical_keypair.public_key, pq_keypair.public_key),
+        BlobPacking.pack(classical_keypair.secret_key, pq_keypair.secret_key)
       )
     end
 
     def encapsulate(public_key)
       ensure_not_freed!
 
-      classical_public_key, pq_public_key = unpack(public_key)
+      classical_public_key, pq_public_key = BlobPacking.unpack(public_key)
       classical_encap = @classical.encapsulate(classical_public_key)
       pq_encap = @pq.encapsulate(pq_public_key)
 
       Encapsulation.new(
-        pack(classical_encap.ciphertext, pq_encap.ciphertext),
+        BlobPacking.pack(classical_encap.ciphertext, pq_encap.ciphertext),
         combine(classical_encap.shared_secret, pq_encap.shared_secret,
                 classical_encap.ciphertext, pq_encap.ciphertext)
       )
@@ -71,8 +72,8 @@ module PqcRails
     def decapsulate(ciphertext, secret_key)
       ensure_not_freed!
 
-      classical_ciphertext, pq_ciphertext = unpack(ciphertext)
-      classical_secret_key, pq_secret_key = unpack(secret_key)
+      classical_ciphertext, pq_ciphertext = BlobPacking.unpack(ciphertext)
+      classical_secret_key, pq_secret_key = BlobPacking.unpack(secret_key)
 
       classical_shared = @classical.decapsulate(classical_ciphertext, classical_secret_key)
       pq_shared = @pq.decapsulate(pq_ciphertext, pq_secret_key)
@@ -109,22 +110,6 @@ module PqcRails
       ].join("\x00")
 
       OpenSSL::KDF.hkdf(ikm, salt: "", info: info, length: SHARED_SECRET_LENGTH, hash: "SHA256")
-    end
-
-    # 2つのバイト列を [4byte長][本体][4byte長][本体] で1本のバイト列にパックする。
-    def pack(first, second)
-      [first.bytesize].pack("N") + first + [second.bytesize].pack("N") + second
-    end
-
-    def unpack(blob)
-      first_length = blob[0, 4].unpack1("N")
-      first = blob[4, first_length]
-
-      second_offset = 4 + first_length
-      second_length = blob[second_offset, 4].unpack1("N")
-      second = blob[(second_offset + 4), second_length]
-
-      [first, second]
     end
 
     def ensure_not_freed!
