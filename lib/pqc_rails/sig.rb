@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "algorithms"
+require_relative "length_validation"
 require_relative "ffi/sig"
 
 module PqcRails
@@ -14,6 +15,8 @@ module PqcRails
   #
   # PqcRails::Kem と同じパターン(open/free によるリソース管理)を踏襲している。
   class Sig
+    include LengthValidation
+
     Keypair = Struct.new(:public_key, :secret_key)
 
     attr_reader :alg_name
@@ -143,13 +146,6 @@ module PqcRails
 
     def ensure_not_freed!
       raise PqcRails::Error, "this PqcRails::Sig instance has already been freed" if @freed
-    end
-
-    def validate_length!(bytes, expected_length, name)
-      return if bytes.bytesize == expected_length
-
-      raise ArgumentError,
-            "#{name} has wrong length: expected #{expected_length} bytes, got #{bytes.bytesize}"
     end
   end
 end

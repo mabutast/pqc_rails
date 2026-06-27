@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "algorithms"
+require_relative "length_validation"
 require_relative "ffi/kem"
 
 module PqcRails
@@ -16,6 +17,8 @@ module PqcRails
   # kem.free を呼ぶか、ブロック形式(PqcRails::Kem.open)を使うことで
   # Cレベルのメモリを確実に解放できる。
   class Kem
+    include LengthValidation
+
     Keypair = Struct.new(:public_key, :secret_key)
     Encapsulation = Struct.new(:ciphertext, :shared_secret)
 
@@ -108,13 +111,6 @@ module PqcRails
 
     def ensure_not_freed!
       raise PqcRails::Error, "this PqcRails::Kem instance has already been freed" if @freed
-    end
-
-    def validate_length!(bytes, expected_length, name)
-      return if bytes.bytesize == expected_length
-
-      raise ArgumentError,
-            "#{name} has wrong length: expected #{expected_length} bytes, got #{bytes.bytesize}"
     end
   end
 end
