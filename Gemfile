@@ -8,3 +8,4 @@ gemspec
 gem "irb"
 gem "rake", "~> 13.0"
 gem "rspec", "~> 3.13"
+gem "sqlite3", "~> 2.0"
