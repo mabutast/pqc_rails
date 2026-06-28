@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 require "base64"
-require "rails"
 require_relative "../blob_packing"
 require_relative "../hybrid_kem"
+require_relative "../key_source"
 
 module PqcRails
   module Session
@@ -19,7 +19,7 @@ module PqcRails
       module_function
 
       def keypair
-        encoded = ENV.fetch(ENV_VAR, nil) || credentials_value
+        encoded = KeySource.fetch(env_var: ENV_VAR, credentials_key: CREDENTIALS_KEY)
         if encoded.nil?
           raise MissingKeyError,
                 "PQC session key not found. Set ENV['#{ENV_VAR}'] or run `rails generate pqc_rails:install`."
@@ -35,12 +35,6 @@ module PqcRails
       def decode(encoded)
         public_key, secret_key = BlobPacking.unpack(Base64.strict_decode64(encoded))
         HybridKem::Keypair.new(public_key, secret_key)
-      end
-
-      def credentials_value
-        return nil unless Rails.respond_to?(:application) && Rails.application
-
-        Rails.application.credentials[CREDENTIALS_KEY]
       end
     end
   end
