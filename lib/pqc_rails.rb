@@ -22,3 +22,5 @@ require_relative "pqc_rails/generators/install/install_generator"
 require_relative "pqc_rails/cipher"
 require_relative "pqc_rails/active_record/key_provider"
 require_relative "pqc_rails/active_record/context"
+
+ActionDispatch::Session::PqcCookieStore = PqcRails::Session::PqcCookieStore
