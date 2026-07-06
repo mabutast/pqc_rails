@@ -18,6 +18,14 @@ config.session_store :pqc_cookie_store
 PqcRails::ActiveRecord::Context.install!
 ```
 
+## PQC 対応が必要な理由
+
+PQC 対応の義務化を待つ理由はありません。今この瞬間も、ハーベスト攻撃（Harvest Now, Decrypt Later：暗号化通信を今傍受し、将来の量子コンピュータで解読する攻撃）によってデータは蓄積され続けています。
+
+過去に漏れたデータは取り返せませんが、これから先の通信は今日から守ることができます。`pqc_rails` は、既存の Rails アプリケーションに耐量子暗号を組み込み、この現在進行形のリスクに対処します。
+
+詳しい脅威モデルはこちら → [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)（準備中）
+
 ## 現在の対応状況
 
 | 機能                          | 状態                                             |
