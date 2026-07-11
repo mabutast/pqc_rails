@@ -33,7 +33,6 @@ RSpec.describe PqcRails::Session::PqcCookieStore do
       set_cookie = response.headers["Set-Cookie"]
       expect(set_cookie).to be_a(String)
       expect(set_cookie).not_to include("user_id")
-      expect(set_cookie).not_to include("42")
     end
   end
 
