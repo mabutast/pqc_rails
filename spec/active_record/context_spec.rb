@@ -61,4 +61,24 @@ RSpec.describe PqcRails::ActiveRecord::Context do
 
     expect { widget_class.find(widget.id).secret }.to raise_error(ActiveRecord::Encryption::Errors::Base)
   end
+
+  describe ".install!" do
+    after do
+      ::ActiveRecord::Encryption.configure(primary_key: nil, deterministic_key: nil, key_derivation_salt: nil)
+    end
+
+    it "install!を呼ぶ前から設定されていたprimary_key等を保持する(黙ってnilに巻き戻さない)" do
+      ::ActiveRecord::Encryption.configure(
+        primary_key: "existing-primary-key",
+        deterministic_key: "existing-deterministic-key",
+        key_derivation_salt: "existing-salt"
+      )
+
+      described_class.install!(pq_alg_name: :ml_kem_512)
+
+      expect(::ActiveRecord::Encryption.config.primary_key).to eq("existing-primary-key")
+      expect(::ActiveRecord::Encryption.config.deterministic_key).to eq("existing-deterministic-key")
+      expect(::ActiveRecord::Encryption.config.key_derivation_salt).to eq("existing-salt")
+    end
+  end
 end
