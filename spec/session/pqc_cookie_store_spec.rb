@@ -67,7 +67,7 @@ RSpec.describe PqcRails::Session::PqcCookieStore do
 
       expect do
         described_class.new(->(env) { [200, {}, [""]] })
-      end.to raise_error(PqcRails::Session::MissingKeyError)
+      end.to raise_error(PqcRails::MissingKeyError)
     end
   end
 end

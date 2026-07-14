@@ -49,7 +49,7 @@ RSpec.describe PqcRails::Session::KeyManager do
       ENV.delete(described_class::ENV_VAR)
       allow(Rails).to receive(:application).and_return(nil)
 
-      expect { described_class.keypair }.to raise_error(PqcRails::Session::MissingKeyError, /PQC_SESSION_KEY/)
+      expect { described_class.keypair }.to raise_error(PqcRails::MissingKeyError, /PQC_SESSION_KEY/)
     end
   end
 end

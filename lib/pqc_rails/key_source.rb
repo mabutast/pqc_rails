@@ -1,12 +1,17 @@
 # frozen_string_literal: true
 
 require "rails"
+require "base64"
+require_relative "blob_packing"
+require_relative "hybrid_kem"
 
 module PqcRails
-  # 環境変数→Rails credentialsの順で値を読み込む共通処理。
-  # Session::KeyManagerとActiveRecord::KeyProviderで同じ手順が必要になるため共通化している。
-  # 環境変数を優先するのは本番運用でcredentialsファイルを使わずに鍵を渡せるようにするため
-  # (コンテナのsecret注入等と相性が良い)。
+  class MissingKeyError < PqcRails::Error; end
+
+  # 環境変数→Rails credentialsの順で鍵を読み込み、HybridKem::Keypairへデコードするまでの
+  # 共通処理。Session::KeyManagerとActiveRecord::KeyProviderで同じ手順(fetch→無ければ例外→decode)
+  # が必要になるため共通化している。環境変数を優先するのは本番運用でcredentialsファイルを
+  # 使わずに鍵を渡せるようにするため(コンテナのsecret注入等と相性が良い)。
   module KeySource
     module_function
 
@@ -14,10 +19,34 @@ module PqcRails
       ENV.fetch(env_var, nil) || credentials_value(credentials_key)
     end
 
+    # fetchした値がnilならMissingKeyErrorを送出する版。
+    def fetch!(env_var:, credentials_key:, label:)
+      fetch(env_var: env_var, credentials_key: credentials_key) ||
+        raise(MissingKeyError,
+              "PQC #{label} key not found. Set ENV['#{env_var}'] or run `rails generate pqc_rails:install`.")
+    end
+
+    # fetch! + decodeまでを1回で行う。Session::KeyManager#keypairとActiveRecord::KeyProvider#keypairの
+    # 両方が同じ「fetch→無ければ例外→decode」という処理列を重複実装していたため、ここに統合した。
+    def fetch_keypair!(env_var:, credentials_key:, label:)
+      decode(fetch!(env_var: env_var, credentials_key: credentials_key, label: label))
+    end
+
     def credentials_value(credentials_key)
       return nil unless Rails.respond_to?(:application) && Rails.application
 
       Rails.application.credentials[credentials_key]
+    end
+
+    # HybridKem::Keypairのシリアライズ形式。セッション固有の処理ではなく鍵の保存形式そのものなので、
+    # Session::KeyManagerではなくここに置く(セッション/AR両方から使われる)。
+    def encode(keypair)
+      Base64.strict_encode64(BlobPacking.pack(keypair.public_key, keypair.secret_key))
+    end
+
+    def decode(encoded)
+      public_key, secret_key = BlobPacking.unpack(Base64.strict_decode64(encoded))
+      HybridKem::Keypair.new(public_key, secret_key)
     end
   end
 end

@@ -2,12 +2,9 @@
 
 require "digest"
 require_relative "../key_source"
-require_relative "../session/key_manager"
 
 module PqcRails
   module ActiveRecord
-    class MissingKeyError < PqcRails::Error; end
-
     # ActiveRecord::Encryption::KeyProvider互換。HybridKemの鍵ペアを1つだけ返す最小実装。
     #
     # 既存のActiveRecord::Encryption::KeyProvider(Key#secretが単一の不透明な文字列)は
@@ -15,8 +12,8 @@ module PqcRails
     # そのためKeyProvider自体を独自実装し、`key.secret`がPqcRails::HybridKem::Keypair
     # (公開鍵・秘密鍵のペア)を返すようにしている。
     #
-    # 鍵のソース(環境変数→Rails credentials)はSession::KeyManagerと同じ仕組みを使うが、
-    # セッション用の鍵とは異なるENV変数名/credentialsキーを使い、用途ごとに鍵を分離する。
+    # 鍵のソース(環境変数→Rails credentials→decode)はKeySourceに一本化されており、
+    # セッション用の鍵とは異なるENV変数名/credentialsキーを渡すことで用途ごとに鍵を分離する。
     #
     # 複数世代の鍵によるローテーションはPhase 4で#decryption_keysを拡張して対応する。
     # 現時点では#encryption_keyと同じ単一鍵のみを返す。
@@ -47,13 +44,7 @@ module PqcRails
       private
 
       def keypair
-        encoded = PqcRails::KeySource.fetch(env_var: ENV_VAR, credentials_key: CREDENTIALS_KEY)
-        if encoded.nil?
-          raise MissingKeyError,
-                "PQC record key not found. Set ENV['#{ENV_VAR}'] or run `rails generate pqc_rails:install`."
-        end
-
-        PqcRails::Session::KeyManager.decode(encoded)
+        PqcRails::KeySource.fetch_keypair!(env_var: ENV_VAR, credentials_key: CREDENTIALS_KEY, label: "record")
       end
     end
   end
