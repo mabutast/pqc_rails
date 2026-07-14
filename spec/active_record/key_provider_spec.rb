@@ -38,6 +38,15 @@ RSpec.describe PqcRails::ActiveRecord::KeyProvider do
 
       expect { described_class.new.encryption_key }.to raise_error(PqcRails::ActiveRecord::MissingKeyError)
     end
+
+    it "store_key_referencesが有効な場合、public_tagsに鍵参照(encrypted_data_key_id)が設定される" do
+      ENV[described_class::ENV_VAR] = PqcRails::Session::KeyManager.encode(keypair)
+      allow(::ActiveRecord::Encryption.config).to receive(:store_key_references).and_return(true)
+
+      key = described_class.new.encryption_key
+
+      expect(key.public_tags.encrypted_data_key_id).to be_a(String)
+    end
   end
 
   describe "#decryption_keys" do

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "digest"
 require_relative "../key_source"
 require_relative "../session/key_manager"
 
@@ -24,11 +25,19 @@ module PqcRails
       CREDENTIALS_KEY = :pqc_record_key
 
       Key = Struct.new(:secret) do
-        def public_tags = {}
+        def id
+          Digest::SHA1.hexdigest(secret.public_key).first(4)
+        end
+
+        def public_tags
+          @public_tags ||= ::ActiveRecord::Encryption::Properties.new
+        end
       end
 
       def encryption_key
-        @encryption_key ||= Key.new(keypair)
+        @encryption_key ||= Key.new(keypair).tap do |key|
+          key.public_tags.encrypted_data_key_id = key.id if ::ActiveRecord::Encryption.config.store_key_references
+        end
       end
 
       def decryption_keys(_encrypted_message)
