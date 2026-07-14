@@ -42,22 +42,33 @@ module PqcRails
       keypairs = key.is_a?(::Array) ? key : [key]
       last_error = nil
 
-      keypairs.each do |keypair|
-        return decrypt_with(encrypted_message, keypair)
-      rescue OpenSSL::Cipher::CipherError, PqcRails::Error, ArgumentError, TypeError => e
-        last_error = e
+      HybridKem.open(@pq_alg_name) do |hybrid|
+        keypairs.each do |keypair|
+          return decrypt_with(hybrid, encrypted_message, keypair)
+        rescue OpenSSL::Cipher::CipherError, PqcRails::Error, ArgumentError, TypeError => e
+          last_error = e
+        end
       end
 
       raise ::ActiveRecord::Encryption::Errors::Decryption, last_error&.message
     end
 
+    def key_length
+      EnvelopeCipher::KEY_LENGTH
+    end
+
+    def iv_length
+      EnvelopeCipher::IV_LENGTH
+    end
+
     private
 
-    def decrypt_with(encrypted_message, keypair)
-      HybridKem.open(@pq_alg_name) do |hybrid|
-        shared_secret = hybrid.decapsulate(encrypted_message.headers[:kem_ct], keypair.secret_key)
-        EnvelopeCipher.new(shared_secret).decrypt(encrypted_message.payload)
-      end
+    def decrypt_with(hybrid, encrypted_message, keypair)
+      kem_ciphertext = encrypted_message.headers[:kem_ct]
+      raise PqcRails::Error, "message is missing the kem_ct header" if kem_ciphertext.nil?
+
+      shared_secret = hybrid.decapsulate(kem_ciphertext, keypair.secret_key)
+      EnvelopeCipher.new(shared_secret).decrypt(encrypted_message.payload)
     end
   end
 end

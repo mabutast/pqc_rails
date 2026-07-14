@@ -44,5 +44,20 @@ RSpec.describe PqcRails::Cipher do
         cipher.decrypt(message, key: other_keypair)
       end.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
     end
+
+    it "kem_ctヘッダーが無いMessageを復号しようとすると、NoMethodErrorではなくActiveRecord::Encryption::Errors::Decryptionを送出する" do
+      malformed_message = ActiveRecord::Encryption::Message.new(payload: "not-a-real-payload")
+
+      expect do
+        cipher.decrypt(malformed_message, key: keypair)
+      end.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
+    end
+  end
+
+  describe "#key_length / #iv_length" do
+    it "EnvelopeCipherが使うAES-256-GCMの鍵長・IV長を返す(ActiveRecord::Encryption::KeyGeneratorが要求するインターフェース)" do
+      expect(cipher.key_length).to eq(PqcRails::EnvelopeCipher::KEY_LENGTH)
+      expect(cipher.iv_length).to eq(PqcRails::EnvelopeCipher::IV_LENGTH)
+    end
   end
 end
