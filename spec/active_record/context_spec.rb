@@ -62,6 +62,48 @@ RSpec.describe PqcRails::ActiveRecord::Context do
     expect { widget_class.find(widget.id).secret }.to raise_error(ActiveRecord::Encryption::Errors::Base)
   end
 
+  describe "既存データの移行(dual-stack, docs/MIGRATION.md)" do
+    let(:old_primary_key) { "s" * 32 }
+    let(:legacy_widget_class) do
+      Class.new(::ActiveRecord::Base) do
+        self.table_name = "widgets"
+        encrypts :secret
+      end
+    end
+    let(:dual_stack_widget_class) do
+      old_primary_key = self.old_primary_key
+      Class.new(::ActiveRecord::Base) do
+        self.table_name = "widgets"
+        encrypts :secret, previous: [
+          {
+            cipher: ::ActiveRecord::Encryption::Cipher.new,
+            key_provider: ::ActiveRecord::Encryption::DerivedSecretKeyProvider.new(old_primary_key)
+          }
+        ]
+      end
+    end
+
+    it "pqc_rails導入前のAES-256-GCMデータをprevious:経由で読み出せ、新規書き込みはpqc_railsで暗号化される" do
+      ::ActiveRecord::Encryption.configure(
+        primary_key: old_primary_key,
+        deterministic_key: "d" * 32,
+        key_derivation_salt: "s" * 32
+      )
+      legacy = legacy_widget_class.create!(secret: "legacy plaintext") # pragma: allowlist secret
+
+      ENV["PQC_RECORD_KEY"] = PqcRails::Session::KeyManager.encode(keypair)
+      described_class.install!(pq_alg_name: :ml_kem_512)
+
+      expect(dual_stack_widget_class.find(legacy.id).secret).to eq("legacy plaintext")
+
+      fresh = dual_stack_widget_class.create!(secret: "new pqc plaintext") # pragma: allowlist secret
+      raw = dual_stack_widget_class.connection.select_value("SELECT secret FROM widgets WHERE id = #{fresh.id}")
+
+      expect(raw).not_to include("new pqc plaintext")
+      expect(dual_stack_widget_class.find(fresh.id).secret).to eq("new pqc plaintext")
+    end
+  end
+
   describe ".install!" do
     after do
       ::ActiveRecord::Encryption.configure(primary_key: nil, deterministic_key: nil, key_derivation_salt: nil)
