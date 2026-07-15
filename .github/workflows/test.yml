@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       LIBOQS_VERSION: "0.15.0"
+      LIBOQS_INSTALL_PREFIX: ${{ github.workspace }}/.liboqs
     steps:
       - uses: actions/checkout@v4
 
@@ -17,11 +18,8 @@ jobs:
         id: cache-liboqs
         uses: actions/cache@v4
         with:
-          path: |
-            /usr/local/lib/liboqs.so
-            /usr/local/lib/liboqs.so.*
-            /usr/local/include/oqs
-          key: liboqs-${{ runner.os }}-${{ env.LIBOQS_VERSION }}-v1
+          path: ${{ env.LIBOQS_INSTALL_PREFIX }}
+          key: liboqs-${{ runner.os }}-${{ env.LIBOQS_VERSION }}-v2
 
       - name: Install liboqs build dependencies
         if: steps.cache-liboqs.outputs.cache-hit != 'true'
@@ -31,12 +29,12 @@ jobs:
         if: steps.cache-liboqs.outputs.cache-hit != 'true'
         run: |
           git clone --branch "${LIBOQS_VERSION}" --depth 1 https://github.com/open-quantum-safe/liboqs.git
-          cmake -GNinja -S liboqs -B liboqs/build -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release
+          cmake -GNinja -S liboqs -B liboqs/build \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${LIBOQS_INSTALL_PREFIX}"
           cmake --build liboqs/build
-          sudo cmake --install liboqs/build
-
-      - name: Refresh dynamic linker cache
-        run: sudo ldconfig
+          cmake --install liboqs/build
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -45,4 +43,6 @@ jobs:
           bundler-cache: true
 
       - name: Run RSpec
+        env:
+          LIBOQS_PATH: ${{ env.LIBOQS_INSTALL_PREFIX }}/lib/liboqs.so
         run: bundle exec rspec
