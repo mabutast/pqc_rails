@@ -132,6 +132,38 @@ RSpec.describe PqcRails::Sig do
         expect(sig.verify(message, tampered_signature, keypair.public_key)).to be false
       end
     end
+
+    it "signatureがlength_signatureを超える長さの場合、liboqsに渡す前にfalseを返す(例外は発生しない)" do
+      described_class.open(alg_name) do |sig|
+        keypair = sig.generate_keypair
+        oversized_signature = ("\x00" * (sig.length_signature + 1))
+
+        expect do
+          expect(sig.verify(message, oversized_signature, keypair.public_key)).to be false
+        end.not_to raise_error
+      end
+    end
+
+    it "signatureがlength_signatureを超える場合、OQS_SIG_verify自体を呼ばない(pqc_rails自身が事前に弾く)" do
+      described_class.open(alg_name) do |sig|
+        keypair = sig.generate_keypair
+        oversized_signature = ("\x00" * (sig.length_signature + 1))
+
+        expect(PqcRails::Ffi::Sig).not_to receive(:OQS_SIG_verify)
+
+        sig.verify(message, oversized_signature, keypair.public_key)
+      end
+    end
+
+    it "signatureが空文字列の場合もfalseを返す(例外は発生しない)" do
+      described_class.open(alg_name) do |sig|
+        keypair = sig.generate_keypair
+
+        expect do
+          expect(sig.verify(message, "", keypair.public_key)).to be false
+        end.not_to raise_error
+      end
+    end
   end
 
   describe "入力バリデーション" do

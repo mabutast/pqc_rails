@@ -105,6 +105,14 @@ module PqcRails
       ensure_not_freed!
       validate_length!(public_key, length_public_key, "public_key")
 
+      # FIPS 204 3.6.3 (Public-Key and Signature Length Checks) は、
+      # 検証実装がσ(署名)の長さを規格上の長さと照合し、異なればfalseを返すことを要求している。
+      # length_signatureは最大長のため、超過した時点でliboqsを呼ばずにfalseを返す
+      # (verifyの契約上、不正な入力は例外ではなく検証失敗として扱う。上のpublic_keyチェックとは
+      # 非対称だが、public_keyは通常呼び出し側が管理する信頼済みの値である一方、
+      # signatureは検証対象そのもの=攻撃者制御下にありうる値のため、扱いを分けている)。
+      return false if signature.bytesize > length_signature
+
       message_ptr = FFI::MemoryPointer.new(:uint8, message.bytesize)
       message_ptr.put_bytes(0, message)
 
