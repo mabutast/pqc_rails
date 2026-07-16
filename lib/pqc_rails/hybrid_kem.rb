@@ -19,6 +19,15 @@ module PqcRails
   # 通常のTLSハンドシェイクのようなトランスクリプトハッシュによる結合が無い
   # スタンドアロン用途のため、コンバイナ自体に結合の安全性を持たせる必要があるため。
   #
+  # この「連結してからHKDFにかける」方式は自己流ではなく、RFC 9954(TLS 1.3ハイブリッド鍵共有、
+  # 旧draft-ietf-tls-hybrid-design)が採用する"concatenation approach"と同じ構成であり、
+  # NIST SP 800-56Cが承認済みアルゴリズムと非承認アルゴリズムのハイブリッド共有鍵生成における
+  # 承認済み手法として単純連結を挙げている。RFC 9954はこの構成が「dual-PRFコンバイナ」に対応し、
+  # ハッシュ関数がdual-PRFであるという仮定の下で安全性が証明されているとしている([BINDEL]論文)。
+  # なお、RFC 9370(IKEv2の複数鍵交換)はSKEYSEED(n) = prf(SK_d(n-1), SK(n) | Ni | Nr)という
+  # 逐次的なPRF連鎖(cascade)を採るため、本実装とは別のコンバイナ方式である点に注意
+  # (2026-07-16、一次資料読解セッションでRFC本文を確認して検証済み)。
+  #
   # 使い方:
   #   PqcRails::HybridKem.open(:ml_kem_512) do |hybrid|
   #     keypair = hybrid.generate_keypair
