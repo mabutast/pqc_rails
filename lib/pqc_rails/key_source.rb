@@ -48,5 +48,37 @@ module PqcRails
       public_key, secret_key = BlobPacking.unpack(Base64.strict_decode64(encoded))
       HybridKem::Keypair.new(public_key, secret_key)
     end
+
+    # ENV/Rails credentialsから現行鍵・旧鍵世代を読み込むデフォルトの鍵ソース。
+    #
+    # Session::KeyManagerとActiveRecord::KeyProviderは、鍵の取得元をこのクラスのインスタンスに
+    # 委譲する。`#current_keypair`/`#previous_keypairs`という2メソッドさえ実装すれば、
+    # 将来HSM/PKCS#11経由の鍵ソースにも差し替えられる(実装はしないが、この分離だけで済むように
+    # しておく、というPhase4での抽象化)。
+    #
+    # 旧鍵世代は、ENVではカンマ区切りの文字列、credentialsでは配列として持たせる(ENVは
+    # 文字列しか持てないため)。世代数に上限は設けない。ローテーション完了後は運用側が
+    # previous_env_var/previous_credentials_keyを空にすることで旧鍵を無効化する。
+    class EnvCredentials
+      def initialize(env_var:, previous_env_var:, credentials_key:, previous_credentials_key:, label:)
+        @env_var = env_var
+        @previous_env_var = previous_env_var
+        @credentials_key = credentials_key
+        @previous_credentials_key = previous_credentials_key
+        @label = label
+      end
+
+      def current_keypair
+        KeySource.fetch_keypair!(env_var: @env_var, credentials_key: @credentials_key, label: @label)
+      end
+
+      def previous_keypairs
+        raw = KeySource.fetch(env_var: @previous_env_var, credentials_key: @previous_credentials_key)
+        return [] if raw.nil?
+
+        entries = raw.is_a?(::Array) ? raw : raw.split(",")
+        entries.map { |encoded| KeySource.decode(encoded.strip) }
+      end
+    end
   end
 end

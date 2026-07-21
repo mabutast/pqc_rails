@@ -7,7 +7,7 @@ RSpec.describe PqcRails::Session::PqcCookieStore do
   let(:keypair) { PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair } }
   let(:session_key) { "_pqc_test_session" }
 
-  def build_app(keypair, session_key)
+  def build_app(keypair, session_key, previous_keypairs: [])
     inner = lambda do |env|
       session = env["rack.session"]
       request = Rack::Request.new(env)
@@ -19,7 +19,8 @@ RSpec.describe PqcRails::Session::PqcCookieStore do
 
     Rack::Builder.new do
       use ActionDispatch::Cookies
-      use PqcRails::Session::PqcCookieStore, key: session_key, keypair: keypair, pq_alg_name: :ml_kem_512
+      use PqcRails::Session::PqcCookieStore, key: session_key, keypair: keypair,
+                                              previous_keypairs: previous_keypairs, pq_alg_name: :ml_kem_512
       run inner
     end.to_app
   end
@@ -57,6 +58,58 @@ RSpec.describe PqcRails::Session::PqcCookieStore do
 
       expect(response.status).to eq(200)
       expect(response.body).to eq("none")
+    end
+  end
+
+  describe "鍵ローテーション(previous_keypairs)" do
+    it "旧鍵で書かれたCookieもprevious_keypairsに旧鍵を渡せば復号できる" do
+      old_keypair = keypair
+      new_keypair = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }
+
+      old_app = build_app(old_keypair, session_key)
+      write_response = Rack::MockRequest.new(old_app).get("/write")
+      cookie_header = write_response.headers["Set-Cookie"].split(";").first
+
+      rotated_app = build_app(new_keypair, session_key, previous_keypairs: [old_keypair])
+      read_response = Rack::MockRequest.new(rotated_app).get("/read", "HTTP_COOKIE" => cookie_header)
+
+      expect(read_response.body).to eq("42")
+    end
+
+    it "previous_keypairsから旧鍵を外すと、その鍵で書かれたCookieはもう復号できない(自然失効後の想定)" do
+      old_keypair = keypair
+      new_keypair = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }
+
+      old_app = build_app(old_keypair, session_key)
+      write_response = Rack::MockRequest.new(old_app).get("/write")
+      cookie_header = write_response.headers["Set-Cookie"].split(";").first
+
+      rotated_app = build_app(new_keypair, session_key, previous_keypairs: [])
+      read_response = Rack::MockRequest.new(rotated_app).get("/read", "HTTP_COOKIE" => cookie_header)
+
+      expect(read_response.body).to eq("none")
+    end
+
+    it "previous_keypairsを渡さない場合、KeyManager.previous_keypairsから読み込む" do
+      old_keypair = keypair
+      new_keypair = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }
+
+      old_app = build_app(old_keypair, session_key)
+      write_response = Rack::MockRequest.new(old_app).get("/write")
+      cookie_header = write_response.headers["Set-Cookie"].split(";").first
+
+      allow(PqcRails::Session::KeyManager).to receive(:previous_keypairs).and_return([old_keypair])
+      inner = ->(env) { [200, {}, [(env["rack.session"]["user_id"] || "none").to_s]] }
+      key = session_key
+      app = Rack::Builder.new do
+        use ActionDispatch::Cookies
+        use PqcRails::Session::PqcCookieStore, key: key, keypair: new_keypair, pq_alg_name: :ml_kem_512
+        run inner
+      end.to_app
+
+      read_response = Rack::MockRequest.new(app).get("/read", "HTTP_COOKIE" => cookie_header)
+
+      expect(read_response.body).to eq("42")
     end
   end
 

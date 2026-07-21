@@ -5,9 +5,11 @@ RSpec.describe PqcRails::ActiveRecord::KeyProvider do
 
   around do |example|
     original = ENV.fetch(described_class::ENV_VAR, nil)
+    original_previous = ENV.fetch(described_class::PREVIOUS_ENV_VAR, nil)
     example.run
   ensure
     ENV[described_class::ENV_VAR] = original
+    ENV[described_class::PREVIOUS_ENV_VAR] = original_previous
   end
 
   describe "#encryption_key" do
@@ -50,13 +52,27 @@ RSpec.describe PqcRails::ActiveRecord::KeyProvider do
   end
 
   describe "#decryption_keys" do
-    it "Phase3では単一鍵のみを配列で返す(encryption_keyと同じ鍵)" do
+    it "旧鍵が設定されていない場合は現行鍵のみを配列で返す" do
       ENV[described_class::ENV_VAR] = PqcRails::Session::KeyManager.encode(keypair)
+      ENV.delete(described_class::PREVIOUS_ENV_VAR)
       provider = described_class.new
 
       keys = provider.decryption_keys(double("message"))
 
       expect(keys).to eq([provider.encryption_key])
+    end
+
+    it "旧鍵が設定されている場合は現行鍵に続けて旧鍵世代を返す(鍵ローテーション対応)" do
+      previous_keypair = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }
+      ENV[described_class::ENV_VAR] = PqcRails::Session::KeyManager.encode(keypair)
+      ENV[described_class::PREVIOUS_ENV_VAR] = PqcRails::Session::KeyManager.encode(previous_keypair)
+      provider = described_class.new
+
+      keys = provider.decryption_keys(double("message"))
+
+      expect(keys.size).to eq(2)
+      expect(keys[0].secret.public_key).to eq(keypair.public_key)
+      expect(keys[1].secret.public_key).to eq(previous_keypair.public_key)
     end
   end
 end

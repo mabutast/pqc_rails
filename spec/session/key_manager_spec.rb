@@ -52,4 +52,28 @@ RSpec.describe PqcRails::Session::KeyManager do
       expect { described_class.keypair }.to raise_error(PqcRails::MissingKeyError, /PQC_SESSION_KEY/)
     end
   end
+
+  describe ".previous_keypairs" do
+    around do |example|
+      original = ENV.fetch(described_class::PREVIOUS_ENV_VAR, nil)
+      example.run
+    ensure
+      ENV[described_class::PREVIOUS_ENV_VAR] = original
+    end
+
+    it "未設定の場合は空配列を返す(ローテーション対象外の既定状態)" do
+      ENV.delete(described_class::PREVIOUS_ENV_VAR)
+      allow(Rails).to receive(:application).and_return(nil)
+
+      expect(described_class.previous_keypairs).to eq([])
+    end
+
+    it "設定されている場合はデコードした旧鍵ペアの配列を返す" do
+      ENV[described_class::PREVIOUS_ENV_VAR] = described_class.encode(keypair)
+
+      keypairs = described_class.previous_keypairs
+
+      expect(keypairs.map(&:public_key)).to eq([keypair.public_key])
+    end
+  end
 end

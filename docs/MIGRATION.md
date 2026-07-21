@@ -33,3 +33,33 @@ end
 ## 一括再暗号化したい場合
 
 段階移行ではなく一括で再暗号化したい場合は、Rails 標準の `bin/rails db:encryption:init` 相当の仕組みは pqc_rails には無いため、対象モデルの全レコードを読み出して `save!` するマイグレーションタスクを自前で用意してください（読み出し時に上記の `previous:` 機構で旧データが復号され、書き込み時には現在の設定＝pqc_rails で再暗号化されます）。
+
+## 鍵ローテーション（pqc_rails鍵世代間）
+
+上記の `previous:` は「pqc_rails 導入前の暗号方式」からの移行を扱いますが、ここで扱うのは「pqc_rails 導入後、鍵そのものを世代交代させたい」場合の手順です。セッション・DB のどちらも、現行鍵に加えて旧鍵世代を併用できます。
+
+### DB（ActiveRecord::Encryption）
+
+`PqcRails::ActiveRecord::KeyProvider#decryption_keys` は、現行鍵に続けて旧鍵世代を返します。ローテーションの手順は次の通りです。
+
+1. 新しい鍵ペアを生成し、`PQC_RECORD_KEY`（または `pqc_record_key` credentials）に設定する
+2. 元々 `PQC_RECORD_KEY` に設定していた値を `PQC_RECORD_PREVIOUS_KEYS`（または `pqc_record_previous_keys` credentials）に移す
+3. アプリを再起動する。新規の暗号化は新しい鍵で行われ、旧鍵で暗号化済みのレコードもそのまま復号できる
+4. 旧鍵で暗号化されたレコードが残っている間は `PQC_RECORD_PREVIOUS_KEYS` を維持する。全レコードを新しい鍵で再暗号化し終えたら（上記「一括再暗号化したい場合」の手順を新旧鍵の組で実行）、`PQC_RECORD_PREVIOUS_KEYS` を削除してよい
+
+`PQC_RECORD_PREVIOUS_KEYS` は複数の旧鍵をカンマ区切りで指定できます（credentials の場合は配列）。世代数に上限はありません。
+
+### セッション（PqcCookieStore）
+
+`PqcCookieStore` は書き込み（`set_cookie`）には常に現行鍵のみを使い、読み込み（`get_cookie`）は現行鍵で復号できなかった場合に旧鍵世代を順に試します。手順は DB 側と同様に `PQC_SESSION_KEY` / `PQC_SESSION_PREVIOUS_KEYS`（または `pqc_session_key` / `pqc_session_previous_keys` credentials）を使います。
+
+セッションは DB のレコードと異なり、Cookie の有効期限（`expire_after` 等）が過ぎれば自然に失効します。そのため `PQC_SESSION_PREVIOUS_KEYS` は「ローテーション後、旧鍵で発行されたセッションが有効期限切れになるまで」の一時的な設定として運用し、その期間を過ぎたら削除してください（DB側のような一括再暗号化の手順は不要です）。
+
+### 外部鍵ソース（HSM等）への差し替えについて
+
+鍵の取得元は、デフォルトでは `PqcRails::KeySource::EnvCredentials`（ENV → Rails credentials）です。`#current_keypair` / `#previous_keypairs` の2メソッドを実装したオブジェクトであれば差し替えられます。
+
+- **DB側**: `PqcRails::ActiveRecord::KeyProvider.new(key_source: your_source)` のように、`Context.install!` に渡す `KeyProvider` へ直接注入できます。
+- **セッション側**: `PqcRails::Session::KeyManager` はモジュール実装のため同様の注入口はありませんが、`PqcCookieStore` は `keypair:` / `previous_keypairs:` オプションで実際の鍵ペアを直接受け取れます（`KeyManager` を経由しない）。外部鍵ソースから取得した鍵ペアをこのオプションに渡すことで、同様に差し替え可能です。
+
+将来 HSM/PKCS#11 経由の鍵管理と連携する場合の拡張ポイントとして用意していますが、pqc_rails 自体は具体的な HSM 連携実装を提供しません。
