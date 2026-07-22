@@ -119,6 +119,23 @@ Rails の `cookie_store` を ML-KEM ベースの PQC ストアで完全に置き
 
 鍵は Rails credentials の `pqc_session_key` から読み込みます。環境変数 `PQC_SESSION_KEY` で上書き可能です。
 
+#### Cookie サイズについて
+
+`HybridKem` の ciphertext を含むため、Cookie は Rails 標準（AES-256-GCM）より大きくなります。実測値（開発機、単純なセッション内容での計測）は次の通りです。
+
+| 内容                          | pqc_rails（ML-KEM-768、デフォルト） | Rails 標準 |
+| ----------------------------- | ------------------------------------ | ---------- |
+| 空セッション                   | 約1,770 bytes                        | 約170 bytes |
+| `user_id` + CSRF トークン程度 | 約1,850 bytes                        | 約260 bytes |
+
+単一 Cookie の上限（多くのブラウザで4,096 bytes）には収まりますが、他の Cookie（analytics・A/B テスト用等）と合算されるリクエストヘッダ全体の上限（多くのサーバ/プロキシで8KB前後）には注意してください。
+
+より小さいサイズが必要な場合、`pq_alg_name: :ml_kem_512` を指定するとサイズを抑えられます（NIST セキュリティレベルは768の「レベル3」から512の「レベル1」に下がります）。
+
+```ruby
+config.session_store :pqc_cookie_store, pq_alg_name: :ml_kem_512
+```
+
 ### ActiveRecord::Encryption
 
 ```ruby
