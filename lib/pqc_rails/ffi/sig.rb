@@ -52,7 +52,7 @@ module PqcRails
       #                          const uint8_t *message, size_t message_len, const uint8_t *secret_key);
       # 引数は6個: sig, signature, signature_len(出力, size_t*), message, message_len, secret_key
       # signature_len は size_t* (出力引数)。FFIでは :pointer として渡し、
-      # 呼び出し側で FFI::MemoryPointer#read_ulong 等で読み出す必要がある。
+      # 呼び出し側で FFI::MemoryPointer#read(:size_t) 等で読み出す必要がある。
       attach_function :OQS_SIG_sign,
                        [:pointer, :pointer, :pointer, :pointer, :size_t, :pointer],
                        :int

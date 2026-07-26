@@ -79,7 +79,8 @@ module PqcRails
 
       # OQS_SIG_signの第3引数(signature_len)は size_t* の出力引数。
       # FFI::MemoryPointer.new(:size_t, 1) で size_t 1個分の領域を確保し、
-      # 関数呼び出し後に read_uint64 (64bit環境でのsize_t) で読み出す。
+      # 関数呼び出し後に .read(:size_t) で読み出す(size_tの実バイト幅はプラットフォーム依存のため、
+      # read_uint64のような固定幅の読み出しメソッドではなく :size_t シンボルを使う)。
       signature_len_ptr = FFI::MemoryPointer.new(:size_t, 1)
 
       status = Ffi::Sig.OQS_SIG_sign(
