@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Clarified in README that the crypto-agility claim applies at the KEM/SIG algorithm-name level
+  only; the classical curve (X25519), HKDF hash (SHA-256), and symmetric cipher (AES-256-GCM) used
+  by `HybridKem` are hardcoded and not currently swappable.
+- Documented in `docs/THREAT_MODEL.md` that IETF's TLS working group voted to keep hybrid key
+  exchange mandatory (rejecting a standalone ML-KEM draft), reinforcing `HybridKem`'s design
+  choice, and added a note tracking NIST's additional signature Round 3 candidates (including the
+  2026-07-28 AI-discovered structural weakness in HAWK).
+- Clarified in README and `docs/THREAT_MODEL.md` that TLS-layer PQC adoption by CDNs/edge
+  providers (e.g. Cloudflare's origin-connection auto-enable) does not cover the application-layer
+  data protection `pqc_rails` provides.
+
 ## [0.1.0] - 2026-07-22
 
 ### Added

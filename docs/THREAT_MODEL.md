@@ -88,7 +88,15 @@ pqc_railsは主に2のシナリオ、すなわち保存データに対するPQC�
 
 - **鍵交換**: ML-KEM(NIST FIPS 203、512/768/1024の3レベルに対応)です。`PqcRails::Kem`がliboqs経由で提供し、`PqcRails::HybridKem`が古典アルゴリズムとの併用を担います
 - **署名**: ML-DSA(NIST FIPS 204、44/65/87の3レベルに対応)です。`PqcRails::Sig`としてliboqs経由で提供していますが、現時点ではスタンドアロンAPIの提供にとどまり、セッションCookieやActiveRecord::Encryptionへの統合(署名によるデータ完全性検証)には組み込まれていません
-- **構成**: `HybridKem`(X25519によるECDH + ML-KEMのKEM-DEM構成)です。両者の共有鍵とciphertextをHKDF-SHA256で結合し、ML-KEM側に未知の脆弱性が見つかった場合でも古典側の安全性でフォールバックできるようにしています。データ本体の暗号化はAES-256-GCM(`EnvelopeCipher`)が担います。この「連結してからHKDFにかける」コンバイナは自己流ではなく、[RFC 9954](https://www.rfc-editor.org/rfc/rfc9954)(TLS 1.3ハイブリッド鍵共有)が採用する構成と同じで、NIST SP 800-56Cが承認済み手法として挙げている単純連結に基づきます(2026-07-16、RFC本文を確認して検証済み)。`X25519 + ML-KEM-768`という組み合わせ自体も、ブラウザ・CDN(Chrome、Cloudflare等)に加えて、Microsoftが2026年7月14日の月例更新でWindows 11/Windows Server 2025のTLSスタック(Schannel)に`X25519_MLKEM768`ハイブリッドグループを追加したことで、OSレベルの実装でも標準的な組み合わせとして採用されています([出典](https://www.techtimes.com/articles/320559/20260715/post-quantum-cryptography-comes-windows-tls-three-ml-kem-groups-now-configurable.htm))
+- **構成**: `HybridKem`(X25519によるECDH + ML-KEMのKEM-DEM構成)です。両者の共有鍵とciphertextをHKDF-SHA256で結合し、ML-KEM側に未知の脆弱性が見つかった場合でも古典側の安全性でフォールバックできるようにしています。データ本体の暗号化はAES-256-GCM(`EnvelopeCipher`)が担います。この「連結してからHKDFにかける」コンバイナは自己流ではなく、[RFC 9954](https://www.rfc-editor.org/rfc/rfc9954)(TLS 1.3ハイブリッド鍵共有)が採用する構成と同じで、NIST SP 800-56Cが承認済み手法として挙げている単純連結に基づきます(2026-07-16、RFC本文を確認して検証済み)。`X25519 + ML-KEM-768`という組み合わせ自体も、ブラウザ・CDN(Chrome、Cloudflare等)に加えて、Microsoftが2026年7月14日の月例更新でWindows 11/Windows Server 2025のTLSスタック(Schannel)に`X25519_MLKEM768`ハイブリッドグループを追加したことで、OSレベルの実装でも標準的な組み合わせとして採用されています([出典](https://www.techtimes.com/articles/320559/20260715/post-quantum-cryptography-comes-windows-tls-three-ml-kem-groups-now-configurable.htm))。IETF TLS作業部会でも、古典暗号を組み合わせない「標準単独ML-KEM」草案の承認が2026年7月7日締切の投票で僅差(4月の先行投票では賛成21・反対22)で否決され、ハイブリッド必須路線が当面優勢という結果になりました。KyberSlash等のタイミング脆弱性・安全性帰着証明の未成熟・格子暗号解読手法の継続的改善が反対理由として挙げられており、`HybridKem`がハイブリッド構成を採用している設計判断は現時点のIETF標準化動向とも一致しています([出典](https://www.techtimes.com/articles/319483/20260701/ml-kem-security-gaps-demand-hybrid-tls-ietf-vote-reaches-final-week.htm))
+
+### 追加デジタル署名方式(NIST Round3)の動向
+
+NISTは2025年5月、格子・アイソジェニー・MPC-in-the-Head・多変数の4つの数学的基盤にまたがる9候補(FAEST、HAWK、MAYO、MQOM、QR-UOV、SDitH、SNOVA、SQIsign、UOV)を追加デジタル署名方式のRound3として選出しています(次回のPQC標準化会議は2027年前半予定)。pqc_railsは現時点でML-DSA(FIPS 204)のみを採用しており、これらRound3候補への直接の依存関係はありません。
+
+- 2026年7月28日、Anthropicのフロンティアモデル「Claude Mythos」が、格子ベースの候補「HAWK」に構造的な脆弱性(格子構造上の隠れた対称性)を発見したと報告されました。HAWK-256の鍵回復コストの見積もりが2^64回から2^38回に低下し、単一サーバー上で実際に秘密鍵回復が確認されています([出典](https://thequantuminsider.com/2026/07/29/ai-finds-new-weaknesses-in-cryptographic-algorithms-anthropic-says/))。HAWKは2年間・2ラウンドの人手クリプトアナリシスを既に通過していた候補で、AIによる突破という点でRound3評価プロセスの信頼性そのものに一石を投じる出来事です
+- pqc_railsが依存するliboqs・mldsa-nativeのようなリファレンス実装も、将来同様のAI支援クリプトアナリシスの対象となりうるため、liboqsのCHANGELOG・セキュリティアドバイザリを継続的に注視する運用とします
+- 将来Round3候補のいずれかを追加サポートする際は、この一件を判断材料の一つとして扱います
 
 ### 実測値: セッションCookieサイズの増加
 
@@ -103,7 +111,7 @@ pqc_railsは主に2のシナリオ、すなわち保存データに対するPQC�
 
 ### 対応していない範囲(スコープ外)
 
-- **TLS層自体のPQC対応**: pqc_railsはアプリケーション層(セッションCookie・DBカラム)の暗号化のみを扱います。TLS 1.3ハンドシェイクのPQC化は対象外で、Webサーバ・ロードバランサ側の設定に依存します。Rubyエコシステム側でも標準ライブラリ全体をPQC-onlyモードで動作させる議論([Ruby Feature #22068](https://bugs.ruby-lang.org/issues/22068)、前提となる`ruby/openssl#894`はマージ済み)が進んでいますが、これはTLS/net-httpレイヤーの話であり、pqc_railsが対象とするアプリケーションデータの暗号化とはレイヤーが異なります
+- **TLS層自体のPQC対応**: pqc_railsはアプリケーション層(セッションCookie・DBカラム)の暗号化のみを扱います。TLS 1.3ハンドシェイクのPQC化は対象外で、Webサーバ・ロードバランサ側の設定に依存します。Rubyエコシステム側でも標準ライブラリ全体をPQC-onlyモードで動作させる議論([Ruby Feature #22068](https://bugs.ruby-lang.org/issues/22068)、前提となる`ruby/openssl#894`はマージ済み)が進んでいますが、これはTLS/net-httpレイヤーの話であり、pqc_railsが対象とするアプリケーションデータの暗号化とはレイヤーが異なります。同様に、Cloudflareが2026年7月21日にオリジンサーバーとのPQCハイブリッド鍵交換(X25519MLKEM768)を新規ゾーンでデフォルト自動有効化した事例のように、CDN/エッジ事業者がTLS層をPQC化しても、保存データ(Cookie・DBカラム)の保護は別の話であり続けます([出典](https://developers.cloudflare.com/changelog/post/2026-07-21-automatic-origin-key-exchange/))
 - **PKI・証明書管理基盤としての機能**: 鍵の発行・失効・証明書ライフサイクル管理・監査ログの提供は対象外です。pqc_railsはRailsアプリ内のセッション・DBカラムの暗号化に特化したライブラリであり、Keyfactor等のエンタープライズPKI基盤の代替ではありません
 - **量子ネイティブな暗号方式**: QKD(量子鍵配送)、ワンショット署名など、量子コンピュータ自体のリソースを前提とする暗号方式は対象外です。pqc_railsが提供するのは古典コンピュータ上で動作し量子コンピュータへの耐性を持つ暗号(PQC)であり、両者は根本的に異なる技術カテゴリです
 - **鍵管理基盤(HSM/KMS等)との連携**: 鍵はデフォルトではRails credentialsまたは環境変数(`KeySource`経由)から読み込みます。`#current_keypair` / `#previous_keypairs` を実装したオブジェクトへの差し替えは可能ですが(将来のHSM/PKCS#11連携を見据えた拡張ポイント)、具体的なHSMやクラウドKMSとの統合実装自体は現時点で提供していません
