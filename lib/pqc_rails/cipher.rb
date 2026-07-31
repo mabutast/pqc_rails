@@ -15,7 +15,7 @@ module PqcRails
   # `key.secret`がPqcRails::HybridKem::Keypair(公開鍵・秘密鍵のペア)を返すように
   # 揃えてあるので、ここではそのKeypairを直接受け取れる。
   #
-  # 内部的にはPhase 2と同じKEM-DEM構成(HybridKem+EnvelopeCipher)。
+  # 内部的にはSession::Encryptorと同じKEM-DEM構成(HybridKem+EnvelopeCipher)。
   # Session::Encryptorを再利用しないのは、ARはCipher層に外から`key:`を渡す設計のため
   # 鍵の持ち方が異なるから(Session::Encryptorは自分でKeypairを保持する)。
   class Cipher

@@ -6,7 +6,7 @@ require_relative "length_validation"
 module PqcRails
   # AES-256-GCMによるエンベロープ暗号化。HybridKem等で導出した32バイトの共有鍵を使って
   # 実際のデータ(平文)を暗号化/復号する。「鍵交換」と「データ暗号化」を分離するのは、
-  # 後でActiveRecord::Encryption統合(Phase 3)で「鍵→暗号化結果」のインターフェースとして
+  # 後でActiveRecord::Encryption統合で「鍵→暗号化結果」のインターフェースとして
   # そのまま使えるようにするため。
   #
   # 暗号文のフォーマット: IV(12byte) + 認証タグ(16byte) + 暗号文本体
