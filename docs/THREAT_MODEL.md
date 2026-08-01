@@ -88,7 +88,7 @@ pqc_railsは主に2のシナリオ、すなわち保存データに対するPQC�
 
 - **鍵交換**: ML-KEM(NIST FIPS 203、512/768/1024の3レベルに対応)です。`PqcRails::Kem`がliboqs経由で提供し、`PqcRails::HybridKem`が古典アルゴリズムとの併用を担います
 - **署名**: ML-DSA(NIST FIPS 204、44/65/87の3レベルに対応)です。`PqcRails::Sig`としてliboqs経由で提供していますが、現時点ではスタンドアロンAPIの提供にとどまり、セッションCookieやActiveRecord::Encryptionへの統合(署名によるデータ完全性検証)には組み込まれていません
-- **構成**: `HybridKem`(X25519によるECDH + ML-KEMのKEM-DEM構成)です。両者の共有鍵とciphertextをHKDF-SHA256で結合し、ML-KEM側に未知の脆弱性が見つかった場合でも古典側の安全性でフォールバックできるようにしています。データ本体の暗号化はAES-256-GCM(`EnvelopeCipher`)が担います。この「連結してからHKDFにかける」コンバイナは自己流ではなく、[RFC 9954](https://www.rfc-editor.org/rfc/rfc9954)(TLS 1.3ハイブリッド鍵共有)が採用する構成と同じで、NIST SP 800-56Cが承認済み手法として挙げている単純連結に基づきます(2026-07-16、RFC本文を確認して検証済み)。`X25519 + ML-KEM-768`という組み合わせ自体も、ブラウザ・CDN(Chrome、Cloudflare等)に加えて、Microsoftが2026年7月14日の月例更新でWindows 11/Windows Server 2025のTLSスタック(Schannel)に`X25519_MLKEM768`ハイブリッドグループを追加したことで、OSレベルの実装でも標準的な組み合わせとして採用されています([出典](https://www.techtimes.com/articles/320559/20260715/post-quantum-cryptography-comes-windows-tls-three-ml-kem-groups-now-configurable.htm))。IETF TLS作業部会でも、古典暗号を組み合わせない「標準単独ML-KEM」草案の承認が2026年7月7日締切の投票で僅差(4月の先行投票では賛成21・反対22)で否決され、ハイブリッド必須路線が当面優勢という結果になりました。KyberSlash等のタイミング脆弱性・安全性帰着証明の未成熟・格子暗号解読手法の継続的改善が反対理由として挙げられており、`HybridKem`がハイブリッド構成を採用している設計判断は現時点のIETF標準化動向とも一致しています([出典](https://www.techtimes.com/articles/319483/20260701/ml-kem-security-gaps-demand-hybrid-tls-ietf-vote-reaches-final-week.htm))
+- **構成**: `HybridKem`(X25519によるECDH + ML-KEMのKEM-DEM構成)です。両者の共有鍵とciphertextをHKDF-SHA256で結合し、ML-KEM側に未知の脆弱性が見つかった場合でも古典側の安全性でフォールバックできるようにしています。データ本体の暗号化はAES-256-GCM(`EnvelopeCipher`)が担います。この「連結してからHKDFにかける」コンバイナは自己流ではなく、[RFC 9954](https://www.rfc-editor.org/rfc/rfc9954)(TLS 1.3ハイブリッド鍵共有)が採用する構成と同じで、NIST SP 800-56Cが承認済み手法として挙げている単純連結に基づきます。`X25519 + ML-KEM-768`という組み合わせ自体も、ブラウザ・CDN(Chrome、Cloudflare等)に加えて、Microsoftが2026年7月14日の月例更新でWindows 11/Windows Server 2025のTLSスタック(Schannel)に`X25519_MLKEM768`ハイブリッドグループを追加したことで、OSレベルの実装でも標準的な組み合わせとして採用されています([出典](https://www.techtimes.com/articles/320559/20260715/post-quantum-cryptography-comes-windows-tls-three-ml-kem-groups-now-configurable.htm))。IETF TLS作業部会でも、古典暗号を組み合わせない「標準単独ML-KEM」草案の承認が2026年7月7日締切の投票で僅差(4月の先行投票では賛成21・反対22)で否決され、ハイブリッド必須路線が当面優勢という結果になりました。KyberSlash等のタイミング脆弱性・安全性帰着証明の未成熟・格子暗号解読手法の継続的改善が反対理由として挙げられており、`HybridKem`がハイブリッド構成を採用している設計判断は現時点のIETF標準化動向とも一致しています([出典](https://www.techtimes.com/articles/319483/20260701/ml-kem-security-gaps-demand-hybrid-tls-ietf-vote-reaches-final-week.htm))
 
 ### 追加デジタル署名方式(NIST Round3)の動向
 
@@ -130,7 +130,7 @@ KEM-DEM構成全体としては、鍵交換をFIPS 203準拠のML-KEMが担い�
 
 ### FIPS 203/204のshall要件との対応(監査結果)
 
-FIPS 203 §3.3(ML-KEM実装への要求事項)とFIPS 204 §3.6(追加の要求事項)に列挙されているshall要件を、pqc_railsの実装(liboqsへのFFIバインディング層)と突き合わせて監査しました(2026-07-16)。
+FIPS 203 §3.3(ML-KEM実装への要求事項)とFIPS 204 §3.6(追加の要求事項)に列挙されているshall要件と、pqc_railsの実装(liboqsへのFFIバインディング層)との対応は次の通りです。
 
 | 要件 | 対応状況 |
 |---|---|

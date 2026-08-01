@@ -8,10 +8,10 @@ require_relative "hybrid_kem"
 module PqcRails
   class MissingKeyError < PqcRails::Error; end
 
-  # 環境変数→Rails credentialsの順で鍵を読み込み、HybridKem::Keypairへデコードするまでの
-  # 共通処理。Session::KeyManagerとActiveRecord::KeyProviderで同じ手順(fetch→無ければ例外→decode)
-  # が必要になるため共通化している。環境変数を優先するのは本番運用でcredentialsファイルを
-  # 使わずに鍵を渡せるようにするため(コンテナのsecret注入等と相性が良い)。
+  # 環境変数、次いでRails credentialsの順で鍵を読み込み、HybridKem::Keypairへデコードするまでの
+  # 共通処理。Session::KeyManagerとActiveRecord::KeyProviderは、いずれも鍵の取得を
+  # このモジュールに委譲する。環境変数を優先するのは、コンテナのsecret注入のように
+  # credentialsファイルを介さずに鍵を渡せるようにするため。
   module KeySource
     module_function
 
@@ -19,15 +19,14 @@ module PqcRails
       ENV.fetch(env_var, nil) || credentials_value(credentials_key)
     end
 
-    # fetchした値がnilならMissingKeyErrorを送出する版。
+    # fetchと同様に鍵を取得する。値が見つからない場合はMissingKeyErrorを送出する。
     def fetch!(env_var:, credentials_key:, label:)
       fetch(env_var: env_var, credentials_key: credentials_key) ||
         raise(MissingKeyError,
               "PQC #{label} key not found. Set ENV['#{env_var}'] or run `rails generate pqc_rails:install`.")
     end
 
-    # fetch! + decodeまでを1回で行う。Session::KeyManager#keypairとActiveRecord::KeyProvider#keypairの
-    # 両方が同じ「fetch→無ければ例外→decode」という処理列を重複実装していたため、ここに統合した。
+    # fetch!で鍵を取得し、decodeまで行った上でHybridKem::Keypairを返す。
     def fetch_keypair!(env_var:, credentials_key:, label:)
       decode(fetch!(env_var: env_var, credentials_key: credentials_key, label: label))
     end
@@ -38,8 +37,8 @@ module PqcRails
       Rails.application.credentials[credentials_key]
     end
 
-    # HybridKem::Keypairのシリアライズ形式。セッション固有の処理ではなく鍵の保存形式そのものなので、
-    # Session::KeyManagerではなくここに置く(セッション/AR両方から使われる)。
+    # HybridKem::Keypairのシリアライズ形式。鍵の保存形式そのものであり、
+    # セッション・ActiveRecordの両方の鍵管理から利用する。
     def encode(keypair)
       Base64.strict_encode64(BlobPacking.pack(keypair.public_key, keypair.secret_key))
     end
@@ -49,16 +48,15 @@ module PqcRails
       HybridKem::Keypair.new(public_key, secret_key)
     end
 
-    # ENV/Rails credentialsから現行鍵・旧鍵世代を読み込むデフォルトの鍵ソース。
+    # ENV、またはRails credentialsから現行鍵・旧鍵世代を読み込む、デフォルトの鍵ソース。
     #
-    # Session::KeyManagerとActiveRecord::KeyProviderは、鍵の取得元をこのクラスのインスタンスに
-    # 委譲する。`#current_keypair`/`#previous_keypairs`という2メソッドさえ実装すれば、
-    # 将来HSM/PKCS#11経由の鍵ソースにも差し替えられる(実装はしないが、この分離だけで済むように
-    # しておくための抽象化)。
+    # Session::KeyManagerとActiveRecord::KeyProviderは、鍵の取得をこのクラスのインスタンスに
+    # 委譲する。`#current_keypair`/`#previous_keypairs`の2メソッドを実装するオブジェクトであれば
+    # 差し替え可能(例: HSM/PKCS#11経由の鍵ソース)。
     #
-    # 旧鍵世代は、ENVではカンマ区切りの文字列、credentialsでは配列として持たせる(ENVは
-    # 文字列しか持てないため)。世代数に上限は設けない。ローテーション完了後は運用側が
-    # previous_env_var/previous_credentials_keyを空にすることで旧鍵を無効化する。
+    # 旧鍵世代は、ENVではカンマ区切りの文字列、credentialsでは配列として指定する
+    # (ENVは文字列しか保持できないため)。世代数に上限はない。鍵のローテーションを
+    # 完了したら、previous_env_var/previous_credentials_keyを空にすることで旧鍵を無効化できる。
     class EnvCredentials
       def initialize(env_var:, previous_env_var:, credentials_key:, previous_credentials_key:, label:)
         @env_var = env_var

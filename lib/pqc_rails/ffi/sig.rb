@@ -11,13 +11,12 @@ module PqcRails
 
       ffi_lib PqcRails.configuration.liboqs_path
 
-      # liboqs/include/oqs/sig.h の OQS_SIG 構造体に対応。
-      # liboqs 0.15.0の実物ヘッダ(/usr/local/include/oqs/sig.h)で確認済みのフィールド順序。
+      # liboqs/include/oqs/sig.h の OQS_SIG 構造体に対応するフィールド順序です(liboqs 0.15.0時点)。
       #
       # KEMのOQS_KEM構造体との違い:
       #   - euf_cma / suf_cma / sig_with_ctx_support という3つのbool値が追加されている
       #   - length_ciphertext / length_shared_secret は無く、代わりに length_signature がある
-      #   - keypair_derand に相当するderandomized版は無い(2026-06-20時点のヘッダには存在しない)
+      #   - keypair_derand に相当するderandomized版は無い(liboqs 0.15.0のヘッダには存在しない)
       #   - sign / verify に加えて、コンテキスト文字列付きの
       #     sign_with_ctx_str / verify_with_ctx_str が追加で存在する
       class Struct < FFI::Struct
