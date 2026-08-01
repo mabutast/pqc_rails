@@ -11,8 +11,10 @@ module PqcRails
     #
     # セッションストアは同一サーバがencrypt(Cookie書き込み時)とdecrypt(Cookie読み込み時)の
     # 両方を行うため、二者間のインタラクティブな鍵交換ではなく、毎回encapsulateし直す
-    # ランダム化された公開鍵暗号として使う。これにより、長期鍵(secret_key)はサーバにしか無くても、
-    # Cookieごとに異なるciphertextが作られる(per-cookieのforward secrecy的な性質を持つ)。
+    # ランダム化された公開鍵暗号として使う。これにより、Cookieごとに異なるciphertext・
+    # 異なるAES鍵が作られる(鍵の一意性・鮮度)。ただし復号は常に同じ静的secret_keyだけで
+    # 決定的に行えるため、forward secrecy(将来secret_keyが漏洩しても過去の暗号文を守れる性質)は
+    # 持たない。TLSの(EC)DHEのような使い捨ての一時鍵は存在しない。
     class Encryptor
       DEFAULT_PQ_ALG_NAME = :ml_kem_768
 
