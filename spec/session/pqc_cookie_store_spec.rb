@@ -25,6 +25,17 @@ RSpec.describe PqcRails::Session::PqcCookieStore do
     end.to_app
   end
 
+  describe "継承とメソッド解決" do
+    it "ActionDispatch::Session::CookieStoreを継承している" do
+      expect(described_class.ancestors).to include(ActionDispatch::Session::CookieStore)
+    end
+
+    it "set_cookie/get_cookieはRailsのCookieStoreではなく自身の実装が使われる" do
+      expect(described_class.instance_method(:set_cookie).owner).to eq(described_class)
+      expect(described_class.instance_method(:get_cookie).owner).to eq(described_class)
+    end
+  end
+
   describe "Cookieへの書き込み" do
     it "セッション値がPQC暗号化された不透明な値としてSet-Cookieに書き込まれる" do
       app = build_app(keypair, session_key)
