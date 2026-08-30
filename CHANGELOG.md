@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Added [Takumi Guard](https://github.com/flatt-security/setup-takumi-guard-rubygems) to CI
+  (blocking-only mode, no account required) so `bundle install` routes through a proxy that
+  blocks known-malicious gems before they reach the build.
+- Added `bundler-audit` to CI to continuously check dependencies against the Ruby Advisory
+  Database, and patched the vulnerabilities it immediately found: `sqlite3` (Use-After-Free,
+  GHSA-mwm8-39rw-8826), `json` (crash on truncated input, CVE-2026-71847), and
+  `loofah`/`rails-html-sanitizer` (SVG local-reference bypass / XSS).
+- CI now installs gems with `BUNDLE_FROZEN=true` instead of relying on `bundler-cache: true`,
+  so a `Gemfile.lock` that drifts from `Gemfile` fails the build instead of silently updating.
+- Enabled Dependabot security alerts on the GitHub repository (detection/notification only; no
+  automatic PRs).
+
 ### Changed
 
 - Clarified in README that the crypto-agility claim applies at the KEM/SIG algorithm-name level
