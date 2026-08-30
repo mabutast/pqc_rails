@@ -11,6 +11,7 @@ jobs:
     env:
       LIBOQS_VERSION: "0.15.0"
       LIBOQS_INSTALL_PREFIX: ${{ github.workspace }}/.liboqs
+      BUNDLE_LOCKFILE_CHECKSUMS: "true"
     steps:
       - uses: actions/checkout@v4
 
@@ -40,7 +41,18 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.4"
-          bundler-cache: true
+          bundler-cache: false
+
+      - name: Set up Takumi Guard (RubyGems supply-chain protection)
+        uses: flatt-security/setup-takumi-guard-rubygems@v1
+
+      - name: Install dependencies
+        env:
+          BUNDLE_FROZEN: "true"
+        run: bundle install
+
+      - name: Audit dependencies for known vulnerabilities
+        run: bundle exec bundle-audit check --update
 
       - name: Run RSpec
         env:
