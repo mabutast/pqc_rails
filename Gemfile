@@ -5,6 +5,7 @@ source "https://rubygems.org"
 # Specify your gem's dependencies in pqc_rails.gemspec
 gemspec
 
+gem "bundler-audit", "~> 0.9"
 gem "irb"
 gem "rake", "~> 13.0"
 gem "rspec", "~> 3.13"
