@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so a `Gemfile.lock` that drifts from `Gemfile` fails the build instead of silently updating.
 - Enabled Dependabot security alerts on the GitHub repository (detection/notification only; no
   automatic PRs).
+- Added a [Trusted Publishing](https://guides.rubygems.org/trusted-publishing/) release workflow
+  (`.github/workflows/release.yml`) so publishing to RubyGems.org no longer requires a long-lived
+  API key: GitHub Actions authenticates via OIDC to a RubyGems.org Trusted Publisher scoped to
+  this repository, workflow, and the `release` environment.
 
 ### Changed
 
