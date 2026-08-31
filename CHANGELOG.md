@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`.github/workflows/release.yml`) so publishing to RubyGems.org no longer requires a long-lived
   API key: GitHub Actions authenticates via OIDC to a RubyGems.org Trusted Publisher scoped to
   this repository, workflow, and the `release` environment.
+- Added GitHub CodeQL static analysis for Ruby (`.github/workflows/codeql.yml`), running on push,
+  pull request, and a weekly schedule.
 
 ### Changed
 
