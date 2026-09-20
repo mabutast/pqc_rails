@@ -24,13 +24,24 @@ Gem::Specification.new do |spec|
   spec.metadata["rubygems_mfa_required"] = "true"
 
   gemspec = File.basename(__FILE__)
-  spec.files = IO.popen(%w[git ls-files -z], chdir: __dir__, err: IO::NULL) do |ls|
+  tracked_files = IO.popen(%w[git ls-files -z], chdir: __dir__, err: IO::NULL) do |ls|
     ls.readlines("\x0", chomp: true).reject do |f|
       (f == gemspec) ||
         f.start_with?(*%w[bin/ spec/ .github/ Gemfile .gitignore .rspec .pre-commit-config.yaml
                            .gitleaks.toml .secrets.baseline])
     end
   end
+  # `rake vendor:liboqs` が取得したliboqsソース(ext/pqc_rails/vendor/)は、サイズが大きいため
+  # pqc_rails自身のgit履歴には含めていない(.gitignore参照)。git ls-filesには出てこないため、
+  # ここでDir.globにより明示的にgemパッケージへ追加する。リリース前に必ず`rake vendor:liboqs`を
+  # 実行しておくこと(release-checklist.html参照)。未実行の場合はこのリストが空になり、
+  # 利用者側は`bundle install`時にextconf.rbのgit clone開発フォールバックに頼ることになる。
+  # liboqsのCMakeビルドスクリプトはドット始まりのディレクトリ(.CMake/)を含むため、
+  # File::FNM_DOTMATCHを付けないとDir.globが黙って取りこぼす(実際に取りこぼしてCMake configureが
+  # 失敗する事象を確認済み)。
+  vendored_files = Dir.glob("ext/pqc_rails/vendor/**/*", base: __dir__, flags: File::FNM_DOTMATCH)
+                       .select { |f| File.file?(File.join(__dir__, f)) }
+  spec.files = tracked_files + vendored_files
   spec.bindir = "exe"
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]

@@ -1,21 +1,26 @@
 # frozen_string_literal: true
 
-# liboqsをソースからビルドし、ビルド済み共有ライブラリをこのディレクトリ(拡張の出力先)に
-# コピーする。RubyGemsの拡張ビルド機構(Gem::Ext::Builder)は最終的に`make`/`make install`を
-# 呼び出す前提のため、実体のビルドはこのファイル内で完結させ、Makefileはそれを素通りさせる
-# ダミーとして生成する(CMake依存のCライブラリを`mkmf`のExtensionビルドに乗せる際の定石)。
+# liboqsをビルドし、ビルド済み共有ライブラリをこのディレクトリ(拡張の出力先)にコピーする。
+# RubyGemsの拡張ビルド機構(Gem::Ext::Builder)は最終的に`make`/`make install`を呼び出す前提のため、
+# 実体のビルドはこのファイル内で完結させ、Makefileはそれを素通りさせるダミーとして生成する
+# (CMake依存のCライブラリを`mkmf`のExtensionビルドに乗せる際の定石)。
 #
-# プロトタイプの位置づけ(2026-09-20、Phase5 Step3):
-# - 対象は1プラットフォーム(macOS arm64)のみ。他OS/アーキテクチャは未検証
-# - liboqsのソースはこのビルド時にgit cloneで取得する(pinされたタグ)。本実装では
-#   gemパッケージ自体にソースを同梱する方式に置き換える必要がある(このファイルの末尾コメント参照)
+# ソースの取得元は2通り:
+#   1. vendor/liboqs/ (rake vendor:liboqs でリリース前に取得・gemに同梱済み) — 通常の利用者はこちら
+#   2. 上記が無い場合はgit cloneでその場取得する(コントリビュータがvendorタスクを走らせずに
+#      specを動かす開発時用のフォールバック。リリースされたgemでは発生しない想定)
+#
+# 対応プラットフォーム: macOS arm64・Linux(x86_64/arm64、Docker/Colimaで検証)で確認済み。
+# Windowsは未検証。詳細は~/knowledge/pqc_rails/2026-09-20-phase5-step3-liboqs-bundle-prototype.html
+# (プロトタイプ)・同日付の本実装ナレッジHTML参照。
 
 require "fileutils"
 require "etc"
 
-LIBOQS_TAG = "0.15.0"
 EXT_DIR = __dir__
-SRC_DIR = File.join(EXT_DIR, "liboqs-src")
+VENDOR_DIR = File.join(EXT_DIR, "vendor", "liboqs")
+DEV_CLONE_TAG = "0.15.0"
+DEV_CLONE_DIR = File.join(EXT_DIR, "liboqs-src")
 BUILD_DIR = File.join(EXT_DIR, "liboqs-build")
 
 def sh!(cmd)
@@ -23,16 +28,29 @@ def sh!(cmd)
   system(cmd) || abort("command failed: #{cmd}")
 end
 
-if ENV["PQC_RAILS_SKIP_LIBOQS_BUILD"] == "1"
-  puts "PQC_RAILS_SKIP_LIBOQS_BUILD=1: liboqsの自動ビルドをスキップします。" \
+def skip_build?
+  ENV["PQC_RAILS_SKIP_LIBOQS_BUILD"] == "1" || ARGV.include?("--skip-liboqs")
+end
+
+def liboqs_source_dir
+  return VENDOR_DIR if File.directory?(VENDOR_DIR)
+
+  puts "-- vendor/liboqs が見つかりません。開発時フォールバックとしてgit cloneします" \
+       "(リリースされたgemではこの経路は通らない想定。メンテナは`rake vendor:liboqs`を実行してください)"
+  unless File.directory?(DEV_CLONE_DIR)
+    sh!("git clone --branch #{DEV_CLONE_TAG} --depth 1 " \
+        "https://github.com/open-quantum-safe/liboqs.git #{DEV_CLONE_DIR}")
+  end
+  DEV_CLONE_DIR
+end
+
+if skip_build?
+  puts "liboqsの自動ビルドをスキップします(--skip-liboqs / PQC_RAILS_SKIP_LIBOQS_BUILD=1)。" \
        "PqcRails.configure { |c| c.liboqs_path = ... } で既存のliboqsを明示的に指定してください。"
 else
-  unless File.directory?(SRC_DIR)
-    sh!("git clone --branch #{LIBOQS_TAG} --depth 1 " \
-        "https://github.com/open-quantum-safe/liboqs.git #{SRC_DIR}")
-  end
+  src_dir = liboqs_source_dir
 
-  sh!("cmake -S #{SRC_DIR} -B #{BUILD_DIR} " \
+  sh!("cmake -S #{src_dir} -B #{BUILD_DIR} " \
       "-DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DOQS_BUILD_ONLY_LIB=ON")
   sh!("cmake --build #{BUILD_DIR} --target oqs -- -j#{Etc.nprocessors}")
 
@@ -55,9 +73,3 @@ File.write(File.join(EXT_DIR, "Makefile"), <<~MAKEFILE)
   clean:
   \ttrue
 MAKEFILE
-
-# 本実装(Phase5 Step3の本番版)で検討すべき変更点:
-# - git cloneではなくgemパッケージ自体にliboqsソースを同梱する(ネットワーク依存を無くす)
-# - `--skip-liboqs`をbundle configの正式なオプションとして提供する(現状はENV変数の代用)
-# - 複数プラットフォーム(Linux、Windows)・複数アーキテクチャへの対応
-# - liboqs(MIT)の著作権表示・NOTICE集約(PENDING.md Step3参照)

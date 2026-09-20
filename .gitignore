@@ -9,9 +9,13 @@
 /.claude
 *.gem
 
-# ext/pqc_rails/extconf.rb がビルド時にliboqsをclone・ビルドする際の生成物(プロトタイプ、Phase5 Step3)
+# ext/pqc_rails/extconf.rb がビルド時にliboqsをビルドする際の生成物(Phase5 Step3)
 /ext/pqc_rails/liboqs-src/
 /ext/pqc_rails/liboqs-build/
 /ext/pqc_rails/liboqs.dylib
 /ext/pqc_rails/liboqs.so
 /ext/pqc_rails/Makefile
+
+# `rake vendor:liboqs` がgemリリース前に取得するliboqsソース。pqc_rails自身のgit履歴には
+# 含めない(サイズが大きいため)が、gemspec側でDir.globにより明示的にパッケージへ含める
+/ext/pqc_rails/vendor/
