@@ -39,6 +39,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clarified in README and `docs/THREAT_MODEL.md` that TLS-layer PQC adoption by CDNs/edge
   providers (e.g. Cloudflare's origin-connection auto-enable) does not cover the application-layer
   data protection `pqc_rails` provides.
+- Documented HAWK's formal withdrawal from NIST's additional-signature Round 3 process (now 8
+  candidates) in `docs/THREAT_MODEL.md`.
+- Added IonQ's fully-compiled resource estimate for breaking ECDLP-256 (secp256k1), and a note
+  tracking a new theoretical quantum algorithm for the dihedral coset problem relevant to the
+  lattice assumptions ML-KEM/ML-DSA rely on, to `docs/THREAT_MODEL.md`.
+- Documented in README why `pqc_rails` binds to liboqs via FFI rather than bundling algorithm
+  reference implementations directly, in response to a newly-appeared competing gem
+  (`pq_crypto`) taking the latter approach.
+- Updated `docs/THREAT_MODEL.md`'s regulatory-timeline and enterprise-market sections with recent
+  developments (EO 14412 deadlines, FIPS 140-3 certified HSM offerings), and added a recommended
+  architecture note for combining `pqc_rails` with a FIPS 140-3 certified HSM/KMS via a custom
+  `KeySource`.
+- Added a crypto-wallet/key-management backend example to README's use-case list.
+- Added a README troubleshooting section covering the most common first-install failures
+  (liboqs `LoadError`, unknown algorithm, session invalidation on switch, existing-data
+  decryption failure).
 
 ## [0.1.0] - 2026-07-22
 
