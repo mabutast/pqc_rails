@@ -124,7 +124,7 @@ ML-KEM(FIPS 203)・ML-DSA(FIPS 204)はいずれも格子問題(Module-LWE/Module
 - **TLS層自体のPQC対応**: pqc_railsはアプリケーション層(セッションCookie・DBカラム)の暗号化のみを扱います。TLS 1.3ハンドシェイクのPQC化は対象外で、Webサーバ・ロードバランサ側の設定に依存します。Rubyエコシステム側でも標準ライブラリ全体をPQC-onlyモードで動作させる議論([Ruby Feature #22068](https://bugs.ruby-lang.org/issues/22068)、前提となる`ruby/openssl#894`はマージ済み)が進んでいますが、これはTLS/net-httpレイヤーの話であり、pqc_railsが対象とするアプリケーションデータの暗号化とはレイヤーが異なります。同様に、Cloudflareが2026年7月21日にオリジンサーバーとのPQCハイブリッド鍵交換(X25519MLKEM768)を新規ゾーンでデフォルト自動有効化した事例のように、CDN/エッジ事業者がTLS層をPQC化しても、保存データ(Cookie・DBカラム)の保護は別の話であり続けます([出典](https://developers.cloudflare.com/changelog/post/2026-07-21-automatic-origin-key-exchange/))
 - **PKI・証明書管理基盤としての機能**: 鍵の発行・失効・証明書ライフサイクル管理・監査ログの提供は対象外です。pqc_railsはRailsアプリ内のセッション・DBカラムの暗号化に特化したライブラリであり、Keyfactor等のエンタープライズPKI基盤の代替ではありません
 - **量子ネイティブな暗号方式**: QKD(量子鍵配送)、ワンショット署名など、量子コンピュータ自体のリソースを前提とする暗号方式は対象外です。pqc_railsが提供するのは古典コンピュータ上で動作し量子コンピュータへの耐性を持つ暗号(PQC)であり、両者は根本的に異なる技術カテゴリです
-- **鍵管理基盤(HSM/KMS等)との連携**: 鍵はデフォルトではRails credentialsまたは環境変数(`KeySource`経由)から読み込みます。`#current_keypair` / `#previous_keypairs` を実装したオブジェクトへの差し替えは可能ですが(将来のHSM/PKCS#11連携を見据えた拡張ポイント)、具体的なHSMやクラウドKMSとの統合実装自体は現時点で提供していません
+- **鍵管理基盤(HSM/KMS等)との連携**: 鍵はデフォルトではRails credentialsまたは環境変数(`KeySource`経由)から読み込みます。`#current_keypair` / `#previous_keypairs` を実装したオブジェクトへの差し替えは可能ですが(将来のHSM/PKCS#11連携を見据えた拡張ポイント)、具体的なHSMやクラウドKMSとの統合実装自体は現時点で提供していません。2026年後半にかけて、PQC専業ベンダー(wolfSSLのFrodoKEM/Linuxカーネル/WireGuard・Tailscale統合、カナダCrypto4A社の量子セーフHSM「QASM」によるFIPS 140-3 Level 3世界初認証取得等)によるFIPS 140-3認証済み製品の市場投入や、機械アイデンティティ管理大手Keyfactorの年間経常収益2億ドル突破(前年比35%成長、PQC移行需要が牽引)など、エンタープライズ調達でのFIPS認証・HSM連携が実務要件として定着しつつある動きが続いています。pqc_rails自体がFIPS 140-3認証を取得する必要性は現時点で低いと考えられますが、上記の外部鍵ソース差し替え機構が、こうした認証済みHSM/KMSとの将来的な連携先になり得ます
 
 ### コンプライアンス・マッピング
 
