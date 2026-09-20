@@ -50,6 +50,16 @@ KEM と DSA に加え、セッション Cookie と ActiveRecord::Encryption の�
 
 より詳しい対応範囲・スコープ外は [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md#for-developers) を参照してください。
 
+### なぜ liboqs への FFI バインディングを採用しているか
+
+Ruby 向けの耐量子暗号実装には、`pqc_rails` のように [liboqs](https://github.com/open-quantum-safe/liboqs) へ FFI バインディングする方式のほかに、参照実装（`mlkem-native` / `mldsa-native` 等）のソースを gem 自体に直接バンドルする方式もあります（例: [pq_crypto](https://rubygems.org/gems/pq_crypto)）。`pqc_rails` が liboqs 経由の方式を選んでいる理由は次の通りです。
+
+- **アルゴリズムカバレッジの広さ**: ML-KEM/ML-DSA に加え、Classic McEliece・HQC など NIST 標準化プロセスの周辺にあるアルゴリズムも、liboqs がビルドしていれば追加コード無しで利用できます（本 README 後述の「レジストリ未登録のアルゴリズムを使う」参照）。
+- **Open Quantum Safe プロジェクトによる継続的なメンテナンス**: NIST の標準化状況の変化（追加署名 Round3 候補の選定・撤退、パラメータセットの追加等）に対して、liboqs 本体の更新に追従するだけで対応できます。
+- **追加署名 Round3 候補への追従のしやすさ**: liboqs は SQIsign 等の Round3 候補も実装しているため、将来これらをサポート対象に加える判断をした場合の実装コストが小さくなります。
+
+一方で、liboqs 自体の成熟度に関する留保（本 README 前述の「liboqs の成熟度について」）や、C ライブラリのビルド・配置が必要になる運用上の負担は、この設計判断のトレードオフです。
+
 ## 想定するユースケース
 
 長期保存が必要なデータを扱う Rails アプリケーション全般が対象ですが、特に以下のような用途では緊急度が高くなります。
