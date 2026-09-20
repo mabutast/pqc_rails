@@ -18,10 +18,32 @@ module PqcRails
 
     private
 
-    # OS別のliboqsデフォルトパス。
-    # あくまで「よくあるインストール場所」の当て推量であり、
+    # liboqsのデフォルトパス。
+    # bundle install時にext/pqc_rails/extconf.rbが自前でビルドしたliboqsが見つかれば
+    # それを優先する(gemを介した自動ビルド、Phase5 Step3のプロトタイプ)。
+    # 見つからない場合はOS別の「よくあるインストール場所」を当て推量するが、
     # 本番運用では明示的に liboqs_path を設定することを強く推奨する。
     def default_liboqs_path
+      bundled_liboqs_path || os_default_liboqs_path
+    end
+
+    # gemのインストールディレクトリ配下、ext/pqc_rails/extconf.rbがビルド後にコピーした
+    # 共有ライブラリがあれば、そのパスを返す(gem_dir、Gem::Specification#extension_dirでは
+    # ない点に注意。extconf.rbはビルド成果物を自身のカレントディレクトリ=ext/pqc_rails/へ
+    # コピーしており、RubyGemsが`make install`経由でextension_dirへ配置する仕組みには
+    # 乗せていないため)。gemとしてインストールされていない場合(このリポジトリを直接bundle
+    # pathで使う開発時等)はnilを返し、呼び出し元がOS標準パスへフォールバックする。
+    def bundled_liboqs_path
+      spec = Gem.loaded_specs["pqc_rails"]
+      return nil unless spec
+
+      %w[liboqs.dylib liboqs.so].map { |name| File.join(spec.gem_dir, "ext", "pqc_rails", name) }
+                                 .find { |path| File.exist?(path) }
+    rescue Gem::Exception
+      nil
+    end
+
+    def os_default_liboqs_path
       case RbConfig::CONFIG["host_os"]
       when /darwin/
         "/usr/local/lib/liboqs.dylib"

@@ -8,3 +8,10 @@
 /tmp/
 /.claude
 *.gem
+
+# ext/pqc_rails/extconf.rb がビルド時にliboqsをclone・ビルドする際の生成物(プロトタイプ、Phase5 Step3)
+/ext/pqc_rails/liboqs-src/
+/ext/pqc_rails/liboqs-build/
+/ext/pqc_rails/liboqs.dylib
+/ext/pqc_rails/liboqs.so
+/ext/pqc_rails/Makefile
