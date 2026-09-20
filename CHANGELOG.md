@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `bundle install` now builds liboqs automatically from source vendored in the gem (via
+  `ext/pqc_rails/extconf.rb`, populated by the new `rake vendor:liboqs` release task), so a fresh
+  install needs no pre-existing liboqs setup. Verified on macOS (arm64) and Linux (arm64, via
+  Docker); Windows and x86_64 remain unverified. Users who already have liboqs installed, or who
+  lack a C build toolchain, can skip the build with `bundle config set build.pqc_rails
+  --skip-liboqs` (or `PQC_RAILS_SKIP_LIBOQS_BUILD=1`) and point `config.liboqs_path` at their own
+  copy. Added `NOTICE.md` documenting liboqs's MIT license and the permissive third-party
+  algorithm-implementation licenses it bundles.
+
 ### Security
 
 - Added [Takumi Guard](https://github.com/flatt-security/setup-takumi-guard-rubygems) to CI
