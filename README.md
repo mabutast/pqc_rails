@@ -73,8 +73,9 @@ Ruby 向けの耐量子暗号実装には、`pqc_rails` のように [liboqs](ht
 - Ruby >= 3.2.0
 - Rails >= 7.1
 - RubyGems / Bundler >= 4.0.16 を推奨（rubygems.org は X25519MLKEM768 + ML-DSA-65 によるハイブリッド TLS を提供しており、4.0.16 未満では `Gem::Request` / `Bundler::Fetcher` のクライアント証明書鍵種別が RSA に決め打ちされる不具合の影響を受けます）
-- [liboqs](https://github.com/open-quantum-safe/liboqs)（C ライブラリ）がビルド・インストール済みであること
-  - 本 gem は liboqs を同梱しません。事前に共有ライブラリ（`liboqs.dylib` / `liboqs.so`）をビルドし、システムに配置してください。
+- CMake・Cコンパイラ（`cmake`、`make`、`gcc`/`clang` 等）が利用できること（`bundle install` 時に liboqs をソースからビルドするため。動作確認済み環境は macOS arm64 / Linux arm64（Dockerコンテナ）です。x86_64・Windows は未検証です）
+
+`bundle install` を実行すると、liboqs のソース（gem に同梱済み）を自動的にビルドし、事前準備なしで利用できます。既に liboqs をシステムにインストール済みの場合や、ビルド環境が無い場合は、`bundle config set build.pqc_rails --skip-liboqs` （または環境変数 `PQC_RAILS_SKIP_LIBOQS_BUILD=1`）でビルドをスキップし、`config.liboqs_path` で既存の liboqs を明示的に指定できます。
 
 ## ⚠️ liboqs の成熟度について
 
@@ -289,7 +290,7 @@ sig.length_signature  # => 2420（最大長。実際の署名はこれより短�
 
 PQC 移行は「計画は立てたが実装が進まない」という組織が多い分野です（[DigiCert の2026年グローバル調査](https://www.digicert.com/news/quantum-readiness-gap-a-digicert-study-on-quantum-safe-encryption)では、移行計画の策定率87%に対し実導入率は7%に留まるという結果が示されています）。導入初回に発生しやすいつまずきをここにまとめます。
 
-- **`LoadError: Could not open library 'liboqs.dylib'` のようなエラーが出る**: liboqs の共有ライブラリが見つかっていません。`liboqs` 自体がビルド・インストール済みか、[必要要件](#必要要件)を確認してください。デフォルトの探索パス（macOS: `/usr/local/lib/liboqs.dylib`、Linux: `/usr/local/lib/liboqs.so`）と異なる場所にインストールしている場合は、環境変数 `LIBOQS_PATH` または `config.liboqs_path`（[liboqs ライブラリパス](#liboqs-ライブラリパス)参照）で明示的にパスを指定してください。
+- **`LoadError: Could not open library 'liboqs.dylib'` のようなエラーが出る**: liboqs の共有ライブラリが見つかっていません。通常は `bundle install` 時に自動ビルドされますが、`--skip-liboqs` でビルドをスキップした場合や、ビルド自体が失敗していた場合（[必要要件](#必要要件)の CMake・Cコンパイラが揃っているか確認してください）に発生します。既存の liboqs を使う場合は、環境変数 `LIBOQS_PATH` または `config.liboqs_path`（[liboqs ライブラリパス](#liboqs-ライブラリパス)参照）で明示的にパスを指定してください。
 - **`PqcRails::Algorithms::UnknownAlgorithmError` が発生する**: シンボル指定（`:ml_kem_512` 等）がレジストリに未登録の場合に発生します。[現在レジストリに登録済みのアルゴリズム](#アルゴリズムの指定方法)の一覧を確認するか、liboqs の生の名前（`"ML-KEM-512"` 等）で直接指定してください。生の名前でも `PqcRails::Error` が発生する場合は、liboqs 側のビルド設定でそのアルゴリズムが有効化されていない可能性があります。
 - **`config.session_store :pqc_cookie_store` に切り替えたら全ユーザーがログアウトされた**: 想定通りの挙動です。暗号方式が変わるため、切り替え前に発行された既存セッションは復号できません（[セッション暗号化](#セッション暗号化)参照）。メンテナンスウィンドウを設けるか、ユーザーへの事前告知を検討してください。
 - **`ActiveRecord::Encryption::Context.install!` 後、既存データの復号に失敗する**: pqc_rails 導入前に Rails 標準の `ActiveRecord::Encryption` で暗号化されたデータは、切り替え後はデフォルトでは復号できません。段階的に移行する方法は [docs/MIGRATION.md](docs/MIGRATION.md) を参照してください。
@@ -300,7 +301,7 @@ PQC 移行は「計画は立てたが実装が進まない」という組織が�
 - Rails 7.1 / 8.1
 - liboqs 0.15.0 / 0.16.0
 
-[CI](.github/workflows/test.yml) では Ruby 3.4 + Rails 8.1 + liboqs 0.15.0 の組み合わせを push・PR のたびに継続的に検証しています。liboqs 0.16.0、および他の Ruby/Rails バージョンの組み合わせは手動で動作確認済みです（CIのマトリクス化は今後の対応予定）。
+[CI](.github/workflows/test.yml) では Ruby 3.4 + Rails 8.1 + liboqs 0.15.0 の組み合わせを push・PR のたびに継続的に検証しています。liboqs 0.16.0、および他の Ruby/Rails バージョンの組み合わせは手動で動作確認済みです（CIのマトリクス化は今後の対応予定）。CIには別途 `extension-build` ジョブがあり、`bundle install` によるliboqsの自動ビルド〜動作（KEM 往復）までを Linux 上で継続的に検証しています。
 
 ## 開発
 
@@ -320,6 +321,8 @@ bundle exec rspec
 詳細な条件は [LICENSE.txt](LICENSE.txt) を参照してください。商用利用に関するお問い合わせは contact@rubyquantum.dev までご連絡ください。
 
 商用利用の判定基準（Additional Use Grant の文言）は、正式な法律レビューを経る前の暫定版です。実際に商用ライセンス契約を結ぶ段階までに見直す可能性があります。
+
+`pqc_rails` が同梱・依存する第三者ソフトウェア（liboqs、ffi 等）のライセンス表示は [NOTICE.md](NOTICE.md) を参照してください。
 
 ## コントリビューション
 

@@ -58,3 +58,56 @@ jobs:
         env:
           LIBOQS_PATH: ${{ env.LIBOQS_INSTALL_PREFIX }}/lib/liboqs.so
         run: bundle exec rspec
+
+  extension-build:
+    # `bundle install`(gemspecのpath source経由)は拡張ビルド(ext/pqc_rails/extconf.rb)を
+    # 通らないため、rspecジョブだけではこの経路の回帰を検知できない。実際に`gem build`→
+    # `gem install`した場合に、liboqsの自動ビルド〜動作までがgreenのままであることを検証する。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake build-essential
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Vendor liboqs source into the gem package
+        run: bundle exec rake vendor:liboqs
+
+      - name: Build the gem
+        run: gem build pqc_rails.gemspec
+
+      - name: Install the built gem into an isolated GEM_HOME (triggers extconf.rb)
+        run: |
+          mkdir -p /tmp/pqc_rails_ext_test
+          GEM_HOME=/tmp/pqc_rails_ext_test GEM_PATH=/tmp/pqc_rails_ext_test \
+            gem install --local pqc_rails-*.gem --no-document --ignore-dependencies
+
+      - name: Verify the bundled liboqs build works (KEM roundtrip)
+        run: |
+          gem install ffi --no-document
+          GEMDIR=$(ls -d /tmp/pqc_rails_ext_test/gems/pqc_rails-*)
+          GEM_PATH=/tmp/pqc_rails_ext_test ruby -I "$GEMDIR/lib" -e '
+            require "rubygems"
+            spec = Gem::Specification.load(Dir.glob("/tmp/pqc_rails_ext_test/specifications/pqc_rails-*.gemspec").first)
+            Gem.loaded_specs["pqc_rails"] = spec
+            module PqcRails; class Error < StandardError; end; end
+            require "ffi"
+            require "pqc_rails/configuration"
+            require "pqc_rails/algorithms"
+            require "pqc_rails/length_validation"
+            require "pqc_rails/kem"
+            path = PqcRails.configuration.liboqs_path
+            raise "expected the bundled liboqs, got #{path}" unless path.include?("ext/pqc_rails/liboqs")
+            kem = PqcRails::Kem.new(:ml_kem_768)
+            kp = kem.generate_keypair
+            enc = kem.encapsulate(kp.public_key)
+            dec = kem.decapsulate(enc.ciphertext, kp.secret_key)
+            raise "KEM roundtrip mismatch" unless dec == enc.shared_secret
+            puts "extension-build smoke test OK (liboqs_path=#{path})"
+          '
