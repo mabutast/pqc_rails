@@ -23,4 +23,7 @@ jobs:
           ruby-version: "3.4"
           bundler-cache: true
 
+      - name: Vendor liboqs source into the gem package
+        run: bundle exec rake vendor:liboqs
+
       - uses: rubygems/release-gem@v1
