@@ -64,8 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tracking a new theoretical quantum algorithm for the dihedral coset problem relevant to the
   lattice assumptions ML-KEM/ML-DSA rely on, to `docs/THREAT_MODEL.md`.
 - Documented in README why `pqc_rails` binds to liboqs via FFI rather than bundling algorithm
-  reference implementations directly, in response to a newly-appeared competing gem
-  (`pq_crypto`) taking the latter approach.
+  reference implementations directly.
 - Updated `docs/THREAT_MODEL.md`'s regulatory-timeline and enterprise-market sections with recent
   developments (EO 14412 deadlines, FIPS 140-3 certified HSM offerings), and added a recommended
   architecture note for combining `pqc_rails` with a FIPS 140-3 certified HSM/KMS via a custom
