@@ -284,6 +284,15 @@ sig.length_signature  # => 2420（最大長。実際の署名はこれより短�
 - `ActiveRecord::Encryption` で復号に失敗した場合は `ActiveRecord::Encryption::Errors::Decryption` が発生します。
 - セッション Cookie が不正・改竄されている場合は空のセッションとして扱います（クラッシュしません）。
 
+## トラブルシューティング（導入時によくある詰まりどころ）
+
+PQC 移行は「計画は立てたが実装が進まない」という組織が多い分野です（[DigiCert の2026年グローバル調査](https://www.digicert.com/news/quantum-readiness-gap-a-digicert-study-on-quantum-safe-encryption)では、移行計画の策定率87%に対し実導入率は7%に留まるという結果が示されています）。導入初回に発生しやすいつまずきをここにまとめます。
+
+- **`LoadError: Could not open library 'liboqs.dylib'` のようなエラーが出る**: liboqs の共有ライブラリが見つかっていません。`liboqs` 自体がビルド・インストール済みか、[必要要件](#必要要件)を確認してください。デフォルトの探索パス（macOS: `/usr/local/lib/liboqs.dylib`、Linux: `/usr/local/lib/liboqs.so`）と異なる場所にインストールしている場合は、環境変数 `LIBOQS_PATH` または `config.liboqs_path`（[liboqs ライブラリパス](#liboqs-ライブラリパス)参照）で明示的にパスを指定してください。
+- **`PqcRails::Algorithms::UnknownAlgorithmError` が発生する**: シンボル指定（`:ml_kem_512` 等）がレジストリに未登録の場合に発生します。[現在レジストリに登録済みのアルゴリズム](#アルゴリズムの指定方法)の一覧を確認するか、liboqs の生の名前（`"ML-KEM-512"` 等）で直接指定してください。生の名前でも `PqcRails::Error` が発生する場合は、liboqs 側のビルド設定でそのアルゴリズムが有効化されていない可能性があります。
+- **`config.session_store :pqc_cookie_store` に切り替えたら全ユーザーがログアウトされた**: 想定通りの挙動です。暗号方式が変わるため、切り替え前に発行された既存セッションは復号できません（[セッション暗号化](#セッション暗号化)参照）。メンテナンスウィンドウを設けるか、ユーザーへの事前告知を検討してください。
+- **`ActiveRecord::Encryption::Context.install!` 後、既存データの復号に失敗する**: pqc_rails 導入前に Rails 標準の `ActiveRecord::Encryption` で暗号化されたデータは、切り替え後はデフォルトでは復号できません。段階的に移行する方法は [docs/MIGRATION.md](docs/MIGRATION.md) を参照してください。
+
 ## 動作確認済み環境
 
 - Ruby 3.2 / 3.3 / 3.4
