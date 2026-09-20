@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   copy. Added `NOTICE.md` documenting liboqs's MIT license and the permissive third-party
   algorithm-implementation licenses it bundles.
 
+  **Note for existing installs**: if you were relying on a manually-installed system liboqs
+  without setting `LIBOQS_PATH` or `config.liboqs_path` explicitly, a fresh `bundle install`
+  after upgrading will now prefer the bundled build over your system copy. This should be
+  behaviorally identical for the default build, but if you built your system liboqs with custom
+  options, set `config.liboqs_path` explicitly (or `--skip-liboqs`) to keep using it.
+
 ### Security
 
 - Added [Takumi Guard](https://github.com/flatt-security/setup-takumi-guard-rubygems) to CI
