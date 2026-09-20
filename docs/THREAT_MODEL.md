@@ -92,11 +92,12 @@ pqc_railsは主に2のシナリオ、すなわち保存データに対するPQC�
 
 ### 追加デジタル署名方式(NIST Round3)の動向
 
-NISTは2025年5月、格子・アイソジェニー・MPC-in-the-Head・多変数の4つの数学的基盤にまたがる9候補(FAEST、HAWK、MAYO、MQOM、QR-UOV、SDitH、SNOVA、SQIsign、UOV)を追加デジタル署名方式のRound3として選出しています(次回のPQC標準化会議は2027年前半予定)。pqc_railsは現時点でML-DSA(FIPS 204)のみを採用しており、これらRound3候補への直接の依存関係はありません。
+NISTは2025年5月、格子・アイソジェニー・MPC-in-the-Head・多変数の4つの数学的基盤にまたがる9候補(FAEST、HAWK、MAYO、MQOM、QR-UOV、SDitH、SNOVA、SQIsign、UOV)を追加デジタル署名方式のRound3として選出していました(次回のPQC標準化会議は2027年前半予定)。pqc_railsは現時点でML-DSA(FIPS 204)のみを採用しており、これらRound3候補への直接の依存関係はありません。
 
 - 2026年7月28日、Anthropicのフロンティアモデル「Claude Mythos」が、格子ベースの候補「HAWK」に構造的な脆弱性(格子構造上の隠れた対称性)を発見したと報告されました。HAWK-256の鍵回復コストの見積もりが2^64回から2^38回に低下し、単一サーバー上で実際に秘密鍵回復が確認されています([出典](https://thequantuminsider.com/2026/07/29/ai-finds-new-weaknesses-in-cryptographic-algorithms-anthropic-says/))。HAWKは2年間・2ラウンドの人手クリプトアナリシスを既に通過していた候補で、AIによる突破という点でRound3評価プロセスの信頼性そのものに一石を投じる出来事です
+- **【決着】HAWKはRound3候補から正式に離脱しました**。2026年8月1日にHAWK開発チーム自身が撤回を確認し、2026年8月12日にはNIST側の正式な撤回確認も報じられています。残る8候補(FAEST、MAYO、MQOM、QR-UOV、SDitH、SNOVA、SQIsign、UOV)は2026年8月14日の仕様修正(tweaks)提出期限を通過し、約2年間の評価フェーズに入りました
 - pqc_railsが依存するliboqs・mldsa-nativeのようなリファレンス実装も、将来同様のAI支援クリプトアナリシスの対象となりうるため、liboqsのCHANGELOG・セキュリティアドバイザリを継続的に注視する運用とします
-- 将来Round3候補のいずれかを追加サポートする際は、この一件を判断材料の一つとして扱います
+- 将来Round3候補のいずれかを追加サポートする際は、AI支援クリプトアナリシスで突破された候補である・独立した第三者検証が乏しい候補である、といった点を避ける判断材料の一つとして扱います
 
 ### 実測値: セッションCookieサイズの増加
 
