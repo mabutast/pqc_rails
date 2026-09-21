@@ -56,12 +56,12 @@ RSpec.describe PqcRails::Generators::InstallGenerator do
       expect(encoded).to be_a(String)
     end
 
-    it "書き込まれた鍵はKeyManager.decodeで有効なHybridKemキーペアに戻る" do
+    it "書き込まれた鍵はKeySource.decodeで有効なHybridKemキーペアに戻る" do
       credentials = build_credentials(@destination_root)
 
       run_generator(credentials)
 
-      keypair = PqcRails::Session::KeyManager.decode(credentials.config[:pqc_session_key])
+      keypair = PqcRails::KeySource.decode(credentials.config[:pqc_session_key])
       expect(keypair.public_key).to be_a(String)
       expect(keypair.secret_key).to be_a(String)
     end

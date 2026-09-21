@@ -28,9 +28,6 @@ module PqcRails
         key_source.previous_keypairs
       end
 
-      def encode(keypair) = KeySource.encode(keypair)
-      def decode(encoded) = KeySource.decode(encoded)
-
       def key_source
         KeySource::EnvCredentials.new(
           env_var: ENV_VAR, previous_env_var: PREVIOUS_ENV_VAR,

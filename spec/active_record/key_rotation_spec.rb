@@ -40,9 +40,9 @@ RSpec.describe "PqcRails鍵ローテーション(DB, E2E)" do
 
   # docs/MIGRATION.mdのローテーション手順(1〜4)をそのままENV設定として再現する。
   def rotate!(current:, previous: [])
-    ENV["PQC_RECORD_KEY"] = PqcRails::Session::KeyManager.encode(current)
+    ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(current)
     ENV["PQC_RECORD_PREVIOUS_KEYS"] =
-      previous.empty? ? nil : previous.map { |kp| PqcRails::Session::KeyManager.encode(kp) }.join(",")
+      previous.empty? ? nil : previous.map { |kp| PqcRails::KeySource.encode(kp) }.join(",")
     PqcRails::ActiveRecord::Context.install!(pq_alg_name: :ml_kem_512)
   end
 

@@ -14,7 +14,7 @@ RSpec.describe PqcRails::ActiveRecord::KeyProvider do
 
   describe "#encryption_key" do
     it "ActiveRecord::Encryption::KeyProvider互換(secret/public_tagsを持つ)のキーを返す" do
-      ENV[described_class::ENV_VAR] = PqcRails::Session::KeyManager.encode(keypair)
+      ENV[described_class::ENV_VAR] = PqcRails::KeySource.encode(keypair)
 
       key = described_class.new.encryption_key
 
@@ -26,7 +26,7 @@ RSpec.describe PqcRails::ActiveRecord::KeyProvider do
     it "環境変数が無い場合はRails.application.credentialsから読む" do
       ENV.delete(described_class::ENV_VAR)
       fake_app = double("Rails.application",
-                         credentials: { described_class::CREDENTIALS_KEY => PqcRails::Session::KeyManager.encode(keypair) })
+                         credentials: { described_class::CREDENTIALS_KEY => PqcRails::KeySource.encode(keypair) })
       allow(Rails).to receive(:application).and_return(fake_app)
 
       key = described_class.new.encryption_key
@@ -42,7 +42,7 @@ RSpec.describe PqcRails::ActiveRecord::KeyProvider do
     end
 
     it "store_key_referencesが有効な場合、public_tagsに鍵参照(encrypted_data_key_id)が設定される" do
-      ENV[described_class::ENV_VAR] = PqcRails::Session::KeyManager.encode(keypair)
+      ENV[described_class::ENV_VAR] = PqcRails::KeySource.encode(keypair)
       allow(::ActiveRecord::Encryption.config).to receive(:store_key_references).and_return(true)
 
       key = described_class.new.encryption_key
@@ -53,7 +53,7 @@ RSpec.describe PqcRails::ActiveRecord::KeyProvider do
 
   describe "#decryption_keys" do
     it "旧鍵が設定されていない場合は現行鍵のみを配列で返す" do
-      ENV[described_class::ENV_VAR] = PqcRails::Session::KeyManager.encode(keypair)
+      ENV[described_class::ENV_VAR] = PqcRails::KeySource.encode(keypair)
       ENV.delete(described_class::PREVIOUS_ENV_VAR)
       provider = described_class.new
 
@@ -64,8 +64,8 @@ RSpec.describe PqcRails::ActiveRecord::KeyProvider do
 
     it "旧鍵が設定されている場合は現行鍵に続けて旧鍵世代を返す(鍵ローテーション対応)" do
       previous_keypair = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }
-      ENV[described_class::ENV_VAR] = PqcRails::Session::KeyManager.encode(keypair)
-      ENV[described_class::PREVIOUS_ENV_VAR] = PqcRails::Session::KeyManager.encode(previous_keypair)
+      ENV[described_class::ENV_VAR] = PqcRails::KeySource.encode(keypair)
+      ENV[described_class::PREVIOUS_ENV_VAR] = PqcRails::KeySource.encode(previous_keypair)
       provider = described_class.new
 
       keys = provider.decryption_keys(double("message"))

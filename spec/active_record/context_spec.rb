@@ -24,7 +24,7 @@ RSpec.describe PqcRails::ActiveRecord::Context do
 
   around do |example|
     original = ENV.fetch("PQC_RECORD_KEY", nil)
-    ENV["PQC_RECORD_KEY"] = PqcRails::Session::KeyManager.encode(keypair)
+    ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(keypair)
     described_class.install!(pq_alg_name: :ml_kem_512)
     example.run
   ensure
@@ -49,7 +49,7 @@ RSpec.describe PqcRails::ActiveRecord::Context do
     widget = widget_class.create!(secret: "hello pqc")
 
     other_keypair = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }
-    ENV["PQC_RECORD_KEY"] = PqcRails::Session::KeyManager.encode(other_keypair)
+    ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(other_keypair)
     described_class.install!(pq_alg_name: :ml_kem_512)
 
     expect { widget_class.find(widget.id).secret }.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
@@ -91,7 +91,7 @@ RSpec.describe PqcRails::ActiveRecord::Context do
       )
       legacy = legacy_widget_class.create!(secret: "legacy plaintext") # pragma: allowlist secret
 
-      ENV["PQC_RECORD_KEY"] = PqcRails::Session::KeyManager.encode(keypair)
+      ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(keypair)
       described_class.install!(pq_alg_name: :ml_kem_512)
 
       expect(dual_stack_widget_class.find(legacy.id).secret).to eq("legacy plaintext")

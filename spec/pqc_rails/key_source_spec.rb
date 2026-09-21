@@ -3,6 +3,18 @@
 RSpec.describe PqcRails::KeySource do
   let(:env_var) { "PQC_TEST_KEY_SOURCE" }
   let(:credentials_key) { :pqc_test_key_source }
+  let(:keypair) { PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair } }
+
+  describe ".encode / .decode" do
+    it "Keypairを文字列にエンコードし、デコードすると元の鍵ペアに戻る" do
+      encoded = described_class.encode(keypair)
+
+      expect(encoded).to be_a(String)
+      decoded = described_class.decode(encoded)
+      expect(decoded.public_key).to eq(keypair.public_key)
+      expect(decoded.secret_key).to eq(keypair.secret_key)
+    end
+  end
 
   around do |example|
     original = ENV.fetch(env_var, nil)

@@ -3,8 +3,8 @@
 require "yaml"
 require "rails/generators"
 require_relative "../../hybrid_kem"
+require_relative "../../key_source"
 require_relative "../../session/encryptor"
-require_relative "../../session/key_manager"
 
 module PqcRails
   module Generators
@@ -21,7 +21,7 @@ module PqcRails
       end
 
       def add_session_key_to_credentials
-        encoded_key = PqcRails::Session::KeyManager.encode(generated_keypair)
+        encoded_key = PqcRails::KeySource.encode(generated_keypair)
 
         credentials.change do |tmp_path|
           data = YAML.safe_load(tmp_path.read, permitted_classes: [Symbol], aliases: true) || {}
