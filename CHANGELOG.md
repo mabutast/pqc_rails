@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `rails pqc_rails:status` reports whether the session/record keys are configured, whether key
+  rotation (previous keys) is in progress, whether `:pqc_cookie_store` is active, and whether
+  `PqcRails::ActiveRecord::Context.install!` has been called — so setup mistakes surface before
+  they hit production traffic instead of on the first real encrypt/decrypt. Exits non-zero if any
+  check fails, for use in CI or deploy hooks. The underlying `PqcRails::StatusCheck.run` is also
+  available for programmatic use (e.g. in a custom health-check endpoint).
+
 ### Fixed
 
 - On Ruby 3.2, `HybridKem`/`DhKem` raised `NoMethodError` (`undefined method 'raw_public_key'`)
@@ -19,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The rollback code sample also now notes that `PqcRails::Cipher.new`'s `pq_alg_name:` must match
   whatever was passed to `Context.install!`, or decryption fails silently for non-default
   algorithms such as `:ml_kem_512`.
+- [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)'s FIPS shall-requirements table hadn't been updated
+  since an earlier audit and understated pqc_rails' actual compliance: it listed RNG strength as
+  unverified, when a later source audit of liboqs had already confirmed it meets every parameter
+  set's required strength. It also didn't mention that intermediate-value zeroization is
+  asymmetric between ML-KEM (satisfied) and ML-DSA (not satisfied) at the liboqs vendor-library
+  level. Updated the table to match.
 
 ### Changed
 

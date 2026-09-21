@@ -294,6 +294,7 @@ pqc_rails は現在 `0.y.z` 版（`0.2.0`）で開発中です。将来 `1.0` �
 - `PqcRails::Algorithms::UnknownAlgorithmError`
 - `PqcRails::Error` / `PqcRails::MissingKeyError`
 - `rails generate pqc_rails:install`
+- `rails pqc_rails:status` / `PqcRails::StatusCheck.run`（戻り値の`Result`が持つ`name` / `ok` / `detail`）
 - 環境変数・credentials キー名（`PQC_SESSION_KEY` / `PQC_SESSION_PREVIOUS_KEYS` / `PQC_RECORD_KEY` / `PQC_RECORD_PREVIOUS_KEYS` 等、本 README「設定」に記載のもの）
 
 **内部実装**（予告なく変更されうるため、直接使わないでください）
@@ -313,9 +314,26 @@ pqc_rails は現在 `0.y.z` 版（`0.2.0`）で開発中です。将来 `1.0` �
 - セッション Cookie が不正・改竄されている場合は空のセッションとして扱います（クラッシュしません）。
 - 環境変数にも Rails credentials にも鍵が設定されていない場合、`PqcRails::MissingKeyError`（`PqcRails::Error` のサブクラス）が発生します。`rails generate pqc_rails:install` を実行済みか確認してください。
 
+## ステータス確認
+
+`rails pqc_rails:status` で、鍵の設定状況・セッションストア・`ActiveRecord::Encryption` の設定が実際に有効になっているかを確認できます。
+
+```
+$ rails pqc_rails:status
+✅ liboqs: /usr/local/lib/liboqs.dylib を使用中
+✅ セッション鍵 (PQC_SESSION_KEY): 設定済み
+✅ セッション旧鍵 (PQC_SESSION_PREVIOUS_KEYS): 未設定(ローテーション中ではありません)
+❌ DBレコード鍵 (PQC_RECORD_KEY): 未設定です。`rails generate pqc_rails:install` を実行したか確認してください
+✅ DBレコード旧鍵 (PQC_RECORD_PREVIOUS_KEYS): 未設定(ローテーション中ではありません)
+✅ セッションストア: :pqc_cookie_store が有効です
+❌ ActiveRecord::Encryption: PqcRails::ActiveRecord::Context.install! が呼ばれていません
+```
+
+鍵の未設定（`MissingKeyError`）は実際に暗号化・復号が走るまで発覚しない遅延的なエラーです。デプロイ前や導入直後にこのコマンドで能動的に確認することで、本番トラフィックで初めて気づくという事態を避けられます。いずれかのチェックが失敗している場合、終了コードは1になります（CI・デプロイフックへの組み込みにも使えます）。
+
 ## トラブルシューティング（導入時によくある詰まりどころ）
 
-PQC 移行は「計画は立てたが実装が進まない」という組織が多い分野です（[DigiCert の2026年グローバル調査](https://www.digicert.com/news/quantum-readiness-gap-a-digicert-study-on-quantum-safe-encryption)では、移行計画の策定率87%に対し実導入率は7%に留まるという結果が示されています）。導入初回に発生しやすいつまずきをここにまとめます。
+PQC 移行は「計画は立てたが実装が進まない」という組織が多い分野です（[DigiCert の2026年グローバル調査](https://www.digicert.com/news/quantum-readiness-gap-a-digicert-study-on-quantum-safe-encryption)では、移行計画の策定率87%に対し実導入率は7%に留まるという結果が示されています）。導入初回に発生しやすいつまずきをここにまとめます。迷ったらまず [`rails pqc_rails:status`](#ステータス確認) を実行してください。
 
 - **`LoadError: Could not open library 'liboqs.dylib'` のようなエラーが出る**: liboqs の共有ライブラリが見つかっていません。通常は `bundle install` 時に自動ビルドされますが、`--skip-liboqs` でビルドをスキップした場合や、ビルド自体が失敗していた場合（[必要要件](#必要要件)の CMake・Cコンパイラが揃っているか確認してください）に発生します。既存の liboqs を使う場合は、環境変数 `LIBOQS_PATH` または `config.liboqs_path`（[liboqs ライブラリパス](#liboqs-ライブラリパス)参照）で明示的にパスを指定してください。
 - **`PqcRails::Algorithms::UnknownAlgorithmError` が発生する**: シンボル指定（`:ml_kem_512` 等）がレジストリに未登録の場合に発生します。[現在レジストリに登録済みのアルゴリズム](#アルゴリズムの指定方法)の一覧を確認するか、liboqs の生の名前（`"ML-KEM-512"` 等）で直接指定してください。生の名前でも `PqcRails::Error` が発生する場合は、liboqs 側のビルド設定でそのアルゴリズムが有効化されていない可能性があります。
