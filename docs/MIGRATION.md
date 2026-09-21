@@ -32,7 +32,13 @@ end
 
 ## 一括再暗号化したい場合
 
-段階移行ではなく一括で再暗号化したい場合は、Rails 標準の `bin/rails db:encryption:init` 相当の仕組みは pqc_rails には無いため、対象モデルの全レコードを読み出して `save!` するマイグレーションタスクを自前で用意してください（読み出し時に上記の `previous:` 機構で旧データが復号され、書き込み時には現在の設定＝pqc_rails で再暗号化されます）。
+段階移行ではなく一括で再暗号化したい場合は、Rails 標準の `bin/rails db:encryption:init` 相当の仕組みは pqc_rails には無いため、対象モデルの全レコードに対して自前でマイグレーションタスクを用意してください。
+
+**`save!` ではなく `encrypt` を使ってください。** 単に読み出して `save!` するだけでは、多くの場合再暗号化されません。ActiveRecord の dirty tracking は「復号後の値（平文）が変わっていない」属性への `save!` を無視し、UPDATE 文自体を発行しないためです。`previous:` 機構で旧データが復号されても、その平文が変わらなければ書き込みはスキップされ、DB 上の暗号文は古い方式のまま残ります。`ActiveRecord::Encryption::EncryptableRecord#encrypt`（`record.encrypt`）は dirty tracking を経由せず、現在の設定（cipher + key_provider）で強制的に再暗号化して保存します。
+
+```ruby
+User.find_each(&:encrypt)
+```
 
 ## 鍵ローテーション（pqc_rails鍵世代間）
 
@@ -89,13 +95,14 @@ pqc_rails 導入後に、何らかの理由で導入前の状態へ戻す必要�
 class User < ApplicationRecord
   encrypts :email, previous: [
     {
-      cipher: PqcRails::Cipher.new,
+      cipher: PqcRails::Cipher.new(pq_alg_name: :ml_kem_768), # Context.install!に渡していたpq_alg_nameと一致させる
       key_provider: PqcRails::ActiveRecord::KeyProvider.new
     }
   ]
 end
 ```
 
+- `PqcRails::Cipher.new` の `pq_alg_name:` は、導入時に `Context.install!(pq_alg_name: ...)` へ渡していた値と一致させてください。省略するとデフォルト（`:ml_kem_768`）が使われ、README の案内に従って `:ml_kem_512` 等へ変更していた場合は KEM 暗号文の長さが合わず復号に失敗します。
 - `Context.install!` の呼び出し自体を削除（または呼ばない状態に戻す）することで、新規の暗号化は Rails 標準（AES-256-GCM + 導出鍵）に戻ります。
 - 完全に pqc_rails 以前の状態へ戻したい場合は、上記「一括再暗号化したい場合」と同じ要領で全レコードを読み出して `save!` し、Rails 標準方式で再暗号化してください。
 - 移行が完了し pqc_rails 方式のデータが残っていないことを確認できるまで、`PQC_RECORD_KEY`（または `pqc_record_key` credentials）は削除しないでください。
