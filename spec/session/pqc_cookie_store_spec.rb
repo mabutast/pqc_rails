@@ -101,6 +101,21 @@ RSpec.describe PqcRails::Session::PqcCookieStore do
       expect(read_response.body).to eq("none")
     end
 
+    it "複数世代の旧鍵をprevious_keypairsに渡せば、最も古い世代で書かれたCookieも復号できる" do
+      gen_a = keypair
+      gen_b = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }
+      gen_c = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }
+
+      gen_a_app = build_app(gen_a, session_key)
+      write_response = Rack::MockRequest.new(gen_a_app).get("/write")
+      cookie_header = write_response.headers["Set-Cookie"].split(";").first
+
+      current_app = build_app(gen_c, session_key, previous_keypairs: [gen_b, gen_a])
+      read_response = Rack::MockRequest.new(current_app).get("/read", "HTTP_COOKIE" => cookie_header)
+
+      expect(read_response.body).to eq("42")
+    end
+
     it "previous_keypairsを渡さない場合、KeyManager.previous_keypairsから読み込む" do
       old_keypair = keypair
       new_keypair = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }

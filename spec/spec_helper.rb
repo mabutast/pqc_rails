@@ -19,4 +19,12 @@ RSpec.configure do |config|
   # ランダム順序でテストを実行し、テスト間の隠れた依存を検出しやすくする
   config.order = :random
   Kernel.srand config.seed
+
+  # ActiveRecord::Encryption.config.previous_schemesはprimary_key:付きの.configure呼び出しの
+  # たびに(support_sha1_for_non_deterministic_encryptionの副作用として)追記される、
+  # プロセス全体で共有されるグローバルな配列。リセットしないとテスト間で蓄積し、
+  # 他のexampleの復号候補鍵に紛れ込んでNoMethodError等の予期しない失敗を引き起こす。
+  config.after do
+    ActiveRecord::Encryption.config.previous_schemes = [] if defined?(ActiveRecord::Encryption)
+  end
 end

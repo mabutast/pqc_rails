@@ -101,6 +101,12 @@ RSpec.describe PqcRails::ActiveRecord::Context do
 
       expect(raw).not_to include("new pqc plaintext")
       expect(dual_stack_widget_class.find(fresh.id).secret).to eq("new pqc plaintext")
+    ensure
+      # primary_keyを設定したままにすると、Context.install!は明示指定が無い限り既存設定を
+      # 引き継ぐ(Phase3の意図的な仕様)ため、後続の他テストのinstall!呼び出しにまで
+      # このprimary_keyが漏れ、支援用のsupport_sha1_for_non_deterministic_encryption経由で
+      # config.previous_schemes(グローバル)にゴミエントリが溜まり続ける。明示的にリセットする。
+      ::ActiveRecord::Encryption.configure(primary_key: nil, deterministic_key: nil, key_derivation_salt: nil)
     end
   end
 
