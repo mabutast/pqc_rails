@@ -277,6 +277,32 @@ sig.length_secret_key # => 2560
 sig.length_signature  # => 2420（最大長。実際の署名はこれより短いことがあります）
 ```
 
+## API の安定性
+
+pqc_rails は現在 `0.y.z` 版（`0.2.0`）で開発中です。将来 `1.0` を名乗る時点で SemVer の対象にする
+つもりのクラス・メソッドを、この時点で明確にしておきます。
+
+**安定した公開 API**（1.0 以降は SemVer の対象にする想定）
+
+- `PqcRails.configure` / `PqcRails::Configuration#liboqs_path`
+- `config.session_store :pqc_cookie_store`（`keypair:` / `previous_keypairs:` / `pq_alg_name:` オプション含む）
+- `PqcRails::ActiveRecord::Context.install!`
+- `PqcRails::ActiveRecord::KeyProvider`（HSM 連携・ロールバック時の `previous:` スキームで使う拡張点。[docs/MIGRATION.md](docs/MIGRATION.md) 参照）
+- `PqcRails::Cipher`（ロールバック時の `previous:` スキームで使う拡張点）
+- `PqcRails::KeySource::EnvCredentials`、および `#current_keypair` / `#previous_keypairs` の2メソッドを実装する独自鍵ソースという拡張契約（HSM/PKCS#11連携用）
+- `PqcRails::Kem` / `PqcRails::Sig`（アルゴリズムプリミティブ。本 README「使い方」に記載の全メソッド）
+- `PqcRails::Algorithms::UnknownAlgorithmError`
+- `PqcRails::Error` / `PqcRails::MissingKeyError`
+- `rails generate pqc_rails:install`
+- 環境変数・credentials キー名（`PQC_SESSION_KEY` / `PQC_SESSION_PREVIOUS_KEYS` / `PQC_RECORD_KEY` / `PQC_RECORD_PREVIOUS_KEYS` 等、本 README「設定」に記載のもの）
+
+**内部実装**（予告なく変更されうるため、直接使わないでください）
+
+- `PqcRails::HybridKem` / `PqcRails::DhKem` / `PqcRails::EnvelopeCipher` / `PqcRails::BlobPacking`（`Cipher` / セッションストアが内部で使うKEM-DEM構成の実装詳細）
+- `PqcRails::Session::Encryptor` / `PqcRails::Session::KeyManager`
+- `PqcRails::Algorithms` の直接呼び出し（`.find_kem` 等）。シンボル指定（`:ml_kem_512` 等）を `Kem.new` / `Sig.new` に渡した「結果」は安定していますが、`Algorithms` モジュール自体のメソッドは内部実装です
+- `PqcRails::KeySource` のモジュール関数（`.fetch` / `.fetch!` / `.fetch_keypair!`）。`EnvCredentials` クラス自体は上記の通り安定した拡張点です
+
 ## エラーハンドリング
 
 - 未知のアルゴリズム名や、liboqs が有効化していないアルゴリズムを指定すると `PqcRails::Error` が発生します。
@@ -285,6 +311,7 @@ sig.length_signature  # => 2420（最大長。実際の署名はこれより短�
 - `PqcRails::Sig#verify` は、署名が無効な場合でも例外を発生させず `false` を返します（KEM とは異なる設計です）。
 - `ActiveRecord::Encryption` で復号に失敗した場合は `ActiveRecord::Encryption::Errors::Decryption` が発生します。
 - セッション Cookie が不正・改竄されている場合は空のセッションとして扱います（クラッシュしません）。
+- 環境変数にも Rails credentials にも鍵が設定されていない場合、`PqcRails::MissingKeyError`（`PqcRails::Error` のサブクラス）が発生します。`rails generate pqc_rails:install` を実行済みか確認してください。
 
 ## トラブルシューティング（導入時によくある詰まりどころ）
 

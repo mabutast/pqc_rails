@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI now runs the test suite across the full supported matrix (Ruby 3.2/3.3/3.4 × Rails 7.1/8.1,
   plus liboqs 0.16.0 on the newest Ruby/Rails combination) on every push and pull request,
   instead of a single combination with the rest verified manually.
+- Added an "API の安定性" section to the README, declaring which classes/methods are the stable
+  public API (intended to be covered by SemVer once 1.0 ships) versus internal implementation
+  detail that may change without notice.
+
+### Removed
+
+- Removed `PqcRails::Session::KeyManager.encode`/`.decode`, which only ever delegated to
+  `PqcRails::KeySource.encode`/`.decode`. Use `PqcRails::KeySource.encode`/`.decode` directly.
 
 ## [0.2.0] - 2026-09-20
 
