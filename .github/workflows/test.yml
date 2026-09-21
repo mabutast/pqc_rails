@@ -59,6 +59,62 @@ jobs:
           LIBOQS_PATH: ${{ env.LIBOQS_INSTALL_PREFIX }}/lib/liboqs.so
         run: bundle exec rspec
 
+  rspec-matrix:
+    # READMEが「動作確認済み」と主張するRuby 3.2/3.3/3.4 × Rails 7.1/8.1の組み合わせを、
+    # 手動確認ではなくCIで継続的に検証する(Phase5 Step5)。liboqsは主要にサポート対象の
+    # 0.15.0で全組み合わせを検証し、0.16.0は最新の組み合わせ(Ruby 3.4 + Rails 8.1)でのみ
+    # 追加検証する(全組み合わせ×2 liboqsバージョンだとジョブ数が倍増しCIコストに見合わないため)。
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ["3.2", "3.3", "3.4"]
+        rails: ["7.1", "8.1"]
+        liboqs: ["0.15.0"]
+        include:
+          - ruby: "3.4"
+            rails: "8.1"
+            liboqs: "0.16.0"
+    env:
+      LIBOQS_VERSION: ${{ matrix.liboqs }}
+      LIBOQS_INSTALL_PREFIX: ${{ github.workspace }}/.liboqs
+      BUNDLE_GEMFILE: ${{ github.workspace }}/gemfiles/rails_${{ matrix.rails }}.gemfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache liboqs
+        id: cache-liboqs
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.LIBOQS_INSTALL_PREFIX }}
+          key: liboqs-${{ runner.os }}-${{ env.LIBOQS_VERSION }}-v2
+
+      - name: Install liboqs build dependencies
+        if: steps.cache-liboqs.outputs.cache-hit != 'true'
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build libssl-dev
+
+      - name: Build and install liboqs
+        if: steps.cache-liboqs.outputs.cache-hit != 'true'
+        run: |
+          git clone --branch "${LIBOQS_VERSION}" --depth 1 https://github.com/open-quantum-safe/liboqs.git
+          cmake -GNinja -S liboqs -B liboqs/build \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${LIBOQS_INSTALL_PREFIX}"
+          cmake --build liboqs/build
+          cmake --install liboqs/build
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+
+      - name: Run RSpec
+        env:
+          LIBOQS_PATH: ${{ env.LIBOQS_INSTALL_PREFIX }}/lib/liboqs.so
+        run: bundle exec rspec
+
   extension-build:
     # `bundle install`(gemspecのpath source経由)は拡張ビルド(ext/pqc_rails/extconf.rb)を
     # 通らないため、rspecジョブだけではこの経路の回帰を検知できない。実際に`gem build`→

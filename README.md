@@ -301,7 +301,7 @@ PQC 移行は「計画は立てたが実装が進まない」という組織が�
 - Rails 7.1 / 8.1
 - liboqs 0.15.0 / 0.16.0
 
-[CI](.github/workflows/test.yml) では Ruby 3.4 + Rails 8.1 + liboqs 0.15.0 の組み合わせを push・PR のたびに継続的に検証しています。liboqs 0.16.0、および他の Ruby/Rails バージョンの組み合わせは手動で動作確認済みです（CIのマトリクス化は今後の対応予定）。CIには別途 `extension-build` ジョブがあり、`bundle install` によるliboqsの自動ビルド〜動作（KEM 往復）までを Linux 上で継続的に検証しています。
+[CI](.github/workflows/test.yml) では、上記の Ruby × Rails × liboqs の組み合わせ（liboqs 0.16.0 は Ruby 3.4 + Rails 8.1 との組み合わせのみ）を push・PR のたびにマトリクスで継続的に検証しています。CIには別途 `extension-build` ジョブがあり、`bundle install` によるliboqsの自動ビルド〜動作（KEM 往復）までを Linux 上で継続的に検証しています。
 
 ## 開発
 

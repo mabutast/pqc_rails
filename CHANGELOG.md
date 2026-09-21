@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- CI now runs the test suite across the full supported matrix (Ruby 3.2/3.3/3.4 × Rails 7.1/8.1,
+  plus liboqs 0.16.0 on the newest Ruby/Rails combination) on every push and pull request,
+  instead of a single combination with the rest verified manually.
+
 ## [0.2.0] - 2026-09-20
 
 ### Added
