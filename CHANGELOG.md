@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   they hit production traffic instead of on the first real encrypt/decrypt. Exits non-zero if any
   check fails, for use in CI or deploy hooks. The underlying `PqcRails::StatusCheck.run` is also
   available for programmatic use (e.g. in a custom health-check endpoint).
+- README now documents Puma worker/thread guidance: pqc_rails' encrypt/decrypt throughput doesn't
+  improve with more threads (CRuby's GVL serializes the FFI calls into liboqs), only with more
+  worker processes (Puma cluster mode), and worker counts beyond the container's CPU quota make
+  throughput worse, not better. Backed by benchmarks recorded in `.claude/COMPLETED.md`
+  that had never been carried into user-facing docs.
 
 ### Fixed
 
