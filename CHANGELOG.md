@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   because Ruby 3.2's bundled `openssl` gem predates the version that added
   `OpenSSL::PKey::PKey#raw_public_key`/`#raw_private_key`. The gemspec now declares
   `openssl >= 3.2` explicitly so `bundle install` always resolves a compatible version.
+- [docs/MIGRATION.md](docs/MIGRATION.md)'s bulk re-encryption instructions recommended `save!`,
+  which silently does nothing when the decrypted value hasn't changed (ActiveRecord's dirty
+  tracking skips the UPDATE). Now recommends `record.encrypt`, which re-encrypts unconditionally.
+  The rollback code sample also now notes that `PqcRails::Cipher.new`'s `pq_alg_name:` must match
+  whatever was passed to `Context.install!`, or decryption fails silently for non-default
+  algorithms such as `:ml_kem_512`.
 
 ### Changed
 
