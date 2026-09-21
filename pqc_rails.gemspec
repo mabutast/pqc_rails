@@ -51,4 +51,8 @@ Gem::Specification.new do |spec|
   spec.add_dependency "activerecord", ">= 7.1", "< 9"
   spec.add_dependency "ffi", "~> 1.16"
   spec.add_dependency "railties", ">= 7.1", "< 9"
+  # HybridKem/DhKem call OpenSSL::PKey::PKey#raw_public_key / #raw_private_key, which the
+  # openssl gem only added in 3.2.0. Ruby 3.2's own bundled default gem is older (3.1.x), so
+  # this must be declared explicitly or `dh_kem.rb` raises NoMethodError on that Ruby version.
+  spec.add_dependency "openssl", ">= 3.2"
 end

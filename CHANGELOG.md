@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- On Ruby 3.2, `HybridKem`/`DhKem` raised `NoMethodError` (`undefined method 'raw_public_key'`)
+  because Ruby 3.2's bundled `openssl` gem predates the version that added
+  `OpenSSL::PKey::PKey#raw_public_key`/`#raw_private_key`. The gemspec now declares
+  `openssl >= 3.2` explicitly so `bundle install` always resolves a compatible version.
+
 ### Changed
 
 - CI now runs the test suite across the full supported matrix (Ruby 3.2/3.3/3.4 × Rails 7.1/8.1,
