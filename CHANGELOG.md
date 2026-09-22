@@ -18,8 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README now documents Puma worker/thread guidance: pqc_rails' encrypt/decrypt throughput doesn't
   improve with more threads (CRuby's GVL serializes the FFI calls into liboqs), only with more
   worker processes (Puma cluster mode), and worker counts beyond the container's CPU quota make
-  throughput worse, not better. Backed by benchmarks recorded in `.claude/COMPLETED.md`
-  that had never been carried into user-facing docs.
+  throughput worse, not better.
 
 ### Fixed
 

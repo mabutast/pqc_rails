@@ -1,0 +1,119 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# 対外公開文書(README.md・docs/配下・CHANGELOG.md・NOTICE.md・LICENSE.txt)に、内部開発プロセスの
+# 表現が漏れ出していないかを警告するpre-commitフック。
+#
+# チェック項目はいずれも過去に実際に指摘・修正された実例から一般化したもの:
+#   - 日付を使った鮮度主張・自己参照フレーズ（THREAT_MODEL.mdのFIPS対応表で指摘）
+#   - Phase/Step内部マイルストーン表記、ローカル専用パス参照（NOTICE.mdで指摘）
+#   - 内部の意思決定・修正履歴のナレーション（CHANGELOG.mdで2回指摘）
+#
+# 意味判断が伴うため機械的に確実な誤検知ゼロは達成できない。したがってこのチェックは常に
+# 警告のみでコミット自体はブロックしない(exit 0固定)。判断基準は.claude/CLAUDE.md
+# 「README文体方針」を参照。
+
+ROOT = File.expand_path("..", __dir__)
+
+TARGET_FILES = [
+  File.join(ROOT, "README.md"),
+  File.join(ROOT, "CHANGELOG.md"),
+  File.join(ROOT, "NOTICE.md"),
+  File.join(ROOT, "LICENSE.txt"),
+  *Dir.glob(File.join(ROOT, "docs/**/*.md"))
+].select { |f| File.file?(f) }
+
+# ドキュメントを書いた時点を基準にした記述。時間が経つと必ず古びるが、フレーズ自体が
+# 更新すべきタイミングを教えてくれないため、外部の出来事の日付よりもさらに気づきにくい。
+SELF_REFERENTIAL_PHRASES = [
+  "執筆時点",
+  "作成時点"
+].freeze
+
+DATE_PATTERN = /\d{4}-\d{2}-\d{2}|\d{4}年\d{1,2}月(\d{1,2}日)?/
+
+# pqc_rails自身の状態・検証結果を述べる際によく使われる語。この語が日付と同じ行にあると、
+# 「いつ確認したか」を書いてしまっている(バージョン番号か現在形の事実に置き換えるべき)
+# 疑いがある。ただし外部の出来事を報じる文にも同じ語(「発見しました」等)が普通に出てくるため、
+# ここでの一致は誤検知を含みうる。
+OWN_STATE_SIGNAL_WORDS = %w[
+  満たしています 満たしていません 確認しました 確認済み 検証しました 検証済み
+  監査しました 監査済み 修正しました 対応しました 対応済み 実装しています
+  判明しました 未検証 未確認
+].freeze
+
+# Phase1/Phase 5/Step3/ステップ3 のような内部マイルストーン管理用の表記。
+# NOTICE.mdで「Phase5 Step3」という記述が指摘・修正された実例がある。
+PHASE_STEP_PATTERN = /Phase\s*\d+|Step\s*\d+|ステップ\s*\d+/i
+
+# ~/knowledge・.claude/ 配下はこのマシンのローカルファイルか、gitignore対象で未公開のため、
+# 対外公開文書から参照してもリンク切れ・アクセス不能になる。NOTICE.mdで指摘・修正された実例がある。
+LOCAL_ONLY_PATH_PATTERN = %r{~/knowledge|~/dev/claude-knowledge-system|\.claude/}
+
+# 「なぜその変更をしたか」というメンテナ内部の意思決定・経緯のナレーション。CHANGELOG.mdで
+# 「in response to a newly-appeared competing gem」という記述が2回指摘・修正された実例がある。
+# 対外公開文書の読者が知りたいのは「何が変わったか」「何をすればよいか」であり、
+# メンテナがどう意思決定したかではない。
+INTERNAL_NARRATIVE_PATTERNS = [
+  /in response to/i,
+  /as pointed out/i,
+  /after discussion/i,
+  /per feedback/i,
+  /following feedback/i,
+  /it was suggested/i,
+  /指摘を受けて/,
+  /指摘されたので/,
+  /検討の結果/,
+  /という競合/,
+  /に伴い作成/,
+  /していたが直した/,
+  /だったため修正/,
+  /していたことが判明/
+].freeze
+
+warnings = []
+
+TARGET_FILES.each do |path|
+  relative = path.delete_prefix("#{ROOT}/")
+
+  File.readlines(path, chomp: true).each_with_index do |line, index|
+    lineno = index + 1
+
+    SELF_REFERENTIAL_PHRASES.each do |phrase|
+      next unless line.include?(phrase)
+
+      warnings << "#{relative}:#{lineno}: 自己参照フレーズ「#{phrase}」— ドキュメントを書いた時点を基準にした記述は古びても気づけません"
+    end
+
+    if line.match?(DATE_PATTERN) && OWN_STATE_SIGNAL_WORDS.any? { |word| line.include?(word) }
+      warnings << "#{relative}:#{lineno}: 日付と状態確認の言葉が同じ行にあります(外部の出来事の日付なら無視して構いません): #{line.strip}"
+    end
+
+    if line.match?(PHASE_STEP_PATTERN)
+      warnings << "#{relative}:#{lineno}: Phase/Step内部マイルストーン表記の疑い(読者には説明コストが高く不要): #{line.strip}"
+    end
+
+    if line.match?(LOCAL_ONLY_PATH_PATTERN)
+      warnings << "#{relative}:#{lineno}: ローカル専用・gitignore対象パスへの参照の疑い(読者からはアクセスできません): #{line.strip}"
+    end
+
+    INTERNAL_NARRATIVE_PATTERNS.each do |pattern|
+      next unless line.match?(pattern)
+
+      warnings << "#{relative}:#{lineno}: メンテナ内部の意思決定・経緯のナレーションの疑い(判断ログ側の役割): #{line.strip}"
+    end
+  end
+end
+
+if warnings.empty?
+  puts "check_public_docs: 対外公開文書に気になる表記は見つかりませんでした"
+else
+  puts "=" * 70
+  puts "check_public_docs: 対外公開文書の表記を確認してください(このチェックはコミットをブロックしません)"
+  puts "=" * 70
+  warnings.each { |warning| puts "  - #{warning}" }
+  puts
+  puts "判断基準: .claude/CLAUDE.md「README文体方針」を参照"
+end
+
+exit 0

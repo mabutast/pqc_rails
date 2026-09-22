@@ -12,14 +12,16 @@ repos:
 
   - repo: local
     hooks:
-      - id: doc-date-check
-        name: Check public docs for stale-date patterns
+      - id: check-public-docs
+        name: Check public docs for internal-process leakage
         description: >-
-          Warns (does not block) when README.md/docs/*.md use a date for a claim about
-          pqc_rails' own state instead of a version number, or a self-referential
-          "as of when this was written" phrase. See .claude/CLAUDE.md「README文体方針 >
-          日付の扱い」for the judgment criteria.
-        entry: bin/check_doc_dates
+          Warns (does not block) when README.md/CHANGELOG.md/NOTICE.md/LICENSE.txt/docs/*.md
+          carry internal development-process traces: dates used for pqc_rails' own state
+          instead of version numbers, self-referential "as of when this was written"
+          phrasing, Phase/Step milestone terminology, references to local-only or
+          gitignored paths, or maintainer decision-narrative. See .claude/CLAUDE.md
+          「README文体方針」for the judgment criteria.
+        entry: bin/check_public_docs
         language: script
         always_run: true
         pass_filenames: false
