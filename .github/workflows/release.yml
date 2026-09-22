@@ -27,3 +27,10 @@ jobs:
         run: bundle exec rake vendor:liboqs
 
       - uses: rubygems/release-gem@v1
+        with:
+          # [EXPERIMENTAL] sigstore attestation signing. Disabled: its RUBYOPT-injected
+          # `require "rubygems/commands/push_command"` activates Ruby's bundled default
+          # openssl gem before `bundle exec rake release` runs, which then conflicts with
+          # Gemfile.lock's pinned newer openssl (needed for Ruby 3.2 compatibility) —
+          # "you have already activated openssl X, but your Gemfile requires openssl Y".
+          attestations: false
