@@ -38,19 +38,22 @@ liboqs自体のLICENSE.txtが明記する通り、liboqsは各PQCアルゴリズ
 （全アルゴリズム）でビルドしているため、実際にリンクされる共有ライブラリにはこれら全ての実装が
 含まれます。
 
-liboqs 0.15.0のソースツリーを確認したところ、以下の系統のライセンスが含まれています
+liboqs 0.16.0のソースツリーを確認したところ、以下の系統のライセンスが含まれています
 （いずれも許諾範囲の広いライセンスで、GPL等のコピーレフトライセンスは含まれていません）。
+0.16.0でSPHINCS+はFIPS 205標準名の「SLH-DSA」実装(slhdsa-cプロジェクト)に置き換わり、
+新規署名アルゴリズム候補「MQOM」が追加されています。
 
 | ライセンス | 主な対象アルゴリズム(一例) |
 |---|---|
-| MIT | Falcon(参照実装)、SNOVA |
+| MIT | Falcon(参照実装)、SNOVA、MQOM |
 | Apache License 2.0 | ML-DSA/Kyber(最適化実装)、BIKE、MAYO、Falcon(ARM NEON実装) |
-| CC0 1.0 Universal(パブリックドメイン相当) | ML-DSA/Kyber(参照実装)、SPHINCS+、XMSS |
+| Apache-2.0 OR ISC OR MIT(トリプルライセンス) | SLH-DSA(slhdsa-c、FIPS 205参照実装) |
+| CC0 1.0 Universal(パブリックドメイン相当) | ML-DSA/Kyber(参照実装)、XMSS |
 | Public Domain | Classic McEliece、HQC |
 | 個別のコピーライト表示付きライセンス | XMSS/LMS(ステートフル署名、Cisco Systems等) |
 
 **個々のサブディレクトリのLICENSE/NOTICEファイル自体が正本です**。本表は概観のための一覧であり、
-174個の個別ライセンスファイル（重複除くと約14種類のライセンス文面）すべての内容を検証・転記した
+153個の個別ライセンスファイル（重複除くと約15種類のライセンス文面）すべての内容を検証・転記した
 ものではありません。同梱されたソースツリー（`ext/pqc_rails/vendor/liboqs/`配下の各`LICENSE`/`NOTICE`
 ファイル）がそのままgemパッケージに含まれるため、再配布時の表示義務はソースの同梱によって満たされる
 設計です。Apache License 2.0が要求する`NOTICE`ファイルの保持についても、上流の`NOTICE`ファイル
