@@ -35,20 +35,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)'s FIPS shall-requirements table hadn't been updated
   since an earlier audit and understated pqc_rails' actual compliance: it listed RNG strength as
   unverified, when a later source audit of liboqs had already confirmed it meets every parameter
-  set's required strength. It also didn't mention that intermediate-value zeroization is
-  asymmetric between ML-KEM (satisfied) and ML-DSA (not satisfied) at the liboqs vendor-library
-  level. Updated the table to match.
+  set's required strength. It also listed intermediate-value zeroization as asymmetric between
+  ML-KEM (satisfied) and ML-DSA (not satisfied) at the liboqs vendor-library level; bumping the
+  default bundled liboqs to 0.16.0 (see Changed) closes that gap too, since its ML-DSA
+  implementation (`mldsa-native`) now zeroizes intermediate values just like ML-KEM's does.
+  Updated the table to match.
 - README's HQC example (`PqcRails::Kem.open("HQC-1")`) didn't work against the liboqs `bundle
   install` actually builds by default: HQC is disabled by default in liboqs 0.15.0
   (`OQS_ENABLE_KEM_HQC` defaults to off) and only defaults to enabled starting in 0.16.0, so the
-  example failed with `PqcRails::Error` out of the box. Added a note that it requires manually
-  pointing `config.liboqs_path` at a liboqs 0.16.0+ build.
+  example failed with `PqcRails::Error` out of the box. Fixed by bumping the default bundled
+  liboqs to 0.16.0 (see Changed), where the example now works unmodified.
 
 ### Changed
 
+- The liboqs version `bundle install` builds by default is now 0.16.0 (was 0.15.0). Verified
+  against liboqs's own release notes and source: the `OQS_KEM`/`OQS_SIG` struct layouts and the
+  `OQS_KEM_*`/`OQS_SIG_*` functions pqc_rails calls via FFI are unchanged between the two
+  versions, and the full test suite passes unmodified against a 0.16.0 build. `--skip-liboqs`
+  with a manually supplied liboqs 0.15.0 remains supported and is checked in CI as a backward-
+  compatibility case.
 - CI now runs the test suite across the full supported matrix (Ruby 3.2/3.3/3.4 × Rails 7.1/8.1,
-  plus liboqs 0.16.0 on the newest Ruby/Rails combination) on every push and pull request,
-  instead of a single combination with the rest verified manually.
+  plus liboqs 0.15.0 on the newest Ruby/Rails combination as a backward-compatibility check) on
+  every push and pull request, instead of a single combination with the rest verified manually.
 - Added an "API の安定性" section to the README, declaring which classes/methods are the stable
   public API (intended to be covered by SemVer once 1.0 ships) versus internal implementation
   detail that may change without notice.
