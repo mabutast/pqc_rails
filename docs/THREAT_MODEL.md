@@ -138,7 +138,7 @@ ML-KEM(FIPS 203)・ML-DSA(FIPS 204)はいずれも格子問題(Module-LWE/Module
 
 KEM-DEM構成全体としては、鍵交換をFIPS 203準拠のML-KEMが担い、データ本体をNIST承認済みの対称暗号(AES-256-GCM)が担う、という構成になります。SLH-DSA(FIPS 205)への対応は現時点で行っていません。
 
-### FIPS 203/204のshall要件との対応(監査結果、2026-08-01追加監査反映)
+### FIPS 203/204のshall要件との対応
 
 FIPS 203 §3.3(ML-KEM実装への要求事項)とFIPS 204 §3.6(追加の要求事項)に列挙されているshall要件と、pqc_railsの実装(liboqsへのFFIバインディング層、および同梱するliboqs 0.15.0本体のソース)との対応は次の通りです。
 
@@ -147,14 +147,14 @@ FIPS 203 §3.3(ML-KEM実装への要求事項)とFIPS 204 §3.6(追加の要求�
 | K-PKEをスタンドアロンで使わない | 満たしています(トップレベルのML-KEM APIのみ使用) |
 | derandomized版など内部関数への制御されたアクセス | 満たしています(標準APIのみをFFI経由で呼び出し可能にしています) |
 | 共有鍵の鍵導出における承認済み手法(NIST SP 800-56C)の使用 | 満たしています(`HybridKem`はHKDF-SHA256で導出) |
-| 乱数生成器の強度がパラメータセットの要求以上 | 満たしています(2026-08-01、liboqs 0.15.0のソースを直接監査して確認。デフォルトはOS依存CSPRNG(macOS: `arc4random_buf`／Linux: `getentropy`／Windows: `BCryptGenRandom`)で、全パラメータセット(128/192/256bit)の要求強度を上回ります) |
+| 乱数生成器の強度がパラメータセットの要求以上 | 満たしています。liboqs 0.15.0のソースを直接監査して確認済みです。デフォルトはOS依存CSPRNG(macOS: `arc4random_buf`／Linux: `getentropy`／Windows: `BCryptGenRandom`)で、全パラメータセット(128/192/256bit)の要求強度を上回ります |
 | Encaps/Decaps・sign/verifyの入力長チェック | 満たしています(公開鍵・秘密鍵・暗号文・署名すべての長さをliboqs呼び出し前に検証します) |
-| 公開鍵・署名の長さチェック、不一致ならfalseを返す(FIPS204 §3.6.2、SIGのみ) | 満たしています(`signature`側の長さ未検証だった箇所を2026-07-16に発見・修正しました) |
-| 署名生成のhedged/deterministic選択(FIPS204 §3.6.4、SIGのみ) | 満たしています(2026-08-01確認。liboqsは全ML-DSAパラメータセットでhedged署名のみをビルドし、deterministicへ切り替えるビルドオプションはありません) |
-| 中間値の破棄 | **KEM/SIGで非対称です**(2026-08-01判明)。ML-KEM実装(`mlkem-native`)は機微な中間値をゼロクリアしFIPS203 §3.3に明示的に準拠しますが、ML-DSA実装(`pqcrystals-dilithium-standard`)は同種の処理を行いません。原因はvendor元実装の性質差(ML-KEMはFIPS203準拠を目的に新規開発されたハードニング実装、ML-DSAは標準化前からの学術的reference実装がそのまま使われている)です。Rubyレイヤー(FFI::MemoryPointer/String)側の明示的なメモリワイプも未実装のままです。技術的な解消策(liboqsへのCソースパッチ)は検討済みですが優先度は低いと判断し、様子見の据え置きとしています(既知の限界) |
+| 公開鍵・署名の長さチェック、不一致ならfalseを返す(FIPS204 §3.6.2、SIGのみ) | 満たしています(`Sig#verify`が`signature`の長さをliboqs呼び出し前に検証します) |
+| 署名生成のhedged/deterministic選択(FIPS204 §3.6.4、SIGのみ) | 満たしています。liboqs 0.15.0は全ML-DSAパラメータセットでhedged署名のみをビルドし、deterministicへ切り替えるビルドオプションはありません |
+| 中間値の破棄 | **KEM/SIGで非対称です**。ML-KEM実装(`mlkem-native`)は機微な中間値をゼロクリアしFIPS203 §3.3に明示的に準拠しますが、ML-DSA実装(`pqcrystals-dilithium-standard`)は同種の処理を行いません。原因はvendor元実装の性質差(ML-KEMはFIPS203準拠を目的に新規開発されたハードニング実装、ML-DSAは標準化前からの学術的reference実装がそのまま使われている)です。Rubyレイヤー(FFI::MemoryPointer/String)側の明示的なメモリワイプも未実装のままです(既知の限界) |
 | 浮動小数点演算を使わない | 該当しません(pqc_railsは暗号計算そのものを実装しておらず、liboqsのC実装に委譲しています) |
 
-**中間値の破棄(ML-DSA側のみ)**は、pqc_railsが依存するliboqsのvendor元実装に起因する既知の限界として明記します。乱数生成器の強度については、2026-08-01の追加監査でliboqs本体のソースを直接確認済みのため、「未検証」ではなく「満たしている」と言い切れる状態です。
+**中間値の破棄(ML-DSA側のみ)**は、pqc_railsが依存するliboqsのvendor元実装に起因する既知の限界として明記します。乱数生成器の強度についてはliboqs本体のソースを直接確認済みのため、「未検証」ではなく「満たしている」と言い切れる状態です。上記の表はliboqs 0.15.0時点のものであり、依存するliboqsのバージョンが変われば再確認が必要です。
 
 ### 参照仕様
 
