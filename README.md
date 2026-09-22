@@ -203,6 +203,8 @@ end
 
 同様に、NIST が ML-KEM のバックアップとして選定した符号ベースKEM「HQC」も liboqs 0.16.0 以降ではデフォルトで有効化されており、生の名前（`"HQC-1"` / `"HQC-3"` / `"HQC-5"`）を渡すことで利用できます。ただしHQCはまだNIST標準化作業中（FIPS番号未確定）のため、シンボルレジストリには未登録です。
 
+**注意**：`bundle install` が既定で自動ビルドする liboqs は 0.15.0（[必要要件](#必要要件)参照）で、この版では `OQS_ENABLE_KEM_HQC` が既定で無効です。下記の例をそのまま試すには、liboqs 0.16.0 以降を別途用意し `config.liboqs_path`（[liboqs ライブラリパス](#liboqs-ライブラリパス)参照）で指定してください。
+
 ```ruby
 PqcRails::Kem.open("HQC-1") do |kem|
   keypair = kem.generate_keypair

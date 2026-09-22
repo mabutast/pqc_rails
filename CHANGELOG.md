@@ -38,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   set's required strength. It also didn't mention that intermediate-value zeroization is
   asymmetric between ML-KEM (satisfied) and ML-DSA (not satisfied) at the liboqs vendor-library
   level. Updated the table to match.
+- README's HQC example (`PqcRails::Kem.open("HQC-1")`) didn't work against the liboqs `bundle
+  install` actually builds by default: HQC is disabled by default in liboqs 0.15.0
+  (`OQS_ENABLE_KEM_HQC` defaults to off) and only defaults to enabled starting in 0.16.0, so the
+  example failed with `PqcRails::Error` out of the box. Added a note that it requires manually
+  pointing `config.liboqs_path` at a liboqs 0.16.0+ build.
 
 ### Changed
 
