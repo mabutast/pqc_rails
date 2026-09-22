@@ -64,16 +64,16 @@ RSpec.describe "READMEの「使い方」節に記載されたコード例(doctes
   end
 
   it "HQC-1の公開鍵サイズが、書かれている値と一致する(liboqsがHQCを有効化してビルドされている場合のみ)" do
-    # HQCはliboqs 0.16.0以降でデフォルト有効(0.15.0はデフォルト無効、OQS_ENABLE_KEM_HQC=OFF)。
-    # pqc_rails自身がbundle installで自動ビルドする既定のliboqsは0.15.0のため、この例は
-    # デフォルト設定では動かない(README側にもその旨の注記がある)。CI環境によってHQCの有無が
-    # 変わりうるので、無効な場合はテスト自体をスキップし、有効な場合のみ値を検証する。
+    # HQCはliboqs 0.16.0以降でデフォルト有効(0.15.0以前はデフォルト無効、OQS_ENABLE_KEM_HQC=OFF)。
+    # pqc_rails自身がbundle installで自動ビルドする既定のliboqsは0.16.0のためこの例は通常動くが、
+    # `--skip-liboqs`で古いバージョン・カスタムビルドのliboqsを指定した環境ではHQCが無効な場合が
+    # あるため、無効な場合はテスト自体をスキップし、有効な場合のみ値を検証する。
     source = find_block('PqcRails::Kem.open("HQC-1")')
 
     begin
       PqcRails::Kem.new("HQC-1").free
     rescue PqcRails::Error
-      skip "このliboqsビルドではHQCが無効化されている(liboqs 0.15.0のデフォルト、既知の制約)"
+      skip "このliboqsビルドではHQCが無効化されている(liboqs 0.15.0以前のデフォルト、既知の制約)"
     end
 
     expect(run_example(source)).to eq([])
