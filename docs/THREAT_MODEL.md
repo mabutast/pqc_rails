@@ -140,21 +140,21 @@ KEM-DEM構成全体としては、鍵交換をFIPS 203準拠のML-KEMが担い�
 
 ### FIPS 203/204のshall要件との対応
 
-FIPS 203 §3.3(ML-KEM実装への要求事項)とFIPS 204 §3.6(追加の要求事項)に列挙されているshall要件と、pqc_railsの実装(liboqsへのFFIバインディング層、および同梱するliboqs 0.15.0本体のソース)との対応は次の通りです。
+FIPS 203 §3.3(ML-KEM実装への要求事項)とFIPS 204 §3.6(追加の要求事項)に列挙されているshall要件と、pqc_railsの実装(liboqsへのFFIバインディング層、および同梱するliboqs 0.16.0本体のソース)との対応は次の通りです。
 
 | 要件 | 対応状況 |
 |---|---|
 | K-PKEをスタンドアロンで使わない | 満たしています(トップレベルのML-KEM APIのみ使用) |
 | derandomized版など内部関数への制御されたアクセス | 満たしています(標準APIのみをFFI経由で呼び出し可能にしています) |
 | 共有鍵の鍵導出における承認済み手法(NIST SP 800-56C)の使用 | 満たしています(`HybridKem`はHKDF-SHA256で導出) |
-| 乱数生成器の強度がパラメータセットの要求以上 | 満たしています。liboqs 0.15.0のソースを直接監査して確認済みです。デフォルトはOS依存CSPRNG(macOS: `arc4random_buf`／Linux: `getentropy`／Windows: `BCryptGenRandom`)で、全パラメータセット(128/192/256bit)の要求強度を上回ります |
+| 乱数生成器の強度がパラメータセットの要求以上 | 満たしています。liboqs 0.16.0のソースを直接監査して確認済みです。デフォルトはOS依存CSPRNG(macOS: `arc4random_buf`／Linux: `getentropy`／Windows: `BCryptGenRandom`)で、全パラメータセット(128/192/256bit)の要求強度を上回ります |
 | Encaps/Decaps・sign/verifyの入力長チェック | 満たしています(公開鍵・秘密鍵・暗号文・署名すべての長さをliboqs呼び出し前に検証します) |
 | 公開鍵・署名の長さチェック、不一致ならfalseを返す(FIPS204 §3.6.2、SIGのみ) | 満たしています(`Sig#verify`が`signature`の長さをliboqs呼び出し前に検証します) |
-| 署名生成のhedged/deterministic選択(FIPS204 §3.6.4、SIGのみ) | 満たしています。liboqs 0.15.0は全ML-DSAパラメータセットでhedged署名のみをビルドし、deterministicへ切り替えるビルドオプションはありません |
-| 中間値の破棄 | **KEM/SIGで非対称です**。ML-KEM実装(`mlkem-native`)は機微な中間値をゼロクリアしFIPS203 §3.3に明示的に準拠しますが、ML-DSA実装(`pqcrystals-dilithium-standard`)は同種の処理を行いません。原因はvendor元実装の性質差(ML-KEMはFIPS203準拠を目的に新規開発されたハードニング実装、ML-DSAは標準化前からの学術的reference実装がそのまま使われている)です。Rubyレイヤー(FFI::MemoryPointer/String)側の明示的なメモリワイプも未実装のままです(既知の限界) |
+| 署名生成のhedged/deterministic選択(FIPS204 §3.6.4、SIGのみ) | 満たしています。liboqs 0.16.0は全ML-DSAパラメータセットでhedged署名のみをビルドし、deterministicへ切り替えるビルドオプションはありません |
+| 中間値の破棄 | 満たしています。ML-KEM実装(`mlkem-native`)・ML-DSA実装(`mldsa-native`)ともに機微な中間値をゼロクリアし、それぞれFIPS203 §3.3・FIPS204 §3.6.3に明示的に準拠します(ソースコード中のコメントで該当条項への参照が明記されています)。liboqs 0.15.0まではML-DSAの参照実装が`pqcrystals-dilithium-standard`(標準化前からの学術的reference実装)で同種の処理を行わずKEM/SIGで非対称でしたが、0.16.0で`mldsa-native`(FIPS204準拠を目的に新規開発されたハードニング実装)へ置き換わり解消しました。Rubyレイヤー(FFI::MemoryPointer/String)側の明示的なメモリワイプは未実装のままです(既知の限界) |
 | 浮動小数点演算を使わない | 該当しません(pqc_railsは暗号計算そのものを実装しておらず、liboqsのC実装に委譲しています) |
 
-**中間値の破棄(ML-DSA側のみ)**は、pqc_railsが依存するliboqsのvendor元実装に起因する既知の限界として明記します。乱数生成器の強度についてはliboqs本体のソースを直接確認済みのため、「未検証」ではなく「満たしている」と言い切れる状態です。上記の表はliboqs 0.15.0時点のものであり、依存するliboqsのバージョンが変われば再確認が必要です。
+乱数生成器の強度・中間値の破棄については、liboqs本体のソースを直接確認済みのため、「未検証」ではなく「満たしている」と言い切れる状態です。Rubyレイヤー側の明示的なメモリワイプが未実装であることは引き続き既知の限界です。上記の表はliboqs 0.16.0時点のものであり、依存するliboqsのバージョンが変われば再確認が必要です。
 
 ### 参照仕様
 
