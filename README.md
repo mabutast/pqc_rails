@@ -201,9 +201,7 @@ end
 
 公開鍵サイズが大きい（348864 パラメータセットで約255KB）ため TLS ハンドシェイクのような頻繁な鍵交換には向きませんが、鍵交換の頻度が低い長期保存データの暗号化では ML-KEM が万一破られた場合のバックアップとして選択肢になります。異なる数学的困難性（符号の復号問題）に安全性の根拠を置くため、ML-KEM（格子問題）とは異なるリスクプロファイルを持ちます。
 
-同様に、NIST が ML-KEM のバックアップとして選定した符号ベースKEM「HQC」も liboqs 0.16.0 以降ではデフォルトで有効化されており、生の名前（`"HQC-1"` / `"HQC-3"` / `"HQC-5"`）を渡すことで利用できます。ただしHQCはまだNIST標準化作業中（FIPS番号未確定）のため、シンボルレジストリには未登録です。
-
-**注意**：`bundle install` が既定で自動ビルドする liboqs は 0.15.0（[必要要件](#必要要件)参照）で、この版では `OQS_ENABLE_KEM_HQC` が既定で無効です。下記の例をそのまま試すには、liboqs 0.16.0 以降を別途用意し `config.liboqs_path`（[liboqs ライブラリパス](#liboqs-ライブラリパス)参照）で指定してください。
+同様に、NIST が ML-KEM のバックアップとして選定した符号ベースKEM「HQC」も liboqs 0.16.0 以降ではデフォルトで有効化されており、生の名前（`"HQC-1"` / `"HQC-3"` / `"HQC-5"`）を渡すことで利用できます。ただしHQCはまだNIST標準化作業中（FIPS番号未確定）のため、シンボルレジストリには未登録です。`bundle install` が既定で自動ビルドする liboqs は 0.16.0（[必要要件](#必要要件)参照）のため、下記の例はそのまま動作します。`--skip-liboqs` で `OQS_ENABLE_KEM_HQC` を無効化した古いバージョン・カスタムビルドの liboqs を指定した場合は利用できません。
 
 ```ruby
 PqcRails::Kem.open("HQC-1") do |kem|
@@ -358,9 +356,9 @@ Puma のようなマルチスレッド型アプリケーションサーバーは
 
 - Ruby 3.2 / 3.3 / 3.4
 - Rails 7.1 / 8.1
-- liboqs 0.15.0 / 0.16.0
+- liboqs 0.16.0 / 0.15.0
 
-[CI](.github/workflows/test.yml) では、上記の Ruby × Rails × liboqs の組み合わせ（liboqs 0.16.0 は Ruby 3.4 + Rails 8.1 との組み合わせのみ）を push・PR のたびにマトリクスで継続的に検証しています。CIには別途 `extension-build` ジョブがあり、`bundle install` によるliboqsの自動ビルド〜動作（KEM 往復）までを Linux 上で継続的に検証しています。
+[CI](.github/workflows/test.yml) では、上記の Ruby × Rails × liboqs の組み合わせ（liboqs 0.15.0 は Ruby 3.4 + Rails 8.1 との組み合わせのみ）を push・PR のたびにマトリクスで継続的に検証しています。CIには別途 `extension-build` ジョブがあり、`bundle install` によるliboqsの自動ビルド〜動作（KEM 往復）までを Linux 上で継続的に検証しています。
 
 ## 開発
 
