@@ -19,7 +19,7 @@ require "etc"
 
 EXT_DIR = __dir__
 VENDOR_DIR = File.join(EXT_DIR, "vendor", "liboqs")
-DEV_CLONE_TAG = "0.15.0"
+DEV_CLONE_TAG = "0.16.0"
 DEV_CLONE_DIR = File.join(EXT_DIR, "liboqs-src")
 BUILD_DIR = File.join(EXT_DIR, "liboqs-build")
 

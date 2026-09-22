@@ -17,7 +17,7 @@ require "tmpdir"
 
 module PqcRails
   module VendorLiboqs
-    TAG = "0.15.0"
+    TAG = "0.16.0"
     EXCLUDE_TOP_LEVEL = %w[.git tests docs scripts zephyr cpp].freeze
     VENDOR_DIR = File.expand_path("vendor/liboqs", __dir__)
 
