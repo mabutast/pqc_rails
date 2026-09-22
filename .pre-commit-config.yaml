@@ -9,3 +9,18 @@ repos:
     hooks:
       - id: detect-secrets
         args: ['--baseline', '.secrets.baseline']
+
+  - repo: local
+    hooks:
+      - id: doc-date-check
+        name: Check public docs for stale-date patterns
+        description: >-
+          Warns (does not block) when README.md/docs/*.md use a date for a claim about
+          pqc_rails' own state instead of a version number, or a self-referential
+          "as of when this was written" phrase. See .claude/CLAUDE.md「README文体方針 >
+          日付の扱い」for the judgment criteria.
+        entry: bin/check_doc_dates
+        language: script
+        always_run: true
+        pass_filenames: false
+        verbose: true
