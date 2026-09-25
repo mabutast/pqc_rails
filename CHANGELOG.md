@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The BSL 1.1 Additional Use Grant no longer restricts commercial use. Production use of
+  pqc_rails — including by for-profit companies in paid products and internal systems — is now
+  free. The only restriction is offering pqc_rails to third parties on a paid, hosted or embedded
+  basis in a product that competes with the Licensor's paid version(s); that use still requires a
+  separate commercial license. See `LICENSE.txt` for the exact terms. This applies to versions
+  released after 0.2.1.
+
 ## [0.2.1] - 2026-09-22
 
 ### Added
