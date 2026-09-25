@@ -369,13 +369,13 @@ bundle exec rspec
 
 ## ライセンス
 
-[Business Source License 1.1 (BSL)](LICENSE.txt) を採用しています。
+[Apache License 2.0](LICENSE.txt) で提供しています。
 
-- ソースコードは公開し、自社のRailsアプリへの組み込みや社内での利用は、企業による商用の本番利用を含めて無料です
-- 唯一の制限は、`pqc_rails` の有償版と競合する製品・サービスとして、`pqc_rails` を第三者に有償で提供すること（ホスティングでの提供や、製品への組み込みを含みます）です。この用途には別途ライセンス契約が必要です
-- 各バージョンのリリースから4年後、自動的にオープンソースライセンス（Apache License 2.0）に移行します
+- 商用・非商用を問わず、無償で利用・改変・再配布できます
+- 再配布時は、ライセンス文と著作権表示（[NOTICE.md](NOTICE.md)）を保持してください
+- 本ソフトウェアは無保証で提供されます。保証の否認・責任の制限の条件は [LICENSE.txt](LICENSE.txt) の第7条・第8条を参照してください
 
-詳細な条件は [LICENSE.txt](LICENSE.txt) を参照してください。ライセンスに関するお問い合わせは contact@rubyquantum.dev までご連絡ください。
+ライセンスに関するお問い合わせは contact@rubyquantum.dev までご連絡ください。
 
 `pqc_rails` が同梱・依存する第三者ソフトウェア（liboqs、ffi 等）のライセンス表示は [NOTICE.md](NOTICE.md) を参照してください。
 

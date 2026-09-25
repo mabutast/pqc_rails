@@ -13,7 +13,7 @@ Gem::Specification.new do |spec|
                       "(NIST-standardized algorithms such as ML-KEM and ML-DSA) for existing Rails " \
                       "applications, via native FFI bindings to liboqs."
   spec.homepage = "https://github.com/mabutast/pqc_rails"
-  spec.license = "Nonstandard" # Business Source License 1.1、詳細はLICENSE.txt参照
+  spec.license = "Apache-2.0"
   spec.required_ruby_version = ">= 3.2.0"
 
   spec.metadata["homepage_uri"] = spec.homepage

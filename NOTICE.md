@@ -1,6 +1,9 @@
 # サードパーティライセンス表示
 
-`pqc_rails`自体のライセンスは[LICENSE.txt](LICENSE.txt)（Business Source License 1.1）を参照してください。
+pqc_rails
+Copyright 2026 Haruyuki Onodera
+
+`pqc_rails`自体は[Apache License 2.0](LICENSE.txt)で提供しています。
 本ファイルは、`pqc_rails`が同梱・依存する第三者ソフトウェアのライセンス表示をまとめたものです。
 
 ## liboqs（同梱・MIT）
