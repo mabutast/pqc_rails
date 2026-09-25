@@ -369,7 +369,7 @@ bundle exec rspec
 
 ## ライセンス
 
-[Apache License 2.0](LICENSE.txt) で提供しています。
+[Apache License 2.0](LICENSE.txt) で提供しています。以前 Business Source License 1.1 で公開していた 0.2.1 以前のバージョンも、Apache License 2.0 で利用できます。
 
 - 商用・非商用を問わず、無償で利用・改変・再配布できます
 - 再配布時は、ライセンス文と著作権表示（[NOTICE.md](NOTICE.md)）を保持してください

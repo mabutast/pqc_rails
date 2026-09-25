@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   1.1. Commercial and non-commercial use, modification and redistribution are free, with no
   restriction on hosted or embedded offerings. The license includes an explicit patent grant
   (Section 3) and a limitation of liability (Section 8). The gemspec `license` field is now
-  `Apache-2.0`. Versions up to and including 0.2.1 remain under the Business Source License 1.1.
+  `Apache-2.0`. Versions up to and including 0.2.1, previously released under the Business Source
+  License 1.1, are also made available under the Apache License 2.0.
 
 ## [0.2.1] - 2026-09-22
 
