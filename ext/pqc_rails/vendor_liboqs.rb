@@ -14,6 +14,7 @@
 
 require "fileutils"
 require "tmpdir"
+require_relative "build_shell"
 
 module PqcRails
   module VendorLiboqs
@@ -26,8 +27,8 @@ module PqcRails
     def run
       Dir.mktmpdir do |tmp|
         clone_dir = File.join(tmp, "liboqs")
-        sh!("git clone --branch #{TAG} --depth 1 " \
-            "https://github.com/open-quantum-safe/liboqs.git #{clone_dir}")
+        BuildShell.sh!("git", "clone", "--branch", TAG, "--depth", "1",
+                       "https://github.com/open-quantum-safe/liboqs.git", clone_dir)
 
         FileUtils.rm_rf(VENDOR_DIR)
         FileUtils.mkdir_p(VENDOR_DIR)
@@ -40,13 +41,8 @@ module PqcRails
         File.write(File.join(VENDOR_DIR, "PQC_RAILS_VENDOR_TAG"), "#{TAG}\n")
       end
 
-      size = `du -sh #{VENDOR_DIR}`.split.first
+      size = BuildShell.capture("du", "-sh", VENDOR_DIR).split.first
       puts "-- vendored liboqs #{TAG} into #{VENDOR_DIR} (#{size})"
-    end
-
-    def sh!(cmd)
-      puts "-- #{cmd}"
-      system(cmd) || abort("command failed: #{cmd}")
     end
   end
 end

@@ -16,17 +16,13 @@
 
 require "fileutils"
 require "etc"
+require_relative "build_shell"
 
 EXT_DIR = __dir__
 VENDOR_DIR = File.join(EXT_DIR, "vendor", "liboqs")
 DEV_CLONE_TAG = "0.16.0"
 DEV_CLONE_DIR = File.join(EXT_DIR, "liboqs-src")
 BUILD_DIR = File.join(EXT_DIR, "liboqs-build")
-
-def sh!(cmd)
-  puts "-- #{cmd}"
-  system(cmd) || abort("command failed: #{cmd}")
-end
 
 def skip_build?
   ENV["PQC_RAILS_SKIP_LIBOQS_BUILD"] == "1" || ARGV.include?("--skip-liboqs")
@@ -38,8 +34,8 @@ def liboqs_source_dir
   puts "-- vendor/liboqs が見つかりません。開発時フォールバックとしてgit cloneします" \
        "(リリースされたgemではこの経路は通らない想定。メンテナは`rake vendor:liboqs`を実行してください)"
   unless File.directory?(DEV_CLONE_DIR)
-    sh!("git clone --branch #{DEV_CLONE_TAG} --depth 1 " \
-        "https://github.com/open-quantum-safe/liboqs.git #{DEV_CLONE_DIR}")
+    PqcRails::BuildShell.sh!("git", "clone", "--branch", DEV_CLONE_TAG, "--depth", "1",
+                             "https://github.com/open-quantum-safe/liboqs.git", DEV_CLONE_DIR)
   end
   DEV_CLONE_DIR
 end
@@ -50,9 +46,9 @@ if skip_build?
 else
   src_dir = liboqs_source_dir
 
-  sh!("cmake -S #{src_dir} -B #{BUILD_DIR} " \
-      "-DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DOQS_BUILD_ONLY_LIB=ON")
-  sh!("cmake --build #{BUILD_DIR} --target oqs -- -j#{Etc.nprocessors}")
+  PqcRails::BuildShell.sh!("cmake", "-S", src_dir, "-B", BUILD_DIR,
+                           "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_SHARED_LIBS=ON", "-DOQS_BUILD_ONLY_LIB=ON")
+  PqcRails::BuildShell.sh!("cmake", "--build", BUILD_DIR, "--target", "oqs", "--", "-j#{Etc.nprocessors}")
 
   built_lib = Dir.glob(File.join(BUILD_DIR, "lib", "liboqs.*dylib")).first ||
               Dir.glob(File.join(BUILD_DIR, "lib", "liboqs.so*")).first
