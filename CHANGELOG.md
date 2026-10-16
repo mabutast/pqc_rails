@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PqcRails.configuration.accept_legacy_cookies_until`: a `Time` after which session cookies in the
   0.3.0 format are rejected. Set it to the upgrade time plus the longest session lifetime. Defaults
   to `nil` (no deadline).
+- `PqcRails.liboqs_version` returns the version of the loaded liboqs, and `rails pqc_rails:status`
+  shows it.
 - `PqcRails::ActiveRecord::CiphertextInfo.parse(record.ciphertext_for(:attr))` reads the format
   version, algorithm id and key id of a stored ciphertext without decrypting it, so records still
   using an old key or the 0.3.0 format can be identified. `PqcRails::Cipher#algorithm_id` returns

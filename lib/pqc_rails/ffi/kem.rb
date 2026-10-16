@@ -35,6 +35,9 @@ module PqcRails
       attach_function :OQS_KEM_keypair, [:pointer, :pointer, :pointer], :int
       attach_function :OQS_KEM_encaps, [:pointer, :pointer, :pointer, :pointer], :int
       attach_function :OQS_KEM_decaps, [:pointer, :pointer, :pointer, :pointer], :int
+
+      # liboqs/include/oqs/common.h の const char *OQS_version(void)。読み込んだliboqsの版を返す。
+      attach_function :OQS_version, [], :string
     end
   end
 end

@@ -5,6 +5,11 @@ require_relative "length_validation"
 require_relative "ffi/kem"
 
 module PqcRails
+  # 読み込んだliboqsの版(例: "0.16.0")。
+  def self.liboqs_version
+    Ffi::Kem.OQS_version
+  end
+
   # liboqsのGeneric KEM APIをRubyらしく包んだクラス。
   #
   # 使い方:

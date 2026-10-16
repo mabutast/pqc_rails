@@ -327,7 +327,7 @@ pqc_rails は現在 `0.y.z` 版で開発中です。将来 `1.0` を名乗る時
 
 **安定した公開 API**（1.0 以降は SemVer の対象にする想定）
 
-- `PqcRails.configure` / `PqcRails::Configuration#liboqs_path` / `#ciphertext_format` / `#accept_legacy_records` / `#accept_legacy_cookies_until`
+- `PqcRails.configure` / `PqcRails.liboqs_version` / `PqcRails::Configuration#liboqs_path` / `#ciphertext_format` / `#accept_legacy_records` / `#accept_legacy_cookies_until`
 - 鍵の生成と保存形式：`PqcRails::HybridKem.open(アルゴリズム) { |hybrid| hybrid.generate_keypair }` と `PqcRails::KeySource.encode` / `.decode`（[docs/MIGRATION.md](docs/MIGRATION.md) の鍵ローテーションの手順で使うもの）
 - `PqcRails::ActiveRecord::CiphertextInfo.parse`（`#format_version` / `#algorithm_id` / `#key_id` / `#pqc?` / `#legacy?`）、`PqcRails::Cipher#algorithm_id`、`PqcRails::CiphertextFormat.key_id`
 - `config.session_store :pqc_cookie_store`（`keypair:` / `previous_keypairs:` / `pq_alg_name:` オプション含む）

@@ -40,7 +40,8 @@ module PqcRails
     private
 
     def liboqs_result
-      Result.new(name: "liboqs", ok: true, detail: "#{PqcRails.configuration.liboqs_path} を使用中")
+      Result.new(name: "liboqs", ok: true,
+                 detail: "#{PqcRails.configuration.liboqs_path} を使用中(版 #{PqcRails.liboqs_version})")
     end
 
     def key_result(name:, env_var:, credentials_key:)

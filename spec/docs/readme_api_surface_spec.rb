@@ -16,6 +16,10 @@ RSpec.describe "README.mdの「API の安定性」節に列挙されたクラス
       expect(PqcRails::Configuration.instance_methods).to include(:liboqs_path)
     end
 
+    it "PqcRails.liboqs_versionが存在する" do
+      expect(PqcRails).to respond_to(:liboqs_version)
+    end
+
     it "暗号文の形式と旧形式の受け付けの設定が存在する" do
       expect(PqcRails::Configuration.instance_methods)
         .to include(:ciphertext_format, :accept_legacy_records, :accept_legacy_cookies_until)
