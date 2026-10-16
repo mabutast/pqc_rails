@@ -12,8 +12,25 @@ module PqcRails
     # 未設定の場合、環境変数 LIBOQS_PATH、それも無ければOS標準の場所を仮定する。
     attr_accessor :liboqs_path
 
+    CIPHERTEXT_FORMATS = %i[v1 v0].freeze
+
+    # 暗号化時に書く暗号文の形式。復号は設定によらず両方の形式を読める。
+    # :v1 形式バージョン・アルゴリズムID・鍵IDを持つ形式(既定)
+    # :v0 0.3.0以前と同じ旧形式。複数台のサーバーへ順番にデプロイする間、まだ旧版のgemが動いている
+    #     サーバーにも読める暗号文を書くために使う。全台の更新後に:v1へ戻す
+    attr_reader :ciphertext_format
+
     def initialize
       @liboqs_path = ENV["LIBOQS_PATH"] || default_liboqs_path
+      @ciphertext_format = :v1
+    end
+
+    def ciphertext_format=(format)
+      unless CIPHERTEXT_FORMATS.include?(format)
+        raise ArgumentError, "ciphertext_format must be one of #{CIPHERTEXT_FORMATS.inspect}, got #{format.inspect}"
+      end
+
+      @ciphertext_format = format
     end
 
     private

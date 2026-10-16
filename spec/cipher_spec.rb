@@ -54,6 +54,99 @@ RSpec.describe PqcRails::Cipher do
     end
   end
 
+  describe "暗号文のメタデータ(形式バージョン・アルゴリズムID・鍵ID)" do
+    around do |example|
+      original = PqcRails.configuration.ciphertext_format
+      example.run
+    ensure
+      PqcRails.configuration.ciphertext_format = original
+    end
+
+    it "形式バージョン・アルゴリズムID・鍵IDをheadersに書く" do
+      message = cipher.encrypt("hello", key: keypair)
+
+      expect(message.headers[:pv]).to eq(1)
+      expect(message.headers[:alg]).to eq("X25519+ML-KEM-512")
+      expect(message.headers[:kid]).to eq(PqcRails::CiphertextFormat.key_id(keypair.public_key))
+    end
+
+    it "ActiveRecordのMessageSerializerを通しても復号できる(DBに保存して読み戻す経路)" do
+      serializer = ActiveRecord::Encryption::MessageSerializer.new
+      stored = serializer.dump(cipher.encrypt("hello pqc", key: keypair))
+
+      expect(cipher.decrypt(serializer.load(stored), key: keypair)).to eq("hello pqc")
+    end
+
+    it "暗号文に書かれたアルゴリズムで復号する(設定のアルゴリズムを変えても既存データを読める)" do
+      keypair_1024 = PqcRails::HybridKem.open(:ml_kem_1024) { |hybrid| hybrid.generate_keypair }
+      message = described_class.new(pq_alg_name: :ml_kem_1024).encrypt("hello pqc", key: keypair_1024)
+
+      expect(cipher.decrypt(message, key: [keypair, keypair_1024])).to eq("hello pqc")
+    end
+
+    it "アルゴリズムをliboqs名で設定しても、シンボルで設定したCipherと互いに復号できる" do
+      message = described_class.new(pq_alg_name: "ML-KEM-512").encrypt("hello pqc", key: keypair)
+
+      expect(cipher.decrypt(message, key: keypair)).to eq("hello pqc")
+    end
+
+    it "アルゴリズムIDを書き換えると復号できない" do
+      message = cipher.encrypt("hello pqc", key: keypair)
+      message.headers.instance_variable_get(:@data)[:alg] = "X25519+ML-KEM-768"
+
+      expect do
+        cipher.decrypt(message, key: keypair)
+      end.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
+    end
+
+    it "鍵IDを書き換えると復号できない" do
+      message = cipher.encrypt("hello pqc", key: keypair)
+      message.headers.instance_variable_get(:@data)[:kid] = "0000"
+
+      expect do
+        cipher.decrypt(message, key: keypair)
+      end.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
+    end
+
+    it "鍵IDが一致しない鍵では復号を試みない" do
+      other_keypair = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }
+      message = cipher.encrypt("hello pqc", key: keypair)
+      allow(PqcRails::HybridKem).to receive(:open).and_call_original
+
+      expect(cipher.decrypt(message, key: [other_keypair, keypair])).to eq("hello pqc")
+      expect(PqcRails::HybridKem).to have_received(:open).once
+    end
+
+    it "レジストリ未登録で設定とも異なるアルゴリズムIDは拒否する" do
+      message = cipher.encrypt("hello pqc", key: keypair)
+      message.headers.instance_variable_get(:@data)[:alg] = "X25519+HQC-1"
+
+      expect do
+        cipher.decrypt(message, key: keypair)
+      end.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
+    end
+
+    context "ciphertext_format = :v0 のとき" do
+      before { PqcRails.configuration.ciphertext_format = :v0 }
+
+      it "旧形式(kem_ctヘッダーのみ)で書く" do
+        message = cipher.encrypt("hello", key: keypair)
+
+        expect(message.headers[:pv]).to be_nil
+        expect(message.headers[:alg]).to be_nil
+        expect(message.headers[:kid]).to be_nil
+      end
+    end
+
+    it "旧形式で書かれたデータを、新形式で書く設定のまま復号できる" do
+      PqcRails.configuration.ciphertext_format = :v0
+      legacy_message = cipher.encrypt("hello pqc", key: keypair)
+      PqcRails.configuration.ciphertext_format = :v1
+
+      expect(cipher.decrypt(legacy_message, key: keypair)).to eq("hello pqc")
+    end
+  end
+
   describe "#key_length / #iv_length" do
     it "EnvelopeCipherが使うAES-256-GCMの鍵長・IV長を返す(ActiveRecord::Encryption::KeyGeneratorが要求するインターフェース)" do
       expect(cipher.key_length).to eq(PqcRails::EnvelopeCipher::KEY_LENGTH)

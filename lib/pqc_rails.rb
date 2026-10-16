@@ -7,6 +7,7 @@ end
 require_relative "pqc_rails/version"
 require_relative "pqc_rails/configuration"
 require_relative "pqc_rails/algorithms"
+require_relative "pqc_rails/ciphertext_format"
 require_relative "pqc_rails/length_validation"
 require_relative "pqc_rails/blob_packing"
 require_relative "pqc_rails/key_source"

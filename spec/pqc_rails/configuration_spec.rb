@@ -63,4 +63,21 @@ RSpec.describe PqcRails::Configuration do
       end
     end
   end
+
+  describe "#ciphertext_format" do
+    it "既定は:v1(形式バージョン・アルゴリズムID・鍵IDを持つ新形式)" do
+      expect(described_class.new.ciphertext_format).to eq(:v1)
+    end
+
+    it ":v0(旧形式)を設定できる" do
+      config = described_class.new
+      config.ciphertext_format = :v0
+
+      expect(config.ciphertext_format).to eq(:v0)
+    end
+
+    it "未知の値はArgumentErrorを送出する" do
+      expect { described_class.new.ciphertext_format = :v2 }.to raise_error(ArgumentError, /ciphertext_format/)
+    end
+  end
 end
