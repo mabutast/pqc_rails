@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PqcRails.configuration.accept_legacy_cookies_until`: a `Time` after which session cookies in the
   0.3.0 format are rejected. Set it to the upgrade time plus the longest session lifetime. Defaults
   to `nil` (no deadline).
+- A `decryption_failed.pqc_rails` ActiveSupport::Notifications event is published when an
+  encrypted column or a session cookie cannot be decrypted, with the target (`:record` or
+  `:session`) and the exception class. Failures that are part of ActiveRecord trying `previous:`
+  schemes in turn are not reported.
 - `PqcRails.liboqs_version` returns the version of the loaded liboqs, and `rails pqc_rails:status`
   shows it.
 - `PqcRails::ActiveRecord::CiphertextInfo.parse(record.ciphertext_for(:attr))` reads the format

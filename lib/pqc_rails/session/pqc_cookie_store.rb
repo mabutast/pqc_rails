@@ -45,12 +45,14 @@ module PqcRails
         raw = request.cookie_jar[@key]
         return nil if raw.nil?
 
+        last_error = nil
         [@encryptor, *@previous_encryptors].each do |encryptor|
           return encryptor.decrypt(raw)
-        rescue StandardError
-          next
+        rescue StandardError => e
+          last_error = e
         end
 
+        PqcRails.instrument_decryption_failure(target: :session, error: last_error)
         nil
       end
     end

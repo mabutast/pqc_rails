@@ -349,6 +349,7 @@ pqc_rails は現在 `0.y.z` 版で開発中です。将来 `1.0` を名乗る時
 - `PqcRails::Kem` / `PqcRails::Sig`（アルゴリズムプリミティブ。本 README「使い方」に記載の全メソッド）
 - `PqcRails::Algorithms::UnknownAlgorithmError`
 - `PqcRails::Error` / `PqcRails::MissingKeyError` / `PqcRails::MissingAuthenticationKeyError`
+- `decryption_failed.pqc_rails` イベント（payload の `target` / `error`）
 - `rails generate pqc_rails:install`
 - `rails pqc_rails:status` / `PqcRails::StatusCheck.run`（戻り値の`Result`が持つ`name` / `ok` / `detail`）
 - 環境変数・credentials キー名（`PQC_SESSION_KEY` / `PQC_SESSION_PREVIOUS_KEYS` / `PQC_RECORD_KEY` / `PQC_RECORD_PREVIOUS_KEYS` 等、本 README「設定」に記載のもの）
@@ -369,6 +370,14 @@ pqc_rails は現在 `0.y.z` 版で開発中です。将来 `1.0` を名乗る時
 - `ActiveRecord::Encryption` で復号に失敗した場合は `ActiveRecord::Encryption::Errors::Decryption` が発生します。
 - セッション Cookie が不正・改竄されている場合は空のセッションとして扱います（クラッシュしません）。
 - 環境変数にも Rails credentials にも鍵が設定されていない場合、`PqcRails::MissingKeyError`（`PqcRails::Error` のサブクラス）が発生します。`rails generate pqc_rails:install` を実行済みか確認してください。
+
+DB カラム・セッション Cookie の復号に失敗すると、`ActiveSupport::Notifications` の `decryption_failed.pqc_rails` イベントを発行します。payload は `target`（`:record` は DB カラム、`:session` はセッション Cookie）と `error`（例外のクラス名）で、値・鍵・例外のメッセージは含みません。鍵の設定の誤りや、改ざんされた値を見つけるのに使えます。`previous:` で指定した旧方式の暗号文を読むときのように、ActiveRecord が復号方式を順に試す過程の失敗では発行しません。
+
+```ruby
+ActiveSupport::Notifications.subscribe("decryption_failed.pqc_rails") do |event|
+  Rails.logger.warn("pqc_rails decryption failed: #{event.payload[:target]} #{event.payload[:error]}")
+end
+```
 
 ## ステータス確認
 

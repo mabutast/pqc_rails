@@ -65,6 +65,11 @@ module PqcRails
       else raise PqcRails::Error, "unsupported ciphertext format version: #{version.inspect}"
       end
     rescue PqcRails::Error, ArgumentError, TypeError => e
+      # pqc_railsの暗号文でない値(previous:のRails標準の暗号文)や、pqc_railsの鍵を含まない呼び出し
+      # (previousスキームの導出鍵だけ)の失敗は、ActiveRecordが復号方式を順に試す過程の正常な失敗なので通知しない。
+      if keypairs&.any? && header(encrypted_message, :kem_ct)
+        PqcRails.instrument_decryption_failure(target: :record, error: e)
+      end
       raise ::ActiveRecord::Encryption::Errors::Decryption, e.message
     end
 

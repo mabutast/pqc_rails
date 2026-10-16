@@ -1,7 +1,16 @@
 # frozen_string_literal: true
 
+require "active_support/notifications"
+
 module PqcRails
   class Error < StandardError; end
+
+  # 復号に失敗したことを、ActiveSupport::Notificationsのdecryption_failed.pqc_railsイベントで通知する。
+  # payloadはtarget(:record=DBカラム、:session=セッションCookie)とerror(例外のクラス名)。
+  # 鍵の設定の誤りや、改ざんされた値の検知に使える。値・鍵・例外のメッセージは含めない。
+  def self.instrument_decryption_failure(target:, error:)
+    ActiveSupport::Notifications.instrument("decryption_failed.pqc_rails", target: target, error: error&.class&.name)
+  end
 end
 
 require_relative "pqc_rails/version"
