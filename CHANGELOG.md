@@ -39,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- README adds ML-DSA key and signature sizes (and why SLH-DSA is not registered), explains the
+  constant-time and standards-based reasons for building on liboqs, and mentions DARPA's Quantum
+  Benchmarking Initiative. docs/THREAT_MODEL.md adds the NIST IR 8547 draft timeline, the EU
+  supervisory authorities' autumn 2026 risk update, DARPA QBI, and states that liboqs is not a
+  FIPS 140-3 validated module.
 - README notes the German BSI's 2026-10-01 recommendation not to use Classic McEliece in new
   developments, states that ML-KEM and ML-DSA are standardized in FIPS 203 and FIPS 204, and
   lists blockchain and cryptocurrency transaction signatures as out of scope.
