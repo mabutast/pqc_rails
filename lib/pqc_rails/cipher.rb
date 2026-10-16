@@ -53,8 +53,10 @@ module PqcRails
 
     # 形式バージョンのヘッダーがあればv1として、無ければ旧形式(v0)として復号する。
     # v1では、暗号文に書かれたアルゴリズムで復号し、鍵IDが一致する鍵だけを試す。
+    # ActiveRecordは、previousスキーム(Rails標準の暗号化の導出鍵等)の鍵もkey:に渡してくることがあるため、
+    # pqc_railsの鍵ペア(public_key/secret_keyを持つもの)だけを使う。
     def decrypt(encrypted_message, key:)
-      keypairs = key.is_a?(::Array) ? key : [key]
+      keypairs = (key.is_a?(::Array) ? key : [key]).select { |candidate| keypair?(candidate) }
       version = header(encrypted_message, :pv)
 
       case version
@@ -129,6 +131,10 @@ module PqcRails
       end
 
       raise PqcRails::Error, last_error.message
+    end
+
+    def keypair?(candidate)
+      candidate.respond_to?(:public_key) && candidate.respond_to?(:secret_key)
     end
 
     # MessageSerializerで読み戻したMessageのheadersは、キーが文字列になる。

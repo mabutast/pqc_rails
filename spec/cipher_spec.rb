@@ -45,6 +45,25 @@ RSpec.describe PqcRails::Cipher do
       end.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
     end
 
+    it "pqc_railsの鍵ペアでない鍵(previousスキームの導出鍵の文字列等)が渡されても、Decryptionを送出する" do
+      message = cipher.encrypt("hello pqc", key: keypair)
+      other_keypair = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }
+
+      expect do
+        cipher.decrypt(message, key: ["derived-secret-string", other_keypair])
+      end.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
+      expect(cipher.decrypt(message, key: ["derived-secret-string", keypair])).to eq("hello pqc")
+    end
+
+    it "旧形式の暗号文でも、pqc_railsの鍵ペアでない鍵は無視する" do
+      PqcRails.configuration.ciphertext_format = :v0
+      message = cipher.encrypt("hello pqc", key: keypair)
+
+      expect(cipher.decrypt(message, key: ["derived-secret-string", keypair])).to eq("hello pqc")
+    ensure
+      PqcRails.configuration.ciphertext_format = :v1
+    end
+
     it "kem_ctヘッダーが無いMessageを復号しようとすると、NoMethodErrorではなくActiveRecord::Encryption::Errors::Decryptionを送出する" do
       malformed_message = ActiveRecord::Encryption::Message.new(payload: "not-a-real-payload")
 

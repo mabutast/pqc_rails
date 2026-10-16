@@ -63,6 +63,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `PqcRails::Cipher#decrypt` no longer raises `NoMethodError` when ActiveRecord passes keys that
+  are not pqc_rails key pairs. This happens when Rails' standard encryption was configured
+  (`primary_key` set) and ActiveRecord adds previous schemes; an unreadable value now raises
+  `ActiveRecord::Encryption::Errors::Decryption` as expected.
 - `bundle install` now builds liboqs correctly when the gem is installed under a path containing
   spaces. The build scripts run `git` and `cmake` directly with argument lists instead of through
   a shell, so the install path is no longer split or interpreted by the shell.
