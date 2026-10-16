@@ -212,6 +212,12 @@ RSpec.describe PqcRails::Cipher do
     end
   end
 
+  describe "#algorithm_id" do
+    it "新しく暗号化するときに暗号文へ書くアルゴリズムIDを返す" do
+      expect(described_class.new(pq_alg_name: "ML-KEM-768").algorithm_id).to eq("X25519+ML-KEM-768")
+    end
+  end
+
   describe "#key_length / #iv_length" do
     it "EnvelopeCipherが使うAES-256-GCMの鍵長・IV長を返す(ActiveRecord::Encryption::KeyGeneratorが要求するインターフェース)" do
       expect(cipher.key_length).to eq(PqcRails::EnvelopeCipher::KEY_LENGTH)

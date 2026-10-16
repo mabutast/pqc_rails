@@ -186,6 +186,16 @@ PqcRails.configure do |config|
 end
 ```
 
+DB カラムに保存された暗号文は、復号せずに形式バージョン・アルゴリズムID・鍵IDを調べられます。鍵ローテーションやアルゴリズム変更の後に、旧い鍵・旧い形式のまま残っているレコードを見分けるのに使えます。
+
+```ruby
+info = PqcRails::ActiveRecord::CiphertextInfo.parse(user.ciphertext_for(:email))
+info.format_version # => 1（0.3.0 以前の形式は 0）
+info.algorithm_id   # => "X25519+ML-KEM-768"
+info.key_id         # => "2e3a"（PqcRails::CiphertextFormat.key_id(公開鍵) と同じ値）
+info.legacy?        # => false
+```
+
 暗号文のサイズは、ML-KEM-768 で DB カラムが約60 bytes、セッション Cookie が約30 bytes 増えます。
 
 複数台のサーバーを順番に更新する場合、更新中は 0.3.0 以前の版が動いているサーバーが新しい形式の暗号文を読めません。更新が終わるまでは旧形式で書くよう設定し、全台の更新後にこの設定を削除してください。

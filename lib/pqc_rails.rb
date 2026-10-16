@@ -23,6 +23,7 @@ require_relative "pqc_rails/generators/install/install_generator"
 require_relative "pqc_rails/cipher"
 require_relative "pqc_rails/active_record/key_provider"
 require_relative "pqc_rails/active_record/context"
+require_relative "pqc_rails/active_record/ciphertext_info"
 require_relative "pqc_rails/status_check"
 require_relative "pqc_rails/railtie"
 

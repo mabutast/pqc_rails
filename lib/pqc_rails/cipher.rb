@@ -66,6 +66,11 @@ module PqcRails
       raise ::ActiveRecord::Encryption::Errors::Decryption, e.message
     end
 
+    # 新しく暗号化するときに暗号文へ書くアルゴリズムID(例: "X25519+ML-KEM-768")。
+    def algorithm_id
+      CiphertextFormat.algorithm_id(@pq_alg_name)
+    end
+
     def key_length
       EnvelopeCipher::KEY_LENGTH
     end
