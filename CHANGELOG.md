@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `bundle install` now builds liboqs correctly when the gem is installed under a path containing
+  spaces. The build scripts run `git` and `cmake` directly with argument lists instead of through
+  a shell, so the install path is no longer split or interpreted by the shell.
+
 ## [0.3.0] - 2026-09-25
 
 ### Changed
