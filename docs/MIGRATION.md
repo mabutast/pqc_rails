@@ -37,7 +37,25 @@ end
 **`save!` ではなく `encrypt` を使ってください。** 単に読み出して `save!` するだけでは、多くの場合再暗号化されません。ActiveRecord の dirty tracking は「復号後の値（平文）が変わっていない」属性への `save!` を無視し、UPDATE 文自体を発行しないためです。`previous:` 機構で旧データが復号されても、その平文が変わらなければ書き込みはスキップされ、DB 上の暗号文は古い方式のまま残ります。`ActiveRecord::Encryption::EncryptableRecord#encrypt`（`record.encrypt`）は dirty tracking を経由せず、現在の設定（cipher + key_provider）で強制的に再暗号化して保存します。
 
 ```ruby
-User.find_each(&:encrypt)
+User.find_each { |user| user.with_lock { user.encrypt } }
+```
+
+`with_lock` を付けるのは、アプリケーションを動かしたまま再暗号化するためです。`encrypt` は読み込んだ時点の値を書き戻すので、読み込んでから書き戻すまでの間に同じレコードが更新されると、その更新を古い値で上書きします。`with_lock` はレコードをロックして読み直してから `encrypt` を呼ぶため、この上書きが起きません。アプリケーションを止めて行う場合は不要です。
+
+再暗号化が残っているレコードは、復号せずに暗号文の鍵ID・形式を調べて見分けられます（[README「暗号文の形式」](../README.md#暗号文の形式)）。
+
+```ruby
+current_key_id = PqcRails::CiphertextFormat.key_id(
+  ActiveRecord::Encryption.key_provider.encryption_key.secret.public_key
+)
+pending = User.find_each.select do |user|
+  ciphertext = user.ciphertext_for(:email)
+  next false if ciphertext.nil?
+
+  info = PqcRails::ActiveRecord::CiphertextInfo.parse(ciphertext)
+  info.nil? || info.legacy? || info.key_id != current_key_id
+end
+pending.size # => 0 なら、旧鍵を外し、accept_legacy_records = false にできる
 ```
 
 0.3.0 以前の版から更新した場合、全レコードを再暗号化し終えたら、旧形式の暗号文を受け付けない設定にしてください。旧形式は作成元の認証を持たず、公開鍵だけで作れるためです（[README「暗号文の形式」](../README.md#暗号文の形式)参照）。
@@ -60,6 +78,8 @@ end
 2. 元々 `PQC_RECORD_KEY` に設定していた値を `PQC_RECORD_PREVIOUS_KEYS`（または `pqc_record_previous_keys` credentials）に移す
 3. アプリを再起動する。新規の暗号化は新しい鍵で行われ、旧鍵で暗号化済みのレコードもそのまま復号できる
 4. 旧鍵で暗号化されたレコードが残っている間は `PQC_RECORD_PREVIOUS_KEYS` を維持する。全レコードを新しい鍵で再暗号化し終えたら（上記「一括再暗号化したい場合」の手順を新旧鍵の組で実行）、`PQC_RECORD_PREVIOUS_KEYS` を削除してよい
+
+鍵の値（公開鍵・秘密鍵・認証鍵）は、暗号化・復号を行うアプリケーションだけが持ちます。暗号化も復号も同じアプリケーションで行うため、公開鍵を他のシステムへ配る手順はありません。公開鍵が外に漏れても、認証鍵が無ければ正しく復号できる暗号文は作れません。
 
 `PQC_RECORD_PREVIOUS_KEYS` は複数の旧鍵をカンマ区切りで指定できます（credentials の場合は配列）。世代数に上限はありません。
 
