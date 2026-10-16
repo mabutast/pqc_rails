@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "digest"
+require "openssl"
 require_relative "algorithms"
 
 module PqcRails
@@ -21,12 +22,24 @@ module PqcRails
   # HybridKemは、鍵導出(HKDF)のinfoに、指定されたアルゴリズム名をその書き方のまま含める。
   # 同じML-KEM-768でも:ml_kem_768と"ML-KEM-768"では導出される共有鍵が異なるため、
   # v1では書き方を1つに決める(canonical_pq_alg_name)。暗号化・復号の両方がこの書き方でHybridKemを開く。
+  #
+  # 作成元の認証: KEMは公開鍵だけで暗号化できるため、KEMの共有鍵をそのままAES鍵にすると、
+  # 公開鍵を知る者が正しく復号できる暗号文を作れる。v1では、秘密鍵から導いた認証鍵をKEMの共有鍵と合わせて
+  # AES鍵を導く(data_key)。認証鍵を知らない者はAES鍵を作れず、AES-GCMの認証タグの検証に必ず失敗する。
+  # 暗号化と復号を同じアプリケーション(秘密鍵の持ち主)が行う前提の構成で、HPKE(RFC 9180)のPSKモードと
+  # 同じく、事前共有の秘密を鍵導出に混ぜて作成元を確かめる。共有鍵と認証鍵の組み合わせは、
+  # NIST SP 800-227 §4.6.2の鍵結合(KDM((S1, S2), OtherInput))の形を取る。
+  # 認証鍵は秘密鍵全体(古典側とPQ側の両方)から導く。古典側(X25519)の秘密鍵は、量子計算機があれば
+  # 公開鍵から求められるため、古典側だけから導くと量子計算機を持つ者に認証鍵を作られる。
   module CiphertextFormat
     class UnsupportedAlgorithmError < PqcRails::Error; end
 
     VERSION = 1
     CLASSICAL_CURVE = "X25519"
     SEPARATOR = "+"
+    KEY_LENGTH = 32
+    AUTHENTICATION_KEY_INFO = "pqc_rails:v#{VERSION}:authentication-key".freeze
+    DATA_KEY_INFO = "pqc_rails:v#{VERSION}:data-key".freeze
 
     module_function
 
@@ -63,9 +76,28 @@ module PqcRails
       "pqc_rails:v#{VERSION}:#{algorithm_id}:#{key_id}"
     end
 
+    # KEMの共有鍵と、秘密鍵から導いた認証鍵から、AES-256-GCMの鍵(32バイト)を導く。
+    # どちらもHKDF-SHA256(saltは空文字列、SP 800-56C §8.2)で、用途ごとに異なるinfoを使う。
+    def data_key(shared_secret, secret_key)
+      authentication_key = hkdf(secret_key, AUTHENTICATION_KEY_INFO)
+      hkdf(shared_secret + authentication_key, DATA_KEY_INFO)
+    end
+
     def write_legacy?
       PqcRails.configuration.ciphertext_format == :v0
     end
+
+    # 旧形式(v0)の暗号文を受け付けない設定なら、PqcRails::Errorを送出する。
+    def ensure_legacy_accepted!
+      return if PqcRails.configuration.accept_legacy_ciphertexts
+
+      raise PqcRails::Error, "legacy (v0) ciphertexts are not accepted (accept_legacy_ciphertexts is false)"
+    end
+
+    def hkdf(input_key_material, info)
+      OpenSSL::KDF.hkdf(input_key_material, salt: "", info: info, length: KEY_LENGTH, hash: "SHA256")
+    end
+    private_class_method :hkdf
 
     def allowed_pq_name?(pq_name, configured)
       return false if pq_name.nil? || pq_name.empty?

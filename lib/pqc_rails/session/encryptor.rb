@@ -57,6 +57,7 @@ module PqcRails
       end
 
       def open_legacy(bytes)
+        CiphertextFormat.ensure_legacy_accepted!
         ciphertext, encrypted = BlobPacking.unpack(bytes)
 
         HybridKem.open(@pq_alg_name) do |hybrid|
@@ -74,7 +75,8 @@ module PqcRails
 
         HybridKem.open(CiphertextFormat.canonical_pq_alg_name(@pq_alg_name)) do |hybrid|
           encap = hybrid.encapsulate(@keypair.public_key)
-          encrypted = EnvelopeCipher.new(encap.shared_secret).encrypt(serialized, associated_data: associated_data)
+          data_key = CiphertextFormat.data_key(encap.shared_secret, @keypair.secret_key)
+          encrypted = EnvelopeCipher.new(data_key).encrypt(serialized, associated_data: associated_data)
           header + BlobPacking.pack(encap.ciphertext, encrypted)
         end
       end
@@ -95,7 +97,8 @@ module PqcRails
 
         HybridKem.open(pq_alg_name) do |hybrid|
           shared_secret = hybrid.decapsulate(ciphertext, @keypair.secret_key)
-          EnvelopeCipher.new(shared_secret).decrypt(encrypted, associated_data: associated_data)
+          data_key = CiphertextFormat.data_key(shared_secret, @keypair.secret_key)
+          EnvelopeCipher.new(data_key).decrypt(encrypted, associated_data: associated_data)
         rescue OpenSSL::Cipher::CipherError, ArgumentError => e
           raise PqcRails::Error, e.message
         end

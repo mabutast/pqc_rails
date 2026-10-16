@@ -47,13 +47,37 @@ RSpec.describe PqcRails::Session::Encryptor do
 
   describe "暗号文のメタデータ(形式バージョン・アルゴリズムID・鍵ID)" do
     around do |example|
-      original = PqcRails.configuration.ciphertext_format
+      original_format = PqcRails.configuration.ciphertext_format
+      original_accept_legacy = PqcRails.configuration.accept_legacy_ciphertexts
       example.run
     ensure
-      PqcRails.configuration.ciphertext_format = original
+      PqcRails.configuration.ciphertext_format = original_format
+      PqcRails.configuration.accept_legacy_ciphertexts = original_accept_legacy
     end
 
     def decoded(blob) = Base64.strict_decode64(blob)
+
+    # 公開鍵だけを使い、KEMの共有鍵をそのままAES鍵にしてv1形式のCookieを作る。
+    # 秘密鍵を持たない者が作れるCookieに当たる。
+    def forge_with_public_key(public_key, session)
+      algorithm_id = PqcRails::CiphertextFormat.algorithm_id(:ml_kem_512)
+      key_id = PqcRails::CiphertextFormat.key_id(public_key)
+      associated_data = PqcRails::CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id)
+      header = [PqcRails::CiphertextFormat::VERSION, algorithm_id.bytesize].pack("CC") + algorithm_id + [key_id].pack("H4")
+
+      PqcRails::HybridKem.open(:ml_kem_512) do |hybrid|
+        encap = hybrid.encapsulate(public_key)
+        encrypted = PqcRails::EnvelopeCipher.new(encap.shared_secret)
+                                            .encrypt(Marshal.dump(session), associated_data: associated_data)
+        Base64.strict_encode64(header + PqcRails::BlobPacking.pack(encap.ciphertext, encrypted))
+      end
+    end
+
+    it "公開鍵だけで作ったCookieは復号できない(作成元の認証)" do
+      forged = forge_with_public_key(keypair.public_key, { "user_id" => 1 })
+
+      expect { encryptor.decrypt(forged) }.to raise_error(PqcRails::Error)
+    end
 
     it "先頭に[形式バージョン][アルゴリズムIDの長さ][アルゴリズムID][鍵ID 2バイト]を持つ" do
       bytes = decoded(encryptor.encrypt({ "user_id" => 1 }))
@@ -114,6 +138,15 @@ RSpec.describe PqcRails::Session::Encryptor do
       PqcRails.configuration.ciphertext_format = :v1
 
       expect(encryptor.decrypt(legacy_blob)).to eq({ "user_id" => 1 })
+    end
+
+    it "accept_legacy_ciphertexts = false のとき、旧形式のCookieを拒否する" do
+      PqcRails.configuration.ciphertext_format = :v0
+      legacy_blob = encryptor.encrypt({ "user_id" => 1 })
+      PqcRails.configuration.ciphertext_format = :v1
+      PqcRails.configuration.accept_legacy_ciphertexts = false
+
+      expect { encryptor.decrypt(legacy_blob) }.to raise_error(PqcRails::Error, /legacy/)
     end
   end
 end

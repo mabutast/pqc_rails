@@ -20,9 +20,16 @@ module PqcRails
     #     サーバーにも読める暗号文を書くために使う。全台の更新後に:v1へ戻す
     attr_reader :ciphertext_format
 
+    # 旧形式(v0)の暗号文を復号するかどうか(既定はtrue)。
+    # 旧形式は作成元の認証を持たず、公開鍵だけで正しく復号できる暗号文を作れる。
+    # 旧形式のデータが残っていない状態(DBは全レコードの再暗号化後、Cookieは最長のセッション有効期限の経過後)に
+    # なったらfalseにし、旧形式の暗号文を受け付けないようにする。
+    attr_reader :accept_legacy_ciphertexts
+
     def initialize
       @liboqs_path = ENV["LIBOQS_PATH"] || default_liboqs_path
       @ciphertext_format = :v1
+      @accept_legacy_ciphertexts = true
     end
 
     def ciphertext_format=(format)
@@ -31,6 +38,14 @@ module PqcRails
       end
 
       @ciphertext_format = format
+    end
+
+    def accept_legacy_ciphertexts=(value)
+      unless [true, false].include?(value)
+        raise ArgumentError, "accept_legacy_ciphertexts must be true or false, got #{value.inspect}"
+      end
+
+      @accept_legacy_ciphertexts = value
     end
 
     private

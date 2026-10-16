@@ -39,7 +39,8 @@ module PqcRails
 
       HybridKem.open(CiphertextFormat.canonical_pq_alg_name(@pq_alg_name)) do |hybrid|
         encap = hybrid.encapsulate(key.public_key)
-        envelope = EnvelopeCipher.new(encap.shared_secret).encrypt(clear_text, associated_data: associated_data)
+        data_key = CiphertextFormat.data_key(encap.shared_secret, key.secret_key)
+        envelope = EnvelopeCipher.new(data_key).encrypt(clear_text, associated_data: associated_data)
 
         ::ActiveRecord::Encryption::Message.new(payload: envelope).tap do |message|
           message.headers[:kem_ct] = encap.ciphertext
@@ -87,7 +88,9 @@ module PqcRails
     end
 
     def decrypt_legacy(encrypted_message, keypairs)
-      try_keypairs(encrypted_message, keypairs, pq_alg_name: @pq_alg_name, associated_data: nil)
+      CiphertextFormat.ensure_legacy_accepted!
+
+      try_keypairs(encrypted_message, keypairs, pq_alg_name: @pq_alg_name, associated_data: nil, authenticated: false)
     end
 
     def decrypt_v1(encrypted_message, keypairs)
@@ -97,10 +100,13 @@ module PqcRails
       candidates = keypairs.select { |keypair| CiphertextFormat.key_id(keypair.public_key) == key_id }
       associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id)
 
-      try_keypairs(encrypted_message, candidates, pq_alg_name: pq_alg_name, associated_data: associated_data)
+      try_keypairs(encrypted_message, candidates, pq_alg_name: pq_alg_name, associated_data: associated_data,
+                                                  authenticated: true)
     end
 
-    def try_keypairs(encrypted_message, keypairs, pq_alg_name:, associated_data:)
+    # 各鍵ペアで復号を試す。authenticatedがtrue(v1)ならAES鍵をCiphertextFormat.data_keyで導き、
+    # false(旧形式)ならKEMの共有鍵をそのままAES鍵にする。
+    def try_keypairs(encrypted_message, keypairs, pq_alg_name:, associated_data:, authenticated:)
       raise PqcRails::Error, "no decryption key matches the message's key id" if keypairs.empty?
 
       kem_ciphertext = header(encrypted_message, :kem_ct)
@@ -110,7 +116,8 @@ module PqcRails
       HybridKem.open(pq_alg_name) do |hybrid|
         keypairs.each do |keypair|
           shared_secret = hybrid.decapsulate(kem_ciphertext, keypair.secret_key)
-          return EnvelopeCipher.new(shared_secret).decrypt(encrypted_message.payload, associated_data: associated_data)
+          data_key = authenticated ? CiphertextFormat.data_key(shared_secret, keypair.secret_key) : shared_secret
+          return EnvelopeCipher.new(data_key).decrypt(encrypted_message.payload, associated_data: associated_data)
         rescue OpenSSL::Cipher::CipherError, PqcRails::Error, ArgumentError, TypeError => e
           last_error = e
         end

@@ -80,4 +80,22 @@ RSpec.describe PqcRails::Configuration do
       expect { described_class.new.ciphertext_format = :v2 }.to raise_error(ArgumentError, /ciphertext_format/)
     end
   end
+
+  describe "#accept_legacy_ciphertexts" do
+    it "既定はtrue(旧形式の暗号文も読む)" do
+      expect(described_class.new.accept_legacy_ciphertexts).to be(true)
+    end
+
+    it "falseを設定できる" do
+      config = described_class.new
+      config.accept_legacy_ciphertexts = false
+
+      expect(config.accept_legacy_ciphertexts).to be(false)
+    end
+
+    it "true/false以外はArgumentErrorを送出する" do
+      expect { described_class.new.accept_legacy_ciphertexts = "no" }
+        .to raise_error(ArgumentError, /accept_legacy_ciphertexts/)
+    end
+  end
 end
