@@ -61,6 +61,29 @@ User.find_each(&:encrypt)
 
 セッションは DB のレコードと異なり、Cookie の有効期限（`expire_after` 等）が過ぎれば自然に失効します。そのため `PQC_SESSION_PREVIOUS_KEYS` は「ローテーション後、旧鍵で発行されたセッションが有効期限切れになるまで」の一時的な設定として運用し、その期間を過ぎたら削除してください（DB側のような一括再暗号化の手順は不要です）。
 
+### アルゴリズム（パラメータセット）の変更
+
+ML-KEM-768 から ML-KEM-1024 に変える場合のように、アルゴリズムを変更する手順です。暗号文は自身のアルゴリズムIDを持つため、設定を変えた後も、変更前のアルゴリズムで暗号化したデータを復号できます（[README「暗号文の形式」](../README.md#暗号文の形式)参照）。鍵ペアはアルゴリズムごとに異なるため、新しいアルゴリズムの鍵ペアを生成し、鍵ローテーションと同時に行います。
+
+1. 0.3.0 以前の版で暗号化したレコードが残っていれば、先に「一括再暗号化したい場合」の手順で再暗号化し、アルゴリズムIDを持つ形式に書き換える。アルゴリズムIDを持たない暗号文は設定のアルゴリズムで復号されるため、設定を変えると復号できなくなる
+2. 新しいアルゴリズムの鍵ペアを生成する
+
+   ```ruby
+   keypair = PqcRails::HybridKem.open(:ml_kem_1024) { |hybrid| hybrid.generate_keypair }
+   PqcRails::KeySource.encode(keypair) # => PQC_RECORD_KEY に設定する文字列
+   ```
+
+3. 上記「鍵ローテーション」の手順 1〜2 と同じく、生成した鍵を `PQC_RECORD_KEY` に、元の鍵を `PQC_RECORD_PREVIOUS_KEYS` に設定する
+4. アルゴリズムの設定を変更してアプリを再起動する
+
+   ```ruby
+   PqcRails::ActiveRecord::Context.install!(pq_alg_name: :ml_kem_1024)
+   ```
+
+5. 旧アルゴリズムのレコードを再暗号化し終えたら、`PQC_RECORD_PREVIOUS_KEYS` から元の鍵を削除する
+
+セッションでは `config.session_store :pqc_cookie_store, pq_alg_name: :ml_kem_1024` に変え、鍵は `PQC_SESSION_KEY` / `PQC_SESSION_PREVIOUS_KEYS` で同様に入れ替えます。0.3.0 以前の版が発行した Cookie は、変更後は復号できず空のセッションとして扱われます（該当ユーザーは再ログインになります）。
+
 ### 外部鍵ソース（HSM等）への差し替えについて
 
 鍵の取得元は、デフォルトでは `PqcRails::KeySource::EnvCredentials`（ENV → Rails credentials）です。`#current_keypair` / `#previous_keypairs` の2メソッドを実装したオブジェクトであれば差し替えられます。

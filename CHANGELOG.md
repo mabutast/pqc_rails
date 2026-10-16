@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Ciphertexts for ActiveRecord columns and session cookies now record a format version, the
+  algorithm that produced them (for example `X25519+ML-KEM-768`) and the id of the key used. These
+  values are authenticated as AES-GCM associated data. Decryption uses the recorded algorithm, so
+  changing `pq_alg_name` no longer makes existing records and cookies undecryptable, and only keys
+  with a matching id are tried. Only registered algorithms and the configured algorithm are
+  accepted from a ciphertext. See "暗号文の形式" in the README and the algorithm change procedure
+  in docs/MIGRATION.md.
+- `PqcRails.configuration.ciphertext_format`: set to `:v0` to keep writing the 0.3.0 format while
+  servers are updated one by one, then remove the setting. Defaults to `:v1`.
+
+### Changed
+
+- Ciphertexts grow by about 60 bytes per ActiveRecord column and about 30 bytes per session cookie
+  with ML-KEM-768. Ciphertexts written in the 0.3.0 format are still decrypted, using the
+  configured algorithm. Ciphertexts written in the new format cannot be decrypted by 0.3.0 or
+  earlier, so roll back only data written with `ciphertext_format = :v0`.
+
 ### Fixed
 
 - `bundle install` now builds liboqs correctly when the gem is installed under a path containing
