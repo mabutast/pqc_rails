@@ -39,7 +39,7 @@ module PqcRails
 
       HybridKem.open(CiphertextFormat.canonical_pq_alg_name(@pq_alg_name)) do |hybrid|
         encap = hybrid.encapsulate(key.public_key)
-        data_key = CiphertextFormat.data_key(encap.shared_secret, key.secret_key)
+        data_key = CiphertextFormat.data_key(encap.shared_secret, key.authentication_key)
         envelope = EnvelopeCipher.new(data_key).encrypt(clear_text, associated_data: associated_data)
 
         ::ActiveRecord::Encryption::Message.new(payload: envelope).tap do |message|
@@ -88,7 +88,7 @@ module PqcRails
     end
 
     def decrypt_legacy(encrypted_message, keypairs)
-      CiphertextFormat.ensure_legacy_accepted!
+      CiphertextFormat.ensure_legacy_record_accepted!
 
       try_keypairs(encrypted_message, keypairs, pq_alg_name: @pq_alg_name, associated_data: nil, authenticated: false)
     end
@@ -116,7 +116,7 @@ module PqcRails
       HybridKem.open(pq_alg_name) do |hybrid|
         keypairs.each do |keypair|
           shared_secret = hybrid.decapsulate(kem_ciphertext, keypair.secret_key)
-          data_key = authenticated ? CiphertextFormat.data_key(shared_secret, keypair.secret_key) : shared_secret
+          data_key = authenticated ? CiphertextFormat.data_key(shared_secret, keypair.authentication_key) : shared_secret
           return EnvelopeCipher.new(data_key).decrypt(encrypted_message.payload, associated_data: associated_data)
         rescue OpenSSL::Cipher::CipherError, PqcRails::Error, ArgumentError, TypeError => e
           last_error = e

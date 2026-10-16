@@ -20,16 +20,21 @@ module PqcRails
     #     サーバーにも読める暗号文を書くために使う。全台の更新後に:v1へ戻す
     attr_reader :ciphertext_format
 
-    # 旧形式(v0)の暗号文を復号するかどうか(既定はtrue)。
-    # 旧形式は作成元の認証を持たず、公開鍵だけで正しく復号できる暗号文を作れる。
-    # 旧形式のデータが残っていない状態(DBは全レコードの再暗号化後、Cookieは最長のセッション有効期限の経過後)に
-    # なったらfalseにし、旧形式の暗号文を受け付けないようにする。
-    attr_reader :accept_legacy_ciphertexts
+    # 旧形式(v0)の暗号文は作成元の認証を持たず、公開鍵だけで正しく復号できる暗号文を作れる。
+    # 旧形式のデータが残っていない状態になったら、旧形式を受け付けないようにする。
+
+    # 旧形式のDBカラムを復号するかどうか(既定はtrue)。全レコードを再暗号化した後にfalseにする。
+    attr_reader :accept_legacy_records
+
+    # 旧形式のセッションCookieを、この日時まで復号する(既定はnilで、期限なし)。
+    # 旧形式のCookieは発行日時を持たないため、更新日時に最長のセッション有効期限を足した日時を設定する。
+    attr_reader :accept_legacy_cookies_until
 
     def initialize
       @liboqs_path = ENV["LIBOQS_PATH"] || default_liboqs_path
       @ciphertext_format = :v1
-      @accept_legacy_ciphertexts = true
+      @accept_legacy_records = true
+      @accept_legacy_cookies_until = nil
     end
 
     def ciphertext_format=(format)
@@ -40,12 +45,20 @@ module PqcRails
       @ciphertext_format = format
     end
 
-    def accept_legacy_ciphertexts=(value)
+    def accept_legacy_records=(value)
       unless [true, false].include?(value)
-        raise ArgumentError, "accept_legacy_ciphertexts must be true or false, got #{value.inspect}"
+        raise ArgumentError, "accept_legacy_records must be true or false, got #{value.inspect}"
       end
 
-      @accept_legacy_ciphertexts = value
+      @accept_legacy_records = value
+    end
+
+    def accept_legacy_cookies_until=(time)
+      unless time.nil? || time.is_a?(Time)
+        raise ArgumentError, "accept_legacy_cookies_until must be a Time or nil, got #{time.inspect}"
+      end
+
+      @accept_legacy_cookies_until = time
     end
 
     private

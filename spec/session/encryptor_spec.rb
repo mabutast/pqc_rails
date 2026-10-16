@@ -48,11 +48,11 @@ RSpec.describe PqcRails::Session::Encryptor do
   describe "暗号文のメタデータ(形式バージョン・アルゴリズムID・鍵ID)" do
     around do |example|
       original_format = PqcRails.configuration.ciphertext_format
-      original_accept_legacy = PqcRails.configuration.accept_legacy_ciphertexts
+      original_until = PqcRails.configuration.accept_legacy_cookies_until
       example.run
     ensure
       PqcRails.configuration.ciphertext_format = original_format
-      PqcRails.configuration.accept_legacy_ciphertexts = original_accept_legacy
+      PqcRails.configuration.accept_legacy_cookies_until = original_until
     end
 
     def decoded(blob) = Base64.strict_decode64(blob)
@@ -140,13 +140,36 @@ RSpec.describe PqcRails::Session::Encryptor do
       expect(encryptor.decrypt(legacy_blob)).to eq({ "user_id" => 1 })
     end
 
-    it "accept_legacy_ciphertexts = false のとき、旧形式のCookieを拒否する" do
-      PqcRails.configuration.ciphertext_format = :v0
-      legacy_blob = encryptor.encrypt({ "user_id" => 1 })
-      PqcRails.configuration.ciphertext_format = :v1
-      PqcRails.configuration.accept_legacy_ciphertexts = false
+    context "旧形式のCookieの受け付け期限(accept_legacy_cookies_until)" do
+      let(:legacy_blob) do
+        PqcRails.configuration.ciphertext_format = :v0
+        encryptor.encrypt({ "user_id" => 1 }).tap { PqcRails.configuration.ciphertext_format = :v1 }
+      end
 
-      expect { encryptor.decrypt(legacy_blob) }.to raise_error(PqcRails::Error, /legacy/)
+      it "期限を過ぎたら旧形式のCookieを拒否する" do
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now - 60
+
+        expect { encryptor.decrypt(legacy_blob) }.to raise_error(PqcRails::Error, /legacy/)
+      end
+
+      it "期限前は旧形式のCookieを読む" do
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+
+        expect(encryptor.decrypt(legacy_blob)).to eq({ "user_id" => 1 })
+      end
+
+      it "期限を過ぎても、新しい形式のCookieは読む" do
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now - 60
+
+        expect(encryptor.decrypt(encryptor.encrypt({ "user_id" => 2 }))).to eq({ "user_id" => 2 })
+      end
+    end
+
+    it "認証鍵を持たない鍵(0.3.0以前の形式)では新しい形式で暗号化できない" do
+      legacy_key = PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key)
+
+      expect { described_class.new(legacy_key, pq_alg_name: :ml_kem_512).encrypt({ "user_id" => 1 }) }
+        .to raise_error(PqcRails::MissingAuthenticationKeyError)
     end
   end
 end

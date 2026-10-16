@@ -66,30 +66,25 @@ RSpec.describe PqcRails::CiphertextFormat do
   end
 
   describe ".data_key" do
-    let(:keypair) { PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair } }
     let(:shared_secret) { "\x01" * 32 }
+    let(:authentication_key) { "\x02" * 32 }
 
-    it "KEMの共有鍵と秘密鍵から32バイトのAES鍵を導く" do
-      expect(described_class.data_key(shared_secret, keypair.secret_key).bytesize).to eq(32)
+    it "KEMの共有鍵と認証鍵から32バイトのAES鍵を導く" do
+      expect(described_class.data_key(shared_secret, authentication_key).bytesize).to eq(32)
     end
 
     it "KEMの共有鍵そのものとは異なる(共有鍵だけではAES鍵を作れない)" do
-      expect(described_class.data_key(shared_secret, keypair.secret_key)).not_to eq(shared_secret)
+      expect(described_class.data_key(shared_secret, authentication_key)).not_to eq(shared_secret)
     end
 
-    it "秘密鍵が異なれば、同じ共有鍵からでも異なるAES鍵になる" do
-      other = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }
-
-      expect(described_class.data_key(shared_secret, keypair.secret_key))
-        .not_to eq(described_class.data_key(shared_secret, other.secret_key))
+    it "認証鍵が異なれば、同じ共有鍵からでも異なるAES鍵になる" do
+      expect(described_class.data_key(shared_secret, authentication_key))
+        .not_to eq(described_class.data_key(shared_secret, "\x03" * 32))
     end
 
-    it "秘密鍵のうちPQ側だけが異なっても、異なるAES鍵になる(古典側の秘密鍵だけから導かない)" do
-      classical_secret, pq_secret = PqcRails::BlobPacking.unpack(keypair.secret_key)
-      tampered_pq = pq_secret.dup.tap { |s| s.setbyte(s.bytesize - 1, s.getbyte(s.bytesize - 1) ^ 1) }
-
-      expect(described_class.data_key(shared_secret, keypair.secret_key))
-        .not_to eq(described_class.data_key(shared_secret, PqcRails::BlobPacking.pack(classical_secret, tampered_pq)))
+    it "認証鍵が無い鍵ペアではPqcRails::MissingAuthenticationKeyErrorを送出する" do
+      expect { described_class.data_key(shared_secret, nil) }
+        .to raise_error(PqcRails::MissingAuthenticationKeyError, /authentication key/)
     end
   end
 

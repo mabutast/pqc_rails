@@ -44,12 +44,23 @@ module PqcRails
     end
 
     def key_result(name:, env_var:, credentials_key:)
-      if KeySource.fetch(env_var: env_var, credentials_key: credentials_key)
+      encoded = KeySource.fetch(env_var: env_var, credentials_key: credentials_key)
+      if encoded && legacy_key?(encoded)
+        Result.new(name: name, ok: false,
+                   detail: "認証鍵を持たない0.3.0以前の形式の鍵です。新しい鍵を生成してローテーションしてください(docs/MIGRATION.md)")
+      elsif encoded
         Result.new(name: name, ok: true, detail: "設定済み")
       else
         Result.new(name: name, ok: false,
                    detail: "未設定です。`rails generate pqc_rails:install` を実行したか確認してください")
       end
+    end
+
+    # 認証鍵を持たない(0.3.0以前に生成した)鍵ならtrue。値を読めない場合は、ここでは判定しない。
+    def legacy_key?(encoded)
+      KeySource.decode(encoded).authentication_key.nil?
+    rescue ArgumentError, TypeError, NoMethodError
+      false
     end
 
     def previous_keys_result(name:, env_var:, credentials_key:)

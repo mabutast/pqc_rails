@@ -13,6 +13,15 @@ RSpec.describe PqcRails::KeySource do
       decoded = described_class.decode(encoded)
       expect(decoded.public_key).to eq(keypair.public_key)
       expect(decoded.secret_key).to eq(keypair.secret_key)
+      expect(decoded.authentication_key).to eq(keypair.authentication_key)
+    end
+
+    it "認証鍵を持たない0.3.0以前の形式の鍵は、authentication_keyがnilの鍵ペアとして読む" do
+      legacy = Base64.strict_encode64(PqcRails::BlobPacking.pack(keypair.public_key, keypair.secret_key))
+
+      decoded = described_class.decode(legacy)
+      expect(decoded.public_key).to eq(keypair.public_key)
+      expect(decoded.authentication_key).to be_nil
     end
   end
 

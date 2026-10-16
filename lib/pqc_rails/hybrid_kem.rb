@@ -35,7 +35,10 @@ module PqcRails
   #     shared == encap.shared_secret # => true
   #   end
   class HybridKem
-    Keypair = Struct.new(:public_key, :secret_key)
+    # authentication_keyは、暗号文の作成元の認証に使う32バイトのランダムな共通鍵
+    # (CiphertextFormat.data_key参照)。KEMの演算には使わない。0.3.0以前に生成した鍵は持たない(nil)。
+    Keypair = Struct.new(:public_key, :secret_key, :authentication_key)
+    AUTHENTICATION_KEY_LENGTH = 32
     Encapsulation = Struct.new(:ciphertext, :shared_secret)
 
     COMBINER_LABEL = "pqc_rails-hybrid-kem-v1"
@@ -59,7 +62,8 @@ module PqcRails
 
       Keypair.new(
         BlobPacking.pack(classical_keypair.public_key, pq_keypair.public_key),
-        BlobPacking.pack(classical_keypair.secret_key, pq_keypair.secret_key)
+        BlobPacking.pack(classical_keypair.secret_key, pq_keypair.secret_key),
+        OpenSSL::Random.random_bytes(AUTHENTICATION_KEY_LENGTH)
       )
     end
 

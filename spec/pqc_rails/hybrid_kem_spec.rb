@@ -30,6 +30,16 @@ RSpec.describe PqcRails::HybridKem do
         expect(first.public_key).not_to eq(second.public_key)
       end
     end
+
+    it "暗号文の作成元の認証に使う32バイトの認証鍵を、鍵ペアごとにランダムに生成する" do
+      described_class.open(pq_alg_name) do |hybrid|
+        first  = hybrid.generate_keypair
+        second = hybrid.generate_keypair
+
+        expect(first.authentication_key.bytesize).to eq(32)
+        expect(first.authentication_key).not_to eq(second.authentication_key)
+      end
+    end
   end
 
   describe "#encapsulate / #decapsulate" do

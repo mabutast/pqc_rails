@@ -22,4 +22,21 @@ RSpec.describe PqcRails::BlobPacking do
       expect(described_class.unpack(blob)).to eq([first, second])
     end
   end
+
+  describe ".pack_all / .unpack_all" do
+    it "任意の個数のバイト列をラウンドトリップできる" do
+      blob = described_class.pack_all("public", "secret", "authentication")
+
+      expect(described_class.unpack_all(blob)).to eq(%w[public secret authentication])
+    end
+
+    it "2つのバイト列はpackと同じ形になる(既存の鍵を読める)" do
+      expect(described_class.pack_all("a", "b")).to eq(described_class.pack("a", "b"))
+      expect(described_class.unpack_all(described_class.pack("a", "b"))).to eq(%w[a b])
+    end
+
+    it "3つ目以降があっても、unpackは先頭2つだけを返す(0.3.0以前の読み方と同じ)" do
+      expect(described_class.unpack(described_class.pack_all("a", "b", "c"))).to eq(%w[a b])
+    end
+  end
 end

@@ -39,13 +39,16 @@ module PqcRails
 
     # HybridKem::Keypairのシリアライズ形式。鍵の保存形式そのものであり、
     # セッション・ActiveRecordの両方の鍵管理から利用する。
+    # [公開鍵][秘密鍵][認証鍵]をBlobPacking.pack_allでまとめる。0.3.0以前の鍵は認証鍵を持たない2要素の形で、
+    # 0.3.0以前の版は先頭の2要素だけを読むため、3要素の鍵も読める。
     def encode(keypair)
-      Base64.strict_encode64(BlobPacking.pack(keypair.public_key, keypair.secret_key))
+      parts = [keypair.public_key, keypair.secret_key, keypair.authentication_key].compact
+      Base64.strict_encode64(BlobPacking.pack_all(*parts))
     end
 
     def decode(encoded)
-      public_key, secret_key = BlobPacking.unpack(Base64.strict_decode64(encoded))
-      HybridKem::Keypair.new(public_key, secret_key)
+      public_key, secret_key, authentication_key = BlobPacking.unpack_all(Base64.strict_decode64(encoded))
+      HybridKem::Keypair.new(public_key, secret_key, authentication_key)
     end
 
     # ENV、またはRails credentialsから現行鍵・旧鍵世代を読み込む、デフォルトの鍵ソース。

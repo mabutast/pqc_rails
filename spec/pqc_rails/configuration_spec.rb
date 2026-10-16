@@ -81,21 +81,39 @@ RSpec.describe PqcRails::Configuration do
     end
   end
 
-  describe "#accept_legacy_ciphertexts" do
-    it "既定はtrue(旧形式の暗号文も読む)" do
-      expect(described_class.new.accept_legacy_ciphertexts).to be(true)
+  describe "#accept_legacy_records" do
+    it "既定はtrue(旧形式のDBカラムも読む)" do
+      expect(described_class.new.accept_legacy_records).to be(true)
     end
 
     it "falseを設定できる" do
       config = described_class.new
-      config.accept_legacy_ciphertexts = false
+      config.accept_legacy_records = false
 
-      expect(config.accept_legacy_ciphertexts).to be(false)
+      expect(config.accept_legacy_records).to be(false)
     end
 
     it "true/false以外はArgumentErrorを送出する" do
-      expect { described_class.new.accept_legacy_ciphertexts = "no" }
-        .to raise_error(ArgumentError, /accept_legacy_ciphertexts/)
+      expect { described_class.new.accept_legacy_records = "no" }.to raise_error(ArgumentError, /accept_legacy_records/)
+    end
+  end
+
+  describe "#accept_legacy_cookies_until" do
+    it "既定はnil(期限なしで旧形式のCookieを読む)" do
+      expect(described_class.new.accept_legacy_cookies_until).to be_nil
+    end
+
+    it "日時を設定できる" do
+      config = described_class.new
+      deadline = Time.utc(2026, 12, 1)
+      config.accept_legacy_cookies_until = deadline
+
+      expect(config.accept_legacy_cookies_until).to eq(deadline)
+    end
+
+    it "日時とnil以外はArgumentErrorを送出する" do
+      expect { described_class.new.accept_legacy_cookies_until = "2026-12-01" }
+        .to raise_error(ArgumentError, /accept_legacy_cookies_until/)
     end
   end
 end

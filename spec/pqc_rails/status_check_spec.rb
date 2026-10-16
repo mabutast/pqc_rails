@@ -57,6 +57,17 @@ RSpec.describe PqcRails::StatusCheck do
       expect(session_key.detail).to include("設定済み")
     end
 
+    it "セッション鍵が認証鍵を持たない(0.3.0以前の形式)場合、鍵の再生成が必要と報告する" do
+      legacy = Base64.strict_encode64(PqcRails::BlobPacking.pack(keypair.public_key, keypair.secret_key))
+      ENV["PQC_SESSION_KEY"] = legacy
+
+      results = described_class.run
+
+      session_key = result_for(results, "セッション鍵 (PQC_SESSION_KEY)")
+      expect(session_key.ok).to be false
+      expect(session_key.detail).to include("認証鍵")
+    end
+
     it "DBレコード鍵が未設定の場合、その旨を報告する" do
       results = described_class.run
 

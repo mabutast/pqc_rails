@@ -13,9 +13,9 @@ module PqcRails
     # set_cookie/get_cookieはCookieStoreがRailsの暗号化クッキージャーへの委譲点として
     # 用意しているprivateな拡張点(Rails 7.1〜8.1で同一シグネチャ)。ここを上書きして
     # 生のcookie_jar(署名・暗号化なし)に対してEncryptorで暗号化した文字列を直接書き込む。
-    # Railsの署名は使わない。v1形式の暗号文はAES鍵を秘密鍵由来の認証鍵から導くため、AES-256-GCMの
-    # 認証タグが改竄検知と作成元の認証(秘密鍵の持ち主が作ったこと)を兼ねる(CiphertextFormat.data_key参照)。
-    # 旧形式(v0)は作成元の認証を持たないため、移行後はaccept_legacy_ciphertextsをfalseにする。
+    # Railsの署名は使わない。v1形式の暗号文はAES鍵を鍵ペアの認証鍵から導くため、AES-256-GCMの
+    # 認証タグが改竄検知と作成元の認証(認証鍵の持ち主が作ったこと)を兼ねる(CiphertextFormat.data_key参照)。
+    # 旧形式(v0)は作成元の認証を持たないため、accept_legacy_cookies_untilで受け付けの期限を決める。
     #
     # 鍵ローテーション対応: 書き込みは常に現行鍵(@encryptor)のみを使う。読み込みは
     # 現行鍵で失敗した場合、previous_keypairs(鍵ローテーション前の旧鍵)で順に再試行する。
