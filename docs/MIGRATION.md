@@ -40,11 +40,11 @@ end
 User.find_each(&:encrypt)
 ```
 
-0.3.0 以前の版から更新した場合、全レコードを再暗号化し終えたら、旧形式の暗号文を受け付けない設定にしてください。旧形式は作成元の認証を持たず、公開鍵だけで作れるためです（[README「暗号文の形式」](../README.md#暗号文の形式)参照）。セッション Cookie を併用している場合は、最長のセッション有効期限が過ぎるのを待ってから設定します。
+0.3.0 以前の版から更新した場合、全レコードを再暗号化し終えたら、旧形式の暗号文を受け付けない設定にしてください。旧形式は作成元の認証を持たず、公開鍵だけで作れるためです（[README「暗号文の形式」](../README.md#暗号文の形式)参照）。
 
 ```ruby
 PqcRails.configure do |config|
-  config.accept_legacy_ciphertexts = false
+  config.accept_legacy_records = false
 end
 ```
 
@@ -68,6 +68,33 @@ end
 `PqcCookieStore` は書き込み（`set_cookie`）には常に現行鍵のみを使い、読み込み（`get_cookie`）は現行鍵で復号できなかった場合に旧鍵世代を順に試します。手順は DB 側と同様に `PQC_SESSION_KEY` / `PQC_SESSION_PREVIOUS_KEYS`（または `pqc_session_key` / `pqc_session_previous_keys` credentials）を使います。
 
 セッションは DB のレコードと異なり、Cookie の有効期限（`expire_after` 等）が過ぎれば自然に失効します。そのため `PQC_SESSION_PREVIOUS_KEYS` は「ローテーション後、旧鍵で発行されたセッションが有効期限切れになるまで」の一時的な設定として運用し、その期間を過ぎたら削除してください（DB側のような一括再暗号化の手順は不要です）。
+
+### 0.3.0 以前からの更新
+
+0.3.0 以前に生成した鍵は認証鍵を持たないため、新しい形式の暗号文を書けません。更新時に、新しい鍵を生成してローテーションします。新しい形式の鍵は、0.3.0 以前の版でも読めます（先頭の公開鍵・秘密鍵だけを使います）。
+
+1. 新しい鍵を生成する（セッション用・DB 用それぞれ）
+
+   ```ruby
+   keypair = PqcRails::HybridKem.open(:ml_kem_768) { |hybrid| hybrid.generate_keypair }
+   PqcRails::KeySource.encode(keypair) # => 新しい鍵の文字列
+   ```
+
+2. 1台だけで動かしている場合は、gem の更新と同時に、新しい鍵を `PQC_SESSION_KEY` / `PQC_RECORD_KEY` に、元の鍵を `PQC_SESSION_PREVIOUS_KEYS` / `PQC_RECORD_PREVIOUS_KEYS` に設定して再起動する
+3. 複数台を順番に更新する場合は、次の順で進める
+   1. `config.ciphertext_format = :v0` を設定して gem を更新する。鍵は元のままでよい（旧形式は認証鍵を使わない）
+   2. 全台の更新後、新しい鍵を `PQC_*_PREVIOUS_KEYS` に追加して全台を再起動する。これで、どのサーバーも新しい鍵の暗号文を読める
+   3. 新しい鍵を `PQC_*_KEY` に、元の鍵を `PQC_*_PREVIOUS_KEYS` に入れ替え、`ciphertext_format = :v0` を削除して全台を再起動する
+4. `rails pqc_rails:status` で、鍵が「設定済み」になっていることを確かめる
+5. 旧形式の Cookie を読む期限を設定する。更新日時に最長のセッション有効期限を足した日時を設定すれば、その後は旧形式の Cookie を自動的に読まなくなる
+
+   ```ruby
+   PqcRails.configure do |config|
+     config.accept_legacy_cookies_until = Time.utc(2026, 12, 1)
+   end
+   ```
+
+6. DB は、全レコードを再暗号化した後（「一括再暗号化したい場合」）に `accept_legacy_records = false` を設定し、`PQC_RECORD_PREVIOUS_KEYS` から元の鍵を削除する
 
 ### アルゴリズム（パラメータセット）の変更
 
