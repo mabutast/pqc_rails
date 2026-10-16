@@ -40,6 +40,14 @@ end
 User.find_each(&:encrypt)
 ```
 
+0.3.0 以前の版から更新した場合、全レコードを再暗号化し終えたら、旧形式の暗号文を受け付けない設定にしてください。旧形式は作成元の認証を持たず、公開鍵だけで作れるためです（[README「暗号文の形式」](../README.md#暗号文の形式)参照）。セッション Cookie を併用している場合は、最長のセッション有効期限が過ぎるのを待ってから設定します。
+
+```ruby
+PqcRails.configure do |config|
+  config.accept_legacy_ciphertexts = false
+end
+```
+
 ## 鍵ローテーション（pqc_rails鍵世代間）
 
 上記の `previous:` は「pqc_rails 導入前の暗号方式」からの移行を扱いますが、ここで扱うのは「pqc_rails 導入後、鍵そのものを世代交代させたい」場合の手順です。セッション・DB のどちらも、現行鍵に加えて旧鍵世代を併用できます。

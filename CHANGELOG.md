@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in docs/MIGRATION.md.
 - `PqcRails.configuration.ciphertext_format`: set to `:v0` to keep writing the 0.3.0 format while
   servers are updated one by one, then remove the setting. Defaults to `:v1`.
+- `PqcRails.configuration.accept_legacy_ciphertexts`: set to `false` to reject ciphertexts in the
+  0.3.0 format once none remain (after re-encrypting all records, and after the longest session
+  lifetime has passed for cookies). Defaults to `true`.
 
 ### Changed
 
@@ -25,6 +28,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with ML-KEM-768. Ciphertexts written in the 0.3.0 format are still decrypted, using the
   configured algorithm. Ciphertexts written in the new format cannot be decrypted by 0.3.0 or
   earlier, so roll back only data written with `ciphertext_format = :v0`.
+
+### Security
+
+- Ciphertexts in the new format authenticate their creator. In 0.3.0 and earlier, the KEM shared
+  secret was used directly as the AES-256-GCM key, so anyone who knew the public key could create
+  ciphertexts that decrypt successfully: forged session cookies (for example with an arbitrary
+  `user_id`), or arbitrary values in encrypted columns for someone able to write to the database.
+  The AES key is now derived from both the KEM shared secret and an authentication key derived
+  from the secret key, so the secret key is required to create a ciphertext. With the default key
+  storage (`PQC_SESSION_KEY` / `PQC_RECORD_KEY` or Rails credentials), the public key is stored
+  together with the secret key and is not exposed, so this was not exploitable unless the public
+  key was disclosed separately. Ciphertexts in the 0.3.0 format remain forgeable with the public
+  key; set `accept_legacy_ciphertexts = false` once they are no longer needed.
 
 ### Fixed
 
