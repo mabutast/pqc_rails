@@ -48,7 +48,7 @@ PQC 対応の義務化を待つ理由はありません。今この瞬間も、�
 | 署名 | 該当する機能なし | ML-DSA（`PqcRails::Sig`、単体のプリミティブとして提供） |
 | TLS 通信路 | 対象外（Web サーバ・ロードバランサの設定） | 対象外 |
 
-読み込んでいる liboqs の版は `rails pqc_rails:status`（`PqcRails.liboqs_version`）で確認できます。
+ML-KEM は NIST FIPS 203、ML-DSA は NIST FIPS 204 で標準化されたアルゴリズムです。読み込んでいる liboqs の版は `rails pqc_rails:status`（`PqcRails.liboqs_version`）で確認できます。
 
 KEM と DSA に加え、セッション Cookie と ActiveRecord::Encryption の両方を ML-KEM ベースのハイブリッド暗号（KEM-DEM 構成）で保護します。liboqs がサポートする他のアルゴリズムも、アルゴリズム名を文字列で指定するだけで利用できます（liboqs 側のビルド設定に依存します）。
 
@@ -57,6 +57,7 @@ KEM と DSA に加え、セッション Cookie と ActiveRecord::Encryption の�
 - **対象はアプリケーション層の暗号化**（セッション Cookie・DB カラム）です。TLS 通信路そのものの PQC 化（Web サーバ・ロードバランサ側の設定）は対象外です。Ruby / RubyGems エコシステム側でも標準ライブラリ全体を PQC 対応させる議論（[Ruby Feature #22068](https://bugs.ruby-lang.org/issues/22068)）が進んでいますが、これは輸送路の話であり、`pqc_rails` が担うアプリケーションデータの暗号化とはレイヤーが異なります。Cloudflare のようなCDN/エッジ事業者がオリジンサーバーとの接続で PQC ハイブリッド鍵交換をデフォルト化しても、それは TLS 層の話であり、保存データ（Cookie・DB カラム）の保護には別途 `pqc_rails` のようなアプリケーション層の対応が必要です。
 - **PKI・証明書管理基盤の代替ではありません**。鍵の発行・ライフサイクル管理・監査ログといった機能は提供しません。`pqc_rails` が担うのは Rails アプリ内のセッション・DB カラムの暗号化のみです。
 - **量子コンピュータそのものを使う暗号方式（QKD、量子署名など）は対象外です**。`pqc_rails` が提供するのは、古典コンピュータ上で動作し量子コンピュータに対して耐性を持つ暗号（PQC: Post-Quantum Cryptography）です。
+- **暗号資産・ブロックチェーンの取引署名の移行は対象外です**。`pqc_rails` が統合しているのはデータの暗号化（機密性）で、ウォレットやチェーン上の署名方式の移行は扱いません。
 - **JWT/トークン署名は対象外です**。`PqcRails::Sig`（ML-DSA）はスタンドアロンの署名プリミティブとして提供していますが、セッション・DB統合と違いJWT等のトークンフォーマットへの統合は行っていません。この用途には [jwt-pq](https://rubygems.org/gems/jwt-pq) のような専用 gem を検討してください（`pqc_rails` とは別々の liboqs を読み込むため、併用しても競合しません）。
 
 より詳しい対応範囲・スコープ外は [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md#for-developers) を参照してください。
@@ -65,7 +66,7 @@ KEM と DSA に加え、セッション Cookie と ActiveRecord::Encryption の�
 
 Ruby 向けの耐量子暗号実装には、`pqc_rails` のように [liboqs](https://github.com/open-quantum-safe/liboqs) へ FFI バインディングする方式のほかに、参照実装（`mlkem-native` / `mldsa-native` 等）のソースを gem 自体に直接バンドルする方式もあります（例: [pq_crypto](https://rubygems.org/gems/pq_crypto)）。`pqc_rails` が liboqs 経由の方式を選んでいる理由は次の通りです。
 
-- **アルゴリズムカバレッジの広さ**: ML-KEM/ML-DSA に加え、Classic McEliece・HQC など NIST 標準化プロセスの周辺にあるアルゴリズムも、liboqs がビルドしていれば追加コード無しで利用できます（本 README 後述の「レジストリ未登録のアルゴリズムを使う」参照）。
+- **アルゴリズムカバレッジの広さ**: ML-KEM/ML-DSA に加え、HQC・Classic McEliece など NIST 標準化プロセスの周辺にあるアルゴリズムも、liboqs がビルドしていれば追加コード無しで利用できます（本 README 後述の「レジストリ未登録のアルゴリズムを使う」参照）。
 - **Open Quantum Safe プロジェクトによる継続的なメンテナンス**: NIST の標準化状況の変化（追加署名 Round3 候補の選定・撤退、パラメータセットの追加等）に対して、liboqs 本体の更新に追従するだけで対応できます。
 - **追加署名 Round3 候補への追従のしやすさ**: liboqs は SQIsign 等の Round3 候補も実装しているため、将来これらをサポート対象に加える判断をした場合の実装コストが小さくなります。
 
@@ -253,7 +254,9 @@ PqcRails::Kem.open("Classic-McEliece-348864") do |kem|
 end
 ```
 
-公開鍵サイズが大きい（348864 パラメータセットで約255KB）ため TLS ハンドシェイクのような頻繁な鍵交換には向きませんが、鍵交換の頻度が低い長期保存データの暗号化では ML-KEM が万一破られた場合のバックアップとして選択肢になります。異なる数学的困難性（符号の復号問題）に安全性の根拠を置くため、ML-KEM（格子問題）とは異なるリスクプロファイルを持ちます。
+公開鍵サイズが大きい（348864 パラメータセットで約255KB）ため、TLS ハンドシェイクのような頻繁な鍵交換には向きません。異なる数学的困難性（符号の復号問題）に安全性の根拠を置くため、ML-KEM（格子問題）とは異なるリスクプロファイルを持ちます。
+
+ただし、ドイツ連邦情報セキュリティ庁（BSI）は 2026年10月1日、暗号解析の進展により想定より安全性の水準が大きく下がっている可能性があるとして、Classic McEliece を当面、新規の開発・新しい用途に使わないよう勧告しました（[BSI の発表](https://www.bsi.bund.de/DE/Service-Navi/Presse/Alle-Meldungen-News/Meldungen/2026/Classic-McEliece_261001.html)）。ML-KEM・FrodoKEM・HQC はこの影響を受けないとされています。新しく採用する場合は ML-KEM（既定）を使ってください。
 
 同様に、NIST が ML-KEM のバックアップとして選定した符号ベースKEM「HQC」も liboqs 0.16.0 以降ではデフォルトで有効化されており、生の名前（`"HQC-1"` / `"HQC-3"` / `"HQC-5"`）を渡すことで利用できます。ただしHQCはまだNIST標準化作業中（FIPS番号未確定）のため、シンボルレジストリには未登録です。`bundle install` が既定で自動ビルドする liboqs は 0.16.0（[必要要件](#必要要件)参照）のため、下記の例はそのまま動作します。`--skip-liboqs` で `OQS_ENABLE_KEM_HQC` を無効化した古いバージョン・カスタムビルドの liboqs を指定した場合は利用できません。
 
