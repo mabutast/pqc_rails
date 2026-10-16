@@ -39,6 +39,17 @@ PQC 対応の義務化を待つ理由はありません。今この瞬間も、�
 | ActiveRecord::Encryption 連携 | ✅ 対応済み（`PqcRails::Cipher` + `KeyProvider`） |
 | 鍵ローテーション              | ✅ 対応済み（セッション・DB 双方で旧鍵世代を併用可能。詳細は [docs/MIGRATION.md](docs/MIGRATION.md#鍵ローテーションpqc_rails鍵世代間)） |
 
+置き換える暗号は次の通りです。
+
+| 保護するもの | Rails 標準 | pqc_rails |
+| --- | --- | --- |
+| セッション Cookie | AES-256-GCM。鍵は `secret_key_base` から導いた固定の鍵 | 値ごとに X25519 + ML-KEM（既定は ML-KEM-768）で鍵を作り、AES-256-GCM で暗号化 |
+| DB カラム（`encrypts`） | AES-256-GCM。鍵は `primary_key` から導いた固定の鍵 | 同上 |
+| 署名 | 該当する機能なし | ML-DSA（`PqcRails::Sig`、単体のプリミティブとして提供） |
+| TLS 通信路 | 対象外（Web サーバ・ロードバランサの設定） | 対象外 |
+
+読み込んでいる liboqs の版は `rails pqc_rails:status`（`PqcRails.liboqs_version`）で確認できます。
+
 KEM と DSA に加え、セッション Cookie と ActiveRecord::Encryption の両方を ML-KEM ベースのハイブリッド暗号（KEM-DEM 構成）で保護します。liboqs がサポートする他のアルゴリズムも、アルゴリズム名を文字列で指定するだけで利用できます（liboqs 側のビルド設定に依存します）。
 
 ## スコープ
