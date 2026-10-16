@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- README's API stability section now lists the key generation and encoding calls used in
+  docs/MIGRATION.md (`HybridKem.open` with `#generate_keypair`, `KeySource.encode` / `.decode`),
+  `CiphertextInfo`, `Cipher#algorithm_id`, `CiphertextFormat.key_id`, the new configuration
+  options and `MissingAuthenticationKeyError` as stable API.
+- docs/MIGRATION.md adds a guide for replacing application-level RSA / ECDH data-key wrapping with
+  pqc_rails encrypted columns.
 - docs/MIGRATION.md re-encrypts with `user.with_lock { user.encrypt }` so updates made while the
   application keeps running are not overwritten, shows how to count records still using an old
   key or the 0.3.0 format with `CiphertextInfo`, and states that public keys need not be

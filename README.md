@@ -322,12 +322,14 @@ sig.length_signature  # => 2420（最大長。実際の署名はこれより短�
 
 ## API の安定性
 
-pqc_rails は現在 `0.y.z` 版（`0.2.0`）で開発中です。将来 `1.0` を名乗る時点で SemVer の対象にする
+pqc_rails は現在 `0.y.z` 版で開発中です。将来 `1.0` を名乗る時点で SemVer の対象にする
 つもりのクラス・メソッドを、この時点で明確にしておきます。
 
 **安定した公開 API**（1.0 以降は SemVer の対象にする想定）
 
-- `PqcRails.configure` / `PqcRails::Configuration#liboqs_path`
+- `PqcRails.configure` / `PqcRails::Configuration#liboqs_path` / `#ciphertext_format` / `#accept_legacy_records` / `#accept_legacy_cookies_until`
+- 鍵の生成と保存形式：`PqcRails::HybridKem.open(アルゴリズム) { |hybrid| hybrid.generate_keypair }` と `PqcRails::KeySource.encode` / `.decode`（[docs/MIGRATION.md](docs/MIGRATION.md) の鍵ローテーションの手順で使うもの）
+- `PqcRails::ActiveRecord::CiphertextInfo.parse`（`#format_version` / `#algorithm_id` / `#key_id` / `#pqc?` / `#legacy?`）、`PqcRails::Cipher#algorithm_id`、`PqcRails::CiphertextFormat.key_id`
 - `config.session_store :pqc_cookie_store`（`keypair:` / `previous_keypairs:` / `pq_alg_name:` オプション含む）
 - `PqcRails::ActiveRecord::Context.install!`
 - `PqcRails::ActiveRecord::KeyProvider`（HSM 連携・ロールバック時の `previous:` スキームで使う拡張点。[docs/MIGRATION.md](docs/MIGRATION.md) 参照）
@@ -335,17 +337,17 @@ pqc_rails は現在 `0.y.z` 版（`0.2.0`）で開発中です。将来 `1.0` �
 - `PqcRails::KeySource::EnvCredentials`、および `#current_keypair` / `#previous_keypairs` の2メソッドを実装する独自鍵ソースという拡張契約（HSM/PKCS#11連携用）
 - `PqcRails::Kem` / `PqcRails::Sig`（アルゴリズムプリミティブ。本 README「使い方」に記載の全メソッド）
 - `PqcRails::Algorithms::UnknownAlgorithmError`
-- `PqcRails::Error` / `PqcRails::MissingKeyError`
+- `PqcRails::Error` / `PqcRails::MissingKeyError` / `PqcRails::MissingAuthenticationKeyError`
 - `rails generate pqc_rails:install`
 - `rails pqc_rails:status` / `PqcRails::StatusCheck.run`（戻り値の`Result`が持つ`name` / `ok` / `detail`）
 - 環境変数・credentials キー名（`PQC_SESSION_KEY` / `PQC_SESSION_PREVIOUS_KEYS` / `PQC_RECORD_KEY` / `PQC_RECORD_PREVIOUS_KEYS` 等、本 README「設定」に記載のもの）
 
 **内部実装**（予告なく変更されうるため、直接使わないでください）
 
-- `PqcRails::HybridKem` / `PqcRails::DhKem` / `PqcRails::EnvelopeCipher` / `PqcRails::BlobPacking`（`Cipher` / セッションストアが内部で使うKEM-DEM構成の実装詳細）
+- `PqcRails::HybridKem`（`.open` と `#generate_keypair` を除く）/ `PqcRails::DhKem` / `PqcRails::EnvelopeCipher` / `PqcRails::BlobPacking`（`Cipher` / セッションストアが内部で使うKEM-DEM構成の実装詳細）
 - `PqcRails::Session::Encryptor` / `PqcRails::Session::KeyManager`
 - `PqcRails::Algorithms` の直接呼び出し（`.find_kem` 等）。シンボル指定（`:ml_kem_512` 等）を `Kem.new` / `Sig.new` に渡した「結果」は安定していますが、`Algorithms` モジュール自体のメソッドは内部実装です
-- `PqcRails::KeySource` のモジュール関数（`.fetch` / `.fetch!` / `.fetch_keypair!`）。`EnvCredentials` クラス自体は上記の通り安定した拡張点です
+- `PqcRails::KeySource` のモジュール関数のうち `.fetch` / `.fetch!` / `.fetch_keypair!`。`EnvCredentials` クラス自体は上記の通り安定した拡張点です
 
 ## エラーハンドリング
 

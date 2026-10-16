@@ -16,6 +16,25 @@ RSpec.describe "README.mdの「API の安定性」節に列挙されたクラス
       expect(PqcRails::Configuration.instance_methods).to include(:liboqs_path)
     end
 
+    it "暗号文の形式と旧形式の受け付けの設定が存在する" do
+      expect(PqcRails::Configuration.instance_methods)
+        .to include(:ciphertext_format, :accept_legacy_records, :accept_legacy_cookies_until)
+    end
+
+    it "鍵の生成(HybridKem.open + #generate_keypair)とKeySource.encode/.decodeが存在する" do
+      keypair = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }
+
+      expect(PqcRails::KeySource.decode(PqcRails::KeySource.encode(keypair)).public_key).to eq(keypair.public_key)
+    end
+
+    it "CiphertextInfo.parse・Cipher#algorithm_id・CiphertextFormat.key_idが存在する" do
+      expect(PqcRails::ActiveRecord::CiphertextInfo).to respond_to(:parse)
+      expect(PqcRails::ActiveRecord::CiphertextInfo.instance_methods)
+        .to include(:format_version, :algorithm_id, :key_id, :pqc?, :legacy?)
+      expect(PqcRails::Cipher.instance_methods).to include(:algorithm_id)
+      expect(PqcRails::CiphertextFormat).to respond_to(:key_id)
+    end
+
     it "PqcRails::Session::PqcCookieStoreがkeypair:/previous_keypairs:/pq_alg_name:オプションを実際に処理する" do
       keypair = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }
 
@@ -56,6 +75,7 @@ RSpec.describe "README.mdの「API の安定性」節に列挙されたクラス
     it "PqcRails::Error / PqcRails::MissingKeyErrorが存在する" do
       expect(PqcRails::Error.ancestors).to include(StandardError)
       expect(PqcRails::MissingKeyError.ancestors).to include(PqcRails::Error)
+      expect(PqcRails::MissingAuthenticationKeyError.ancestors).to include(PqcRails::Error)
     end
 
     it "rails generate pqc_rails:installジェネレータが存在する" do
