@@ -14,7 +14,7 @@ Gem::Specification.new do |spec|
                       "applications, via native FFI bindings to liboqs."
   spec.homepage = "https://github.com/mabutast/pqc_rails"
   spec.license = "Apache-2.0"
-  spec.required_ruby_version = ">= 3.2.0"
+  spec.required_ruby_version = ">= 3.3.0"
 
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = spec.homepage
@@ -52,7 +52,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "ffi", "~> 1.16"
   spec.add_dependency "railties", ">= 7.1", "< 9"
   # HybridKem/DhKem call OpenSSL::PKey::PKey#raw_public_key / #raw_private_key, which the
-  # openssl gem only added in 3.2.0. Ruby 3.2's own bundled default gem is older (3.1.x), so
-  # this must be declared explicitly or `dh_kem.rb` raises NoMethodError on that Ruby version.
+  # openssl gem added in 3.2.0. The default openssl gem of Ruby 3.3 and later already satisfies
+  # this, so no compilation is needed; the floor is declared to keep the requirement explicit.
   spec.add_dependency "openssl", ">= 3.2"
 end

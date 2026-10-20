@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Requires Ruby 3.3 or later.** Ruby 3.2 reached its end of life on 2026-04-01 and is no longer
+  supported. Ruby 4.0 is now tested in CI alongside 3.3 and 3.4.
 - README adds ML-DSA key and signature sizes (and why SLH-DSA is not registered), explains the
   constant-time and standards-based reasons for building on liboqs, and mentions DARPA's Quantum
   Benchmarking Initiative. docs/THREAT_MODEL.md adds the NIST IR 8547 draft timeline, the EU

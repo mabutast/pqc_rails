@@ -84,7 +84,7 @@ Ruby 向けの耐量子暗号実装には、`pqc_rails` のように [liboqs](ht
 
 ## 必要要件
 
-- Ruby >= 3.2.0
+- Ruby >= 3.3.0
 - Rails >= 7.1
 - RubyGems / Bundler >= 4.0.16 を推奨（rubygems.org は X25519MLKEM768 + ML-DSA-65 によるハイブリッド TLS を提供しており、4.0.16 未満では `Gem::Request` / `Bundler::Fetcher` のクライアント証明書鍵種別が RSA に決め打ちされる不具合の影響を受けます）
 - CMake・Cコンパイラ（`cmake`、`make`、`gcc`/`clang` 等）が利用できること（`bundle install` 時に liboqs をソースからビルドするため。動作確認済み環境は macOS arm64 / Linux arm64（Dockerコンテナ）です。x86_64・Windows は未検証です）
@@ -434,7 +434,7 @@ Puma のようなマルチスレッド型アプリケーションサーバーは
 
 ## 動作確認済み環境
 
-- Ruby 3.2 / 3.3 / 3.4
+- Ruby 3.3 / 3.4 / 4.0
 - Rails 7.1 / 8.1
 - liboqs 0.16.0 / 0.15.0
 

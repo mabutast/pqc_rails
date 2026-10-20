@@ -60,7 +60,7 @@ jobs:
         run: bundle exec rspec
 
   rspec-matrix:
-    # READMEが「動作確認済み」と主張するRuby 3.2/3.3/3.4 × Rails 7.1/8.1の組み合わせを、
+    # READMEが「動作確認済み」と主張するRuby 3.3/3.4/4.0 × Rails 7.1/8.1の組み合わせを、
     # 手動確認ではなくCIで継続的に検証する(Phase5 Step5)。liboqsは既定でbundle installが
     # 自動ビルドする0.16.0で全組み合わせを検証し、0.15.0は後方互換確認として最新の組み合わせ
     # (Ruby 3.4 + Rails 8.1)でのみ追加検証する(全組み合わせ×2 liboqsバージョンだとジョブ数が
@@ -69,7 +69,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ruby: ["3.2", "3.3", "3.4"]
+        ruby: ["3.3", "3.4", "4.0"]
         rails: ["7.1", "8.1"]
         liboqs: ["0.16.0"]
         include:
