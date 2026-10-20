@@ -6,7 +6,12 @@ on:
       - "v*"
 
 jobs:
+  # ビルド済みのliboqsを同梱したプラットフォーム別のgemを作り、コンパイラの無い環境で確かめる
+  native:
+    uses: ./.github/workflows/native-gems.yml
+
   push:
+    needs: native
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -31,6 +36,18 @@ jobs:
           # [EXPERIMENTAL] sigstore attestation signing. Disabled: its RUBYOPT-injected
           # `require "rubygems/commands/push_command"` activates Ruby's bundled default
           # openssl gem before `bundle exec rake release` runs, which then conflicts with
-          # Gemfile.lock's pinned newer openssl (needed for Ruby 3.2 compatibility) —
+          # Gemfile.lock's pinned newer openssl —
           # "you have already activated openssl X, but your Gemfile requires openssl Y".
           attestations: false
+
+      # release-gem が設定した RubyGems.org の認証情報で、プラットフォーム別のgemも公開する
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-gems
+          path: native-gems
+
+      - name: Push the platform gems
+        run: |
+          for gem in native-gems/*.gem; do
+            gem push "$gem"
+          done

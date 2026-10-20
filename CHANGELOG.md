@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Platform gems for x86_64-linux-gnu, aarch64-linux-gnu, x86_64-linux-musl, aarch64-linux-musl
+  and arm64-darwin bundle a prebuilt liboqs, so `bundle install` no longer needs CMake or a C
+  compiler on those platforms. The prebuilt liboqs does not depend on OpenSSL, selects optimized
+  code for the CPU at run time, and on Linux runs on glibc 2.28 or later or on musl. Other
+  platforms keep installing the source gem, which builds liboqs as before.
 - Ciphertexts for ActiveRecord columns and session cookies now record a format version, the
   algorithm that produced them (for example `X25519+ML-KEM-768`) and the id of the key used. These
   values are authenticated as AES-GCM associated data. Decryption uses the recorded algorithm, so

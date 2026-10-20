@@ -87,9 +87,12 @@ Ruby 向けの耐量子暗号実装には、`pqc_rails` のように [liboqs](ht
 - Ruby >= 3.3.0
 - Rails >= 7.1
 - RubyGems / Bundler >= 4.0.16 を推奨（rubygems.org は X25519MLKEM768 + ML-DSA-65 によるハイブリッド TLS を提供しており、4.0.16 未満では `Gem::Request` / `Bundler::Fetcher` のクライアント証明書鍵種別が RSA に決め打ちされる不具合の影響を受けます）
-- CMake・Cコンパイラ（`cmake`、`make`、`gcc`/`clang` 等）が利用できること（`bundle install` 時に liboqs をソースからビルドするため。動作確認済み環境は macOS arm64 / Linux arm64（Dockerコンテナ）です。x86_64・Windows は未検証です）
+- 次の環境では、ビルド済みの liboqs を同梱した gem が入るため、CMake・Cコンパイラは不要です
+  - Linux x86_64 / arm64（glibc 2.28 以上、または musl）
+  - macOS arm64
+- それ以外の環境（Intel Mac・Windows 等）では、CMake・Cコンパイラ（`cmake`、`make`、`gcc`/`clang` 等）が利用できること（`bundle install` 時に liboqs をソースからビルドするため）
 
-`bundle install` を実行すると、liboqs のソース（gem に同梱済み）を自動的にビルドし、事前準備なしで利用できます。既に liboqs をシステムにインストール済みの場合や、ビルド環境が無い場合は、`bundle config set build.pqc_rails --skip-liboqs` （または環境変数 `PQC_RAILS_SKIP_LIBOQS_BUILD=1`）でビルドをスキップし、`config.liboqs_path` で既存の liboqs を明示的に指定できます。
+Bundler は、環境に合ったビルド済みの gem を自動的に選びます。ビルド済みの liboqs は OpenSSL に依存せず、実行時に CPU の機能を調べて最適な実装を選びます。ビルド済みの gem が無い環境では、`bundle install` が liboqs のソース（gem に同梱済み）を自動的にビルドし、事前準備なしで利用できます。既に liboqs をシステムにインストール済みの場合や、ビルド環境が無い場合は、`bundle config set build.pqc_rails --skip-liboqs` （または環境変数 `PQC_RAILS_SKIP_LIBOQS_BUILD=1`）でビルドをスキップし、`config.liboqs_path` で既存の liboqs を明示的に指定できます。
 
 ## ⚠️ liboqs の成熟度について
 
@@ -415,7 +418,7 @@ $ rails pqc_rails:status
 
 PQC 移行は「計画は立てたが実装が進まない」という組織が多い分野です（[DigiCert の2026年グローバル調査](https://www.digicert.com/news/quantum-readiness-gap-a-digicert-study-on-quantum-safe-encryption)では、移行計画の策定率87%に対し実導入率は7%に留まるという結果が示されています）。導入初回に発生しやすいつまずきをここにまとめます。迷ったらまず [`rails pqc_rails:status`](#ステータス確認) を実行してください。
 
-- **`LoadError: Could not open library 'liboqs.dylib'` のようなエラーが出る**: liboqs の共有ライブラリが見つかっていません。通常は `bundle install` 時に自動ビルドされますが、`--skip-liboqs` でビルドをスキップした場合や、ビルド自体が失敗していた場合（[必要要件](#必要要件)の CMake・Cコンパイラが揃っているか確認してください）に発生します。既存の liboqs を使う場合は、環境変数 `LIBOQS_PATH` または `config.liboqs_path`（[liboqs ライブラリパス](#liboqs-ライブラリパス)参照）で明示的にパスを指定してください。
+- **`LoadError: Could not open library 'liboqs.dylib'` のようなエラーが出る**: liboqs の共有ライブラリが見つかっていません。通常はビルド済みの gem に同梱されているか、`bundle install` 時に自動ビルドされますが、`--skip-liboqs` でビルドをスキップした場合や、ビルド自体が失敗していた場合（ビルド済みの gem が無い環境では、[必要要件](#必要要件)の CMake・Cコンパイラが揃っているか確認してください）に発生します。既存の liboqs を使う場合は、環境変数 `LIBOQS_PATH` または `config.liboqs_path`（[liboqs ライブラリパス](#liboqs-ライブラリパス)参照）で明示的にパスを指定してください。
 - **`PqcRails::Algorithms::UnknownAlgorithmError` が発生する**: シンボル指定（`:ml_kem_512` 等）がレジストリに未登録の場合に発生します。[現在レジストリに登録済みのアルゴリズム](#アルゴリズムの指定方法)の一覧を確認するか、liboqs の生の名前（`"ML-KEM-512"` 等）で直接指定してください。生の名前でも `PqcRails::Error` が発生する場合は、liboqs 側のビルド設定でそのアルゴリズムが有効化されていない可能性があります。
 - **`config.session_store :pqc_cookie_store` に切り替えたら全ユーザーがログアウトされた**: 想定通りの挙動です。暗号方式が変わるため、切り替え前に発行された既存セッションは復号できません（[セッション暗号化](#セッション暗号化)参照）。メンテナンスウィンドウを設けるか、ユーザーへの事前告知を検討してください。
 - **`ActiveRecord::Encryption::Context.install!` 後、既存データの復号に失敗する**: pqc_rails 導入前に Rails 標準の `ActiveRecord::Encryption` で暗号化されたデータは、切り替え後はデフォルトでは復号できません。段階的に移行する方法は [docs/MIGRATION.md](docs/MIGRATION.md) を参照してください。
@@ -437,6 +440,8 @@ Puma のようなマルチスレッド型アプリケーションサーバーは
 - Ruby 3.3 / 3.4 / 4.0
 - Rails 7.1 / 8.1
 - liboqs 0.16.0 / 0.15.0
+
+ビルド済みの gem は、[CI](.github/workflows/native-gems.yml) で、対応する各環境のコンパイラの入っていない Ruby 3.3 / 4.0 にインストールし、ML-KEM の暗号化・復号が通ることを確かめています。
 
 [CI](.github/workflows/test.yml) では、上記の Ruby × Rails × liboqs の組み合わせ（liboqs 0.15.0 は Ruby 3.4 + Rails 8.1 との組み合わせのみ）を push・PR のたびにマトリクスで継続的に検証しています。CIには別途 `extension-build` ジョブがあり、`bundle install` によるliboqsの自動ビルド〜動作（KEM 往復）までを Linux 上で継続的に検証しています。
 

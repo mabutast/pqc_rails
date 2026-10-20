@@ -1,0 +1,162 @@
+name: Native gems
+
+# ビルド済みのliboqsを同梱した、プラットフォーム別のgemを作り、コンパイラの無い環境で動くかを確かめる。
+# release.ymlからも呼ばれ、そこで作ったgemを公開する。
+#
+# Linuxのliboqsは、古いglibc(2.28、AlmaLinux 8)とmusl(Alpine)のコンテナの中でビルドする。
+# 新しいglibcでビルドすると、それより古いLinux(Debian 12等)で読み込めないため。
+# コンテナはホストのランナーからdocker runで動かす(Alpineのコンテナの中ではJavaScriptのactionが動かないため)。
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "ext/pqc_rails/**"
+      - "rakelib/**"
+      - "script/build-native-liboqs"
+      - "script/native-smoke"
+      - "lib/pqc_rails/configuration.rb"
+      - "pqc_rails.gemspec"
+      - ".github/workflows/native-gems.yml"
+  pull_request:
+    paths:
+      - "ext/pqc_rails/**"
+      - "rakelib/**"
+      - "script/build-native-liboqs"
+      - "script/native-smoke"
+      - "lib/pqc_rails/configuration.rb"
+      - "pqc_rails.gemspec"
+      - ".github/workflows/native-gems.yml"
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  liboqs:
+    name: liboqs (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: x86_64-linux-gnu, runner: ubuntu-24.04, image: "almalinux:8" }
+          - { platform: aarch64-linux-gnu, runner: ubuntu-24.04-arm, image: "almalinux:8" }
+          - { platform: x86_64-linux-musl, runner: ubuntu-24.04, image: "alpine:3.20" }
+          - { platform: aarch64-linux-musl, runner: ubuntu-24.04-arm, image: "alpine:3.20" }
+          - { platform: arm64-darwin, runner: macos-14, image: "" }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Vendor liboqs source
+        run: bundle exec rake vendor:liboqs
+
+      - name: Build liboqs (glibc 2.28)
+        if: startsWith(matrix.image, 'almalinux')
+        run: |
+          docker run --rm -v "$PWD":/src -w /src "${{ matrix.image }}" bash -c '
+            dnf -q -y install cmake gcc make binutils >/dev/null && script/build-native-liboqs'
+
+      - name: Build liboqs (musl)
+        if: startsWith(matrix.image, 'alpine')
+        run: |
+          docker run --rm -v "$PWD":/src -w /src "${{ matrix.image }}" sh -c '
+            apk add -q bash cmake gcc make musl-dev linux-headers binutils >/dev/null && bash script/build-native-liboqs'
+
+      - name: Build liboqs (macOS)
+        if: matrix.image == ''
+        run: brew list cmake >/dev/null 2>&1 || brew install cmake; script/build-native-liboqs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: liboqs-${{ matrix.platform }}
+          path: lib/pqc_rails/native/
+          if-no-files-found: error
+
+  package:
+    needs: liboqs
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: liboqs-*
+          path: native
+
+      - name: Package the platform gems
+        run: |
+          for dir in native/liboqs-*; do
+            platform="${dir#native/liboqs-}"
+            mkdir -p lib/pqc_rails/native
+            cp "$dir"/* lib/pqc_rails/native/
+            bundle exec rake "native:gem[$platform]"
+          done
+          ls -l pkg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-gems
+          path: pkg/*.gem
+          if-no-files-found: error
+
+  smoke:
+    name: smoke (${{ matrix.platform }}, ${{ matrix.ruby }})
+    needs: package
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ["3.3", "4.0"]
+        platform: [x86_64-linux-gnu, aarch64-linux-gnu, x86_64-linux-musl, aarch64-linux-musl, arm64-darwin]
+        include:
+          - { platform: x86_64-linux-gnu, runner: ubuntu-24.04, image: slim }
+          - { platform: aarch64-linux-gnu, runner: ubuntu-24.04-arm, image: slim }
+          - { platform: x86_64-linux-musl, runner: ubuntu-24.04, image: alpine }
+          - { platform: aarch64-linux-musl, runner: ubuntu-24.04-arm, image: alpine }
+          - { platform: arm64-darwin, runner: macos-14, image: "" }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-gems
+          path: pkg
+
+      # 公式のRubyのslim・alpineのイメージにはCコンパイラもCMakeも入っていない
+      - name: Install and run in ruby:${{ matrix.ruby }}-slim (no compiler)
+        if: matrix.image == 'slim'
+        run: |
+          docker run --rm -v "$PWD":/src -w /src "ruby:${{ matrix.ruby }}-slim" bash -c '
+            ! command -v cc && script/native-smoke pkg/pqc_rails-*-${{ matrix.platform }}.gem'
+
+      - name: Install and run in ruby:${{ matrix.ruby }}-alpine (no compiler)
+        if: matrix.image == 'alpine'
+        run: |
+          docker run --rm -v "$PWD":/src -w /src "ruby:${{ matrix.ruby }}-alpine" sh -c '
+            apk add -q bash >/dev/null && ! command -v cc && bash script/native-smoke pkg/pqc_rails-*-${{ matrix.platform }}.gem'
+
+      - uses: ruby/setup-ruby@v1
+        if: matrix.image == ''
+        with:
+          ruby-version: ${{ matrix.ruby }}
+
+      - name: Install and run on macOS
+        if: matrix.image == ''
+        run: script/native-smoke pkg/pqc_rails-*-${{ matrix.platform }}.gem
