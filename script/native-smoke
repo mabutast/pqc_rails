@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# プラットフォーム別のgemを、空のGEM_HOMEにインストールし、同梱のliboqsでML-KEMの暗号化・復号が通るかを確かめる。
+# 使い方: script/native-smoke pkg/pqc_rails-x.y.z-arm64-darwin.gem
+set -euo pipefail
+
+GEM_FILE="$1"
+HOME_DIR="$(mktemp -d)"
+trap 'rm -rf "$HOME_DIR"' EXIT
+export GEM_HOME="$HOME_DIR" GEM_PATH="$HOME_DIR"
+
+gem install --local "$GEM_FILE" --no-document --ignore-dependencies
+gem install ffi --no-document
+if ls "$HOME_DIR"/extensions/*/*/pqc_rails-* >/dev/null 2>&1; then
+  echo "拡張のビルドが走りました。プラットフォーム別のgemでは走らないはずです。" >&2
+  exit 1
+fi
+
+GEMDIR="$(ls -d "$HOME_DIR"/gems/pqc_rails-*)"
+ruby -I "$GEMDIR/lib" -e '
+  require "rubygems"
+  spec = Gem::Specification.load(Dir.glob(File.join(ENV["GEM_HOME"], "specifications", "pqc_rails-*.gemspec")).first)
+  Gem.loaded_specs["pqc_rails"] = spec
+  module PqcRails; class Error < StandardError; end; end
+  require "ffi"
+  require "pqc_rails/configuration"
+  require "pqc_rails/algorithms"
+  require "pqc_rails/length_validation"
+  require "pqc_rails/kem"
+  path = PqcRails.configuration.liboqs_path
+  raise "expected the prebuilt liboqs, got #{path}" unless path.include?("lib/pqc_rails/native/liboqs")
+  kem = PqcRails::Kem.new(:ml_kem_768)
+  kp = kem.generate_keypair
+  enc = kem.encapsulate(kp.public_key)
+  raise "KEM roundtrip mismatch" unless kem.decapsulate(enc.ciphertext, kp.secret_key) == enc.shared_secret
+  puts "native gem smoke test OK (#{RUBY_PLATFORM}, ruby #{RUBY_VERSION}, liboqs_path=#{path})"
+'

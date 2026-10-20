@@ -15,6 +15,21 @@ RSpec.describe PqcRails::Configuration do
       expect(described_class.new.liboqs_path).to eq("/custom/path/liboqs.dylib")
     end
 
+    context "ENV未設定で、プラットフォーム別のgemが同梱したliboqs(lib/pqc_rails/native/)がある場合" do
+      it "同梱のliboqsを、bundle installでビルドしたものより優先して使う" do
+        ENV.delete("LIBOQS_PATH")
+        native_path = File.join(PqcRails::Configuration::NATIVE_DIR, "liboqs.so")
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with(native_path).and_return(true)
+
+        expect(described_class.new.liboqs_path).to eq(native_path)
+      end
+
+      it "同梱先はlib/pqc_rails/native/" do
+        expect(PqcRails::Configuration::NATIVE_DIR).to eq(File.expand_path("../../lib/pqc_rails/native", __dir__))
+      end
+    end
+
     context "ENV未設定で、gemとしてインストールされ、ext/pqc_rails/にビルド済みliboqsがある場合" do
       it "bundle installでビルドされたliboqsを優先して使う" do
         ENV.delete("LIBOQS_PATH")

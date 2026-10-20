@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# プラットフォーム別のgemに同梱するliboqsを、同梱済みのソース(ext/pqc_rails/vendor/liboqs)からビルドし、
+# lib/pqc_rails/native/ に置く。どの環境でも読み込めるよう、次のようにビルドする。
+#
+#   OQS_USE_OPENSSL=OFF  OpenSSLに依存しない(SHA-2・AESもliboqs自身の実装を使う。ML-KEM・ML-DSAの
+#                        SHA-3/SHAKEはもともとliboqs自身の実装)。ビルドした環境のlibcryptoに依存させないため
+#   OQS_DIST_BUILD=ON    実行時にCPUの機能を調べて最適な実装を選ぶ(ビルドした機械のCPUに合わせない)
+#
+# Linuxでは、古いglibc(2.28)の環境やmuslの環境の中で実行する(.github/workflows/native-gems.yml)。
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+SRC="ext/pqc_rails/vendor/liboqs"
+OUT="lib/pqc_rails/native"
+[[ -d "$SRC" ]] || { echo "$SRC がありません。先に bundle exec rake vendor:liboqs を実行してください。" >&2; exit 1; }
+
+BUILD="$(mktemp -d)"
+trap 'rm -rf "$BUILD"' EXIT
+
+cmake_args=(-DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DOQS_BUILD_ONLY_LIB=ON
+            -DOQS_USE_OPENSSL=OFF -DOQS_DIST_BUILD=ON)
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  cmake_args+=(-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0)
+fi
+
+cmake -S "$SRC" -B "$BUILD" "${cmake_args[@]}"
+cmake --build "$BUILD" --target oqs -- -j"$(getconf _NPROCESSORS_ONLN)"
+
+rm -rf "$OUT"
+mkdir -p "$OUT"
+case "$(uname -s)" in
+  Darwin)
+    cp "$(ls "$BUILD"/lib/liboqs.*.dylib | head -1)" "$OUT/liboqs.dylib"
+    strip -x "$OUT/liboqs.dylib"
+    deps="$(otool -L "$OUT/liboqs.dylib")"
+    ;;
+  *)
+    cp -L "$BUILD/lib/liboqs.so" "$OUT/liboqs.so"
+    strip --strip-unneeded "$OUT/liboqs.so"
+    deps="$(readelf -d "$OUT/liboqs.so" | grep NEEDED || true)"
+    ;;
+esac
+
+echo "$deps"
+if grep -qi "crypto\|ssl" <<<"$deps"; then
+  echo "liboqs が OpenSSL に依存しています。配れません。" >&2
+  exit 1
+fi
+ls -l "$OUT"

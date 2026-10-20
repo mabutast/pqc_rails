@@ -27,7 +27,7 @@ Gem::Specification.new do |spec|
   tracked_files = IO.popen(%w[git ls-files -z], chdir: __dir__, err: IO::NULL) do |ls|
     ls.readlines("\x0", chomp: true).reject do |f|
       (f == gemspec) ||
-        f.start_with?(*%w[bin/ spec/ .github/ Gemfile .gitignore .rspec .pre-commit-config.yaml
+        f.start_with?(*%w[bin/ spec/ .github/ rakelib/ script/ Gemfile .gitignore .rspec .pre-commit-config.yaml
                            .gitleaks.toml .secrets.baseline])
     end
   end

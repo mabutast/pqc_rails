@@ -8,6 +8,8 @@ module PqcRails
   #     config.liboqs_path = "/usr/local/lib/liboqs.dylib"
   #   end
   class Configuration
+    # プラットフォーム別のgem(x86_64-linux-gnu等)が、ビルド済みのliboqsを同梱する場所。
+    NATIVE_DIR = File.expand_path("native", __dir__)
     # liboqsの共有ライブラリへのパス。
     # 未設定の場合、環境変数 LIBOQS_PATH、それも無ければOS標準の場所を仮定する。
     attr_accessor :liboqs_path
@@ -64,12 +66,18 @@ module PqcRails
     private
 
     # liboqsのデフォルトパス。
-    # bundle install時にext/pqc_rails/extconf.rbが自前でビルドしたliboqsが見つかれば
-    # それを優先する(gemを介した自動ビルド、Phase5 Step3のプロトタイプ)。
+    # プラットフォーム別のgemが同梱したビルド済みのliboqs、次にbundle install時に
+    # ext/pqc_rails/extconf.rbが自前でビルドしたliboqsの順に探す。
     # 見つからない場合はOS別の「よくあるインストール場所」を当て推量するが、
     # 本番運用では明示的に liboqs_path を設定することを強く推奨する。
     def default_liboqs_path
-      bundled_liboqs_path || os_default_liboqs_path
+      native_liboqs_path || bundled_liboqs_path || os_default_liboqs_path
+    end
+
+    # プラットフォーム別のgemが同梱したビルド済みのliboqsがあれば、そのパスを返す。
+    # ソースのgem(platform: ruby)には含まれないので、その場合はnilを返す。
+    def native_liboqs_path
+      %w[liboqs.dylib liboqs.so].map { |name| File.join(NATIVE_DIR, name) }.find { |path| File.exist?(path) }
     end
 
     # gemのインストールディレクトリ配下、ext/pqc_rails/extconf.rbがビルド後にコピーした

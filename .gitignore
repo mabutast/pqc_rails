@@ -21,3 +21,5 @@
 # `rake vendor:liboqs` がgemリリース前に取得するliboqsソース。pqc_rails自身のgit履歴には
 # 含めない(サイズが大きいため)が、gemspec側でDir.globにより明示的にパッケージへ含める
 /ext/pqc_rails/vendor/
+# プラットフォーム別のgemに同梱する、ビルド済みのliboqs(rake native:gemが置く)
+/lib/pqc_rails/native/
