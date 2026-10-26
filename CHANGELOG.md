@@ -94,6 +94,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the garbage collector without being cleared. Secret keys held as Ruby Strings cannot be wiped
   reliably and stay in memory for the life of the process; see "中間値の破棄" in
   docs/THREAT_MODEL.md.
+- Fewer copies of secret keys are left in Ruby memory. Keys are decoded once per key source and
+  kept, instead of the previous keys being decoded again on every decryption, and the decoded key
+  blob and the X25519 and ML-KEM secret key copies made during decapsulation are zeroed after use.
+  Keys are therefore read once per process; restart the application after changing them, as was
+  already needed for the current key. docs/THREAT_MODEL.md lists what remains in memory and
+  recommends disabling core dumps and unencrypted swap in production.
 - The bundled liboqs source is pinned to the upstream commit of its release tag. Gem builds and the
   development fallback that clones liboqs stop if the tag resolves to a different commit, and
   `rake vendor:verify` compares the bundled source file by file with that commit. Pass `DIR=` to
