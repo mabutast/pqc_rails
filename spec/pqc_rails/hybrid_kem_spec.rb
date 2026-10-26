@@ -93,6 +93,37 @@ RSpec.describe PqcRails::HybridKem do
     end
   end
 
+  describe "改ざんした暗号文のdecapsulate" do
+    def flip_last_byte(bytes)
+      bytes.dup.tap { |copy| copy.setbyte(copy.bytesize - 1, copy.getbyte(copy.bytesize - 1) ^ 0x01) }
+    end
+
+    it "ML-KEM側の暗号文の末尾を改変すると、例外を出さずに元と異なる共有鍵を返す(暗黙的拒否)" do
+      described_class.open(:ml_kem_1024) do |hybrid|
+        keypair = hybrid.generate_keypair
+        encap   = hybrid.encapsulate(keypair.public_key)
+        classical_ciphertext, pq_ciphertext = PqcRails::BlobPacking.unpack(encap.ciphertext)
+        tampered = PqcRails::BlobPacking.pack(classical_ciphertext, flip_last_byte(pq_ciphertext))
+
+        shared = hybrid.decapsulate(tampered, keypair.secret_key)
+
+        expect(shared.bytesize).to eq(32)
+        expect(shared).not_to eq(encap.shared_secret)
+      end
+    end
+
+    it "X25519側の暗号文を改変しても、元と異なる共有鍵になる" do
+      described_class.open(:ml_kem_1024) do |hybrid|
+        keypair = hybrid.generate_keypair
+        encap   = hybrid.encapsulate(keypair.public_key)
+        classical_ciphertext, pq_ciphertext = PqcRails::BlobPacking.unpack(encap.ciphertext)
+        tampered = PqcRails::BlobPacking.pack(flip_last_byte(classical_ciphertext), pq_ciphertext)
+
+        expect(hybrid.decapsulate(tampered, keypair.secret_key)).not_to eq(encap.shared_secret)
+      end
+    end
+  end
+
   describe "#free" do
     it "free後にencapsulateを呼ぶとPqcRails::Errorを送出する" do
       hybrid = described_class.new(pq_alg_name)

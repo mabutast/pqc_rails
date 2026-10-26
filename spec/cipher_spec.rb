@@ -73,6 +73,20 @@ RSpec.describe PqcRails::Cipher do
     end
   end
 
+  # KEMは改ざんされた暗号文に例外を出さず別の共有鍵を返すため、改ざんはAES-256-GCMの認証タグの
+  # 検証で失敗として現れる。KEMの層で例外が出ないことは kem_spec・hybrid_kem_spec で確かめている。
+  describe "KEM暗号文(kem_ct)の改ざん" do
+    it "kem_ctの末尾1バイトを改変すると、ActiveRecord::Encryption::Errors::Decryptionを送出する" do
+      message = cipher.encrypt("hello pqc", key: keypair)
+      kem_ct = message.headers[:kem_ct]
+      kem_ct.setbyte(kem_ct.bytesize - 1, kem_ct.getbyte(kem_ct.bytesize - 1) ^ 0x01)
+
+      expect do
+        cipher.decrypt(message, key: keypair)
+      end.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
+    end
+  end
+
   describe "暗号文のメタデータ(形式バージョン・アルゴリズムID・鍵ID)" do
     around do |example|
       original_format = PqcRails.configuration.ciphertext_format
