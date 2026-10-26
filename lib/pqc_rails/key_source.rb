@@ -3,6 +3,7 @@
 require "rails"
 require "base64"
 require_relative "blob_packing"
+require_relative "secret_buffer"
 require_relative "hybrid_kem"
 
 module PqcRails
@@ -46,9 +47,13 @@ module PqcRails
       Base64.strict_encode64(BlobPacking.pack_all(*parts))
     end
 
+    # Base64から戻したバイト列は、鍵を取り出した後にゼロで埋める(鍵ペアが持つのは取り出したコピーだけ)。
     def decode(encoded)
-      public_key, secret_key, authentication_key = BlobPacking.unpack_all(Base64.strict_decode64(encoded))
+      raw = Base64.strict_decode64(encoded)
+      public_key, secret_key, authentication_key = BlobPacking.unpack_all(raw)
       HybridKem::Keypair.new(public_key, secret_key, authentication_key)
+    ensure
+      SecretBuffer.wipe(raw)
     end
 
     # ENV、またはRails credentialsから現行鍵・旧鍵世代を読み込む、デフォルトの鍵ソース。
@@ -69,16 +74,20 @@ module PqcRails
         @label = label
       end
 
+      # 鍵は最初の呼び出しで1回だけ復元し、以後は同じ鍵ペアを返す。呼び出しのたびに復元すると、
+      # 秘密鍵のコピーが作られては消されずに解放され、メモリに溜まるため。ENV・credentialsは
+      # プロセスの起動後に変わらない前提で、鍵を替える時はプロセスを再起動する。
       def current_keypair
-        KeySource.fetch_keypair!(env_var: @env_var, credentials_key: @credentials_key, label: @label)
+        @current_keypair ||= KeySource.fetch_keypair!(env_var: @env_var, credentials_key: @credentials_key,
+                                                      label: @label)
       end
 
       def previous_keypairs
-        raw = KeySource.fetch(env_var: @previous_env_var, credentials_key: @previous_credentials_key)
-        return [] if raw.nil?
-
-        entries = raw.is_a?(::Array) ? raw : raw.split(",")
-        entries.map { |encoded| KeySource.decode(encoded.strip) }
+        @previous_keypairs ||= begin
+          raw = KeySource.fetch(env_var: @previous_env_var, credentials_key: @previous_credentials_key)
+          entries = raw.nil? ? [] : (raw.is_a?(::Array) ? raw : raw.split(","))
+          entries.map { |encoded| KeySource.decode(encoded.strip) }
+        end
       end
     end
   end

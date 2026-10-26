@@ -84,4 +84,18 @@ RSpec.describe PqcRails::KeySource::EnvCredentials do
       expect(source.previous_keypairs.size).to eq(3)
     end
   end
+  describe "鍵の復元の回数" do
+    it "現行鍵・旧鍵とも、最初の1回だけ復元し、以後は同じ鍵ペアを返す(秘密鍵のコピーを増やさない)" do
+      ENV["PQC_TEST_KEY"] = PqcRails::KeySource.encode(keypair)
+      ENV["PQC_TEST_PREVIOUS_KEYS"] = PqcRails::KeySource.encode(previous_keypair)
+      allow(PqcRails::KeySource).to receive(:decode).and_call_original
+
+      first = [source.current_keypair, source.previous_keypairs]
+      second = [source.current_keypair, source.previous_keypairs]
+
+      expect(PqcRails::KeySource).to have_received(:decode).twice
+      expect(second[0]).to equal(first[0])
+      expect(second[1]).to equal(first[1])
+    end
+  end
 end

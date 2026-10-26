@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "objspace"
+require "json"
+
 RSpec.describe PqcRails::KeySource do
   let(:env_var) { "PQC_TEST_KEY_SOURCE" }
   let(:credentials_key) { :pqc_test_key_source }
@@ -30,6 +33,28 @@ RSpec.describe PqcRails::KeySource do
     example.run
   ensure
     ENV[env_var] = original
+  end
+
+  describe ".decode の途中のバイト列" do
+    it "Base64から戻した鍵の値(公開鍵・秘密鍵・認証鍵を連結したもの)を、取り出した後にゼロで埋める" do
+      raw = PqcRails::BlobPacking.pack_all(keypair.public_key, keypair.secret_key, keypair.authentication_key)
+      wiped = []
+      shared = []
+      allow(PqcRails::SecretBuffer).to receive(:wipe).and_wrap_original do |original, *strings|
+        strings.compact.each { |string| shared << JSON.parse(ObjectSpace.dump(string)).fetch("shared", false) }
+        wiped.concat(strings.compact.map { |string| [string, string.dup] })
+        original.call(*strings)
+      end
+
+      decoded = described_class.decode(described_class.encode(keypair))
+
+      before, after = wiped.find { |(_, copy)| copy == raw }&.then { |string, copy| [copy, string] }
+      expect(before).to eq(raw)
+      expect(after).to eq("\x00" * raw.bytesize)
+      # 共有の状態の文字列に書き込むと、元の領域ではなく新しいコピーが消されるため
+      expect(shared).to all(be(false))
+      expect(decoded.secret_key).to eq(keypair.secret_key)
+    end
   end
 
   describe ".fetch" do

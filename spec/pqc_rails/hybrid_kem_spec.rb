@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "objspace"
+require "json"
+
 RSpec.describe PqcRails::HybridKem do
   let(:pq_alg_name) { :ml_kem_512 }
 
@@ -89,6 +92,36 @@ RSpec.describe PqcRails::HybridKem do
 
         decipher = PqcRails::EnvelopeCipher.new(shared)
         expect(decipher.decrypt(encrypted)).to eq("secret payload")
+      end
+    end
+  end
+
+  describe "decapsulateで作る秘密鍵のコピー" do
+    it "X25519とML-KEMの秘密鍵に分けたコピーを、使い終わりにゼロで埋め、渡された秘密鍵は壊さない" do
+      described_class.open(pq_alg_name) do |hybrid|
+        keypair = hybrid.generate_keypair
+        classical_secret, pq_secret = PqcRails::BlobPacking.unpack(keypair.secret_key)
+        original_secret_key = keypair.secret_key.dup
+        wiped = []
+        shared = []
+        allow(PqcRails::SecretBuffer).to receive(:wipe).and_wrap_original do |original, *strings|
+          strings.compact.each { |string| shared << JSON.parse(ObjectSpace.dump(string)).fetch("shared", false) }
+          wiped.concat(strings.compact.map { |string| [string.dup, string] })
+          original.call(*strings)
+        end
+
+        2.times do
+          encap = hybrid.encapsulate(keypair.public_key)
+          expect(hybrid.decapsulate(encap.ciphertext, keypair.secret_key)).to eq(encap.shared_secret)
+        end
+
+        [classical_secret, pq_secret].each do |secret|
+          copies = wiped.select { |(before, _)| before == secret }
+          expect(copies.size).to eq(2)
+          copies.each { |(_, after)| expect(after).to eq("\x00" * secret.bytesize) }
+        end
+        expect(shared).to all(be(false))
+        expect(keypair.secret_key).to eq(original_secret_key)
       end
     end
   end

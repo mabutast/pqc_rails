@@ -4,6 +4,7 @@ require "openssl"
 require_relative "blob_packing"
 require_relative "dh_kem"
 require_relative "kem"
+require_relative "secret_buffer"
 
 module PqcRails
   # 古典ECDH(DhKem)とPQ KEM(liboqs経由のKem)を組み合わせたハイブリッドKEM。
@@ -91,6 +92,9 @@ module PqcRails
       pq_shared = @pq.decapsulate(pq_ciphertext, pq_secret_key)
 
       combine(classical_shared, pq_shared, classical_ciphertext, pq_ciphertext)
+    ensure
+      # unpackが作った秘密鍵のコピーを消す。呼び出し側が渡したsecret_keyはそのまま残る。
+      SecretBuffer.wipe(classical_secret_key, pq_secret_key)
     end
 
     def free

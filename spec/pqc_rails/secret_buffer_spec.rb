@@ -28,6 +28,23 @@ RSpec.describe PqcRails::SecretBuffer do
     end
   end
 
+  describe ".wipe" do
+    it "文字列を同じオブジェクトのままゼロで上書きする" do
+      secret = "\xAA".b * 64
+
+      described_class.wipe(secret)
+
+      expect(secret).to eq("\x00" * 64)
+    end
+
+    it "nilと凍結された文字列は飛ばす" do
+      frozen = "secret".b.freeze
+
+      expect { described_class.wipe(nil, frozen) }.not_to raise_error
+      expect(frozen).to eq("secret")
+    end
+  end
+
   # liboqsに秘密鍵・共有鍵を渡す・受け取るCのバッファが、呼び出しの後に残らないことを確かめる。
   describe "Kem・Sigでの使われ方" do
     let(:pointers) { [] }

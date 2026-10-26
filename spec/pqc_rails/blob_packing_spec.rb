@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "objspace"
+require "json"
+
 RSpec.describe PqcRails::BlobPacking do
   describe ".pack / .unpack" do
     it "2つのバイト列を1本のバイト列にまとめ、元に戻せる" do
@@ -37,6 +40,28 @@ RSpec.describe PqcRails::BlobPacking do
 
     it "3つ目以降があっても、unpackは先頭2つだけを返す(0.3.0以前の読み方と同じ)" do
       expect(described_class.unpack(described_class.pack_all("a", "b", "c"))).to eq(%w[a b])
+    end
+  end
+  # 取り出した値(秘密鍵など)をゼロ埋めした時に、元のバイト列の領域まで消せるように、
+  # 元の領域を共有しない独立したコピーとして返す。共有している文字列に書き込むと、
+  # 書き込んだ側だけが別の領域へコピーされ、元の領域の秘密鍵は残る。
+  describe "取り出した値の独立性" do
+    def shared?(string)
+      JSON.parse(ObjectSpace.dump(string)).fetch("shared", false)
+    end
+
+    let(:secret) { "\xAA".b * 2400 }
+
+    it "unpackの値は、元のバイト列と領域を共有しない" do
+      described_class.unpack(described_class.pack("\x01".b * 32, secret)).each do |part|
+        expect(shared?(part)).to be(false)
+      end
+    end
+
+    it "unpack_allの値は、元のバイト列と領域を共有しない" do
+      described_class.unpack_all(described_class.pack_all("\x01".b * 1200, secret)).each do |part|
+        expect(shared?(part)).to be(false)
+      end
     end
   end
 end
