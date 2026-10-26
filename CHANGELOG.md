@@ -89,6 +89,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the public key was disclosed separately. Ciphertexts in the 0.3.0 format remain forgeable with the public
   key; reject them with `accept_legacy_records` and `accept_legacy_cookies_until` once they are no
   longer needed.
+- Secret keys and shared secrets passed to and from liboqs are now zeroed in the native buffers
+  after each key generation, decapsulation and signature. Previously these buffers were freed by
+  the garbage collector without being cleared. Secret keys held as Ruby Strings cannot be wiped
+  reliably and stay in memory for the life of the process; see "中間値の破棄" in
+  docs/THREAT_MODEL.md.
+- The bundled liboqs source is pinned to the upstream commit of its release tag. Gem builds and the
+  development fallback that clones liboqs stop if the tag resolves to a different commit, and
+  `rake vendor:verify` compares the bundled source file by file with that commit. Pass `DIR=` to
+  check the `ext/pqc_rails/vendor/liboqs` directory of a gem unpacked with `gem unpack`.
 
 ### Fixed
 
