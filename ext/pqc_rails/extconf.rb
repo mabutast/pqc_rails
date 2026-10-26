@@ -17,10 +17,10 @@
 require "fileutils"
 require "etc"
 require_relative "build_shell"
+require_relative "vendor_liboqs"
 
 EXT_DIR = __dir__
 VENDOR_DIR = File.join(EXT_DIR, "vendor", "liboqs")
-DEV_CLONE_TAG = "0.16.0"
 DEV_CLONE_DIR = File.join(EXT_DIR, "liboqs-src")
 BUILD_DIR = File.join(EXT_DIR, "liboqs-build")
 
@@ -34,9 +34,10 @@ def liboqs_source_dir
   puts "-- vendor/liboqs が見つかりません。開発時フォールバックとしてgit cloneします" \
        "(リリースされたgemではこの経路は通らない想定。メンテナは`rake vendor:liboqs`を実行してください)"
   unless File.directory?(DEV_CLONE_DIR)
-    PqcRails::BuildShell.sh!("git", "clone", "--branch", DEV_CLONE_TAG, "--depth", "1",
-                             "https://github.com/open-quantum-safe/liboqs.git", DEV_CLONE_DIR)
+    PqcRails::BuildShell.sh!("git", "clone", "--branch", PqcRails::VendorLiboqs::TAG, "--depth", "1",
+                             PqcRails::VendorLiboqs::UPSTREAM_URL, DEV_CLONE_DIR)
   end
+  PqcRails::VendorLiboqs.verify_commit!(DEV_CLONE_DIR)
   DEV_CLONE_DIR
 end
 

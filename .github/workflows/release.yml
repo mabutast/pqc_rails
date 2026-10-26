@@ -31,6 +31,10 @@ jobs:
       - name: Vendor liboqs source into the gem package
         run: bundle exec rake vendor:liboqs
 
+      # 同梱したソースが、vendor_liboqs.rb で固定した上流のコミットとファイルごとに一致することを確かめる
+      - name: Verify the vendored liboqs source against the pinned upstream commit
+        run: bundle exec rake vendor:verify
+
       - uses: rubygems/release-gem@v1
         with:
           # [EXPERIMENTAL] sigstore attestation signing. Disabled: its RUBYOPT-injected
