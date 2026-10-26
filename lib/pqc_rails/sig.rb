@@ -2,6 +2,7 @@
 
 require_relative "algorithms"
 require_relative "length_validation"
+require_relative "secret_buffer"
 require_relative "ffi/sig"
 
 module PqcRails
@@ -48,15 +49,16 @@ module PqcRails
       ensure_not_freed!
 
       public_key = FFI::MemoryPointer.new(:uint8, length_public_key)
-      secret_key = FFI::MemoryPointer.new(:uint8, length_secret_key)
 
-      status = Ffi::Sig.OQS_SIG_keypair(@sig_ptr, public_key, secret_key)
-      raise PqcRails::Error, "OQS_SIG_keypair failed (status=#{status})" unless status.zero?
+      SecretBuffer.with(length_secret_key) do |secret_key|
+        status = Ffi::Sig.OQS_SIG_keypair(@sig_ptr, public_key, secret_key)
+        raise PqcRails::Error, "OQS_SIG_keypair failed (status=#{status})" unless status.zero?
 
-      Keypair.new(
-        public_key.read_bytes(length_public_key),
-        secret_key.read_bytes(length_secret_key)
-      )
+        Keypair.new(
+          public_key.read_bytes(length_public_key),
+          secret_key.read_bytes(length_secret_key)
+        )
+      end
     end
 
     # メッセージに署名する
@@ -70,9 +72,6 @@ module PqcRails
       message_ptr = FFI::MemoryPointer.new(:uint8, message.bytesize)
       message_ptr.put_bytes(0, message)
 
-      secret_key_ptr = FFI::MemoryPointer.new(:uint8, secret_key.bytesize)
-      secret_key_ptr.put_bytes(0, secret_key)
-
       # signatureバッファは「最大長」で確保しておく。
       # 実際に書き込まれた長さは signature_len_ptr 経由で後から読み取る。
       signature_ptr = FFI::MemoryPointer.new(:uint8, length_signature)
@@ -83,14 +82,10 @@ module PqcRails
       # read_uint64のような固定幅の読み出しメソッドではなく :size_t シンボルを使う)。
       signature_len_ptr = FFI::MemoryPointer.new(:size_t, 1)
 
-      status = Ffi::Sig.OQS_SIG_sign(
-        @sig_ptr,
-        signature_ptr,
-        signature_len_ptr,
-        message_ptr,
-        message.bytesize,
-        secret_key_ptr
-      )
+      status = SecretBuffer.with(secret_key.bytesize, secret_key) do |secret_key_ptr|
+        Ffi::Sig.OQS_SIG_sign(@sig_ptr, signature_ptr, signature_len_ptr, message_ptr, message.bytesize,
+                              secret_key_ptr)
+      end
       raise PqcRails::Error, "OQS_SIG_sign failed (status=#{status})" unless status.zero?
 
       actual_signature_len = signature_len_ptr.read(:size_t)

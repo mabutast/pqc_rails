@@ -2,6 +2,7 @@
 
 require_relative "algorithms"
 require_relative "length_validation"
+require_relative "secret_buffer"
 require_relative "ffi/kem"
 
 module PqcRails
@@ -52,15 +53,16 @@ module PqcRails
       ensure_not_freed!
 
       public_key = FFI::MemoryPointer.new(:uint8, length_public_key)
-      secret_key = FFI::MemoryPointer.new(:uint8, length_secret_key)
 
-      status = Ffi::Kem.OQS_KEM_keypair(@kem_ptr, public_key, secret_key)
-      raise PqcRails::Error, "OQS_KEM_keypair failed (status=#{status})" unless status.zero?
+      SecretBuffer.with(length_secret_key) do |secret_key|
+        status = Ffi::Kem.OQS_KEM_keypair(@kem_ptr, public_key, secret_key)
+        raise PqcRails::Error, "OQS_KEM_keypair failed (status=#{status})" unless status.zero?
 
-      Keypair.new(
-        public_key.read_bytes(length_public_key),
-        secret_key.read_bytes(length_secret_key)
-      )
+        Keypair.new(
+          public_key.read_bytes(length_public_key),
+          secret_key.read_bytes(length_secret_key)
+        )
+      end
     end
 
     def encapsulate(public_key)
@@ -86,16 +88,17 @@ module PqcRails
       validate_length!(ciphertext, length_ciphertext, "ciphertext")
       validate_length!(secret_key, length_secret_key, "secret_key")
 
-      shared_secret = FFI::MemoryPointer.new(:uint8, length_shared_secret)
-      ct_ptr        = FFI::MemoryPointer.new(:uint8, ciphertext.bytesize)
+      ct_ptr = FFI::MemoryPointer.new(:uint8, ciphertext.bytesize)
       ct_ptr.put_bytes(0, ciphertext)
-      sk_ptr        = FFI::MemoryPointer.new(:uint8, secret_key.bytesize)
-      sk_ptr.put_bytes(0, secret_key)
 
-      status = Ffi::Kem.OQS_KEM_decaps(@kem_ptr, shared_secret, ct_ptr, sk_ptr)
-      raise PqcRails::Error, "OQS_KEM_decaps failed (status=#{status})" unless status.zero?
+      SecretBuffer.with(secret_key.bytesize, secret_key) do |sk_ptr|
+        SecretBuffer.with(length_shared_secret) do |shared_secret|
+          status = Ffi::Kem.OQS_KEM_decaps(@kem_ptr, shared_secret, ct_ptr, sk_ptr)
+          raise PqcRails::Error, "OQS_KEM_decaps failed (status=#{status})" unless status.zero?
 
-      shared_secret.read_bytes(length_shared_secret)
+          shared_secret.read_bytes(length_shared_secret)
+        end
+      end
     end
 
     def free
