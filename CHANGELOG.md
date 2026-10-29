@@ -57,8 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README lists, for each protected value (session cookies, encrypted columns, signatures, TLS),
   the cryptography Rails uses by default and what pqc_rails uses instead.
 - README states that the default ML-KEM-768 is the parameter set NIST IR 8547 recommends as the
-  default for key establishment. docs/THREAT_MODEL.md notes that NIST IR 8547 treats hybrid
-  key establishment as a temporary measure leading to a second transition to PQC-only algorithms.
+  default for key establishment. docs/THREAT_MODEL.md notes that NIST IR 8547 typically expects
+  hybrid key establishment to be a temporary measure leading to a second transition to PQC-only
+  algorithms.
 - README's API stability section now lists the key generation and encoding calls used in
   docs/MIGRATION.md (`HybridKem.open` with `#generate_keypair`, `KeySource.encode` / `.decode`),
   `CiphertextInfo`, `Cipher#algorithm_id`, `CiphertextFormat.key_id`, the new configuration
