@@ -48,7 +48,7 @@ PQC 対応の義務化を待つ理由はありません。今この瞬間も、�
 | 署名 | 該当する機能なし | ML-DSA（`PqcRails::Sig`、単体のプリミティブとして提供） |
 | TLS 通信路 | 対象外（Web サーバ・ロードバランサの設定） | 対象外 |
 
-ML-KEM は NIST FIPS 203、ML-DSA は NIST FIPS 204 で標準化されたアルゴリズムです。読み込んでいる liboqs の版は `rails pqc_rails:status`（`PqcRails.liboqs_version`）で確認できます。
+ML-KEM は NIST FIPS 203、ML-DSA は NIST FIPS 204 で標準化されたアルゴリズムです。既定の ML-KEM-768 は、[NIST IR 8547](https://csrc.nist.gov/pubs/ir/8547/final) が鍵確立の既定として推奨するパラメータセットと同じです。読み込んでいる liboqs の版は `rails pqc_rails:status`（`PqcRails.liboqs_version`）で確認できます。
 
 KEM と DSA に加え、セッション Cookie と ActiveRecord::Encryption の両方を ML-KEM ベースのハイブリッド暗号（KEM-DEM 構成）で保護します。liboqs がサポートする他のアルゴリズムも、アルゴリズム名を文字列で指定するだけで利用できます（liboqs 側のビルド設定に依存します）。
 
