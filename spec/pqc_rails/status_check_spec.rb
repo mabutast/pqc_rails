@@ -68,6 +68,27 @@ RSpec.describe PqcRails::StatusCheck do
       expect(session_key.detail).to include("認証鍵")
     end
 
+    it "セッション鍵の値が途中で切れている場合、止まらずに鍵を貼り直すよう報告する" do
+      ENV["PQC_SESSION_KEY"] = Base64.strict_encode64(Base64.strict_decode64(PqcRails::KeySource.encode(keypair))[0..-4])
+
+      results = described_class.run
+
+      session_key = result_for(results, "セッション鍵 (PQC_SESSION_KEY)")
+      expect(session_key.ok).to be false
+      expect(session_key.detail).to include("途中で切れて")
+      expect(result_for(results, "liboqs")).not_to be_nil
+    end
+
+    it "旧鍵の値が途中で切れている場合、何世代目かを報告する" do
+      good = PqcRails::KeySource.encode(keypair)
+      cut = Base64.strict_encode64(Base64.strict_decode64(good)[0..-4])
+      ENV["PQC_SESSION_PREVIOUS_KEYS"] = [good, cut].join(",")
+
+      previous = result_for(described_class.run, "セッション旧鍵 (PQC_SESSION_PREVIOUS_KEYS)")
+      expect(previous.ok).to be false
+      expect(previous.detail).to include("2世代目")
+    end
+
     it "DBレコード鍵が未設定の場合、その旨を報告する" do
       results = described_class.run
 

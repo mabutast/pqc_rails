@@ -46,7 +46,10 @@ module PqcRails
 
     def key_result(name:, env_var:, credentials_key:)
       encoded = KeySource.fetch(env_var: env_var, credentials_key: credentials_key)
-      if encoded && legacy_key?(encoded)
+      state = encoded && key_state(encoded)
+      if state == :truncated
+        Result.new(name: name, ok: false, detail: "鍵の値が途中で切れています。鍵の値を最後まで貼り直してください")
+      elsif state == :legacy
         Result.new(name: name, ok: false,
                    detail: "認証鍵を持たない0.3.0以前の形式の鍵です。新しい鍵を生成してローテーションしてください(docs/MIGRATION.md)")
       elsif encoded
@@ -57,18 +60,26 @@ module PqcRails
       end
     end
 
-    # 認証鍵を持たない(0.3.0以前に生成した)鍵ならtrue。値を読めない場合は、ここでは判定しない。
-    def legacy_key?(encoded)
-      KeySource.decode(encoded).authentication_key.nil?
+    # 途中で切れた鍵なら:truncated、認証鍵を持たない(0.3.0以前に生成した)鍵なら:legacyを返す。
+    # Base64として読めない等の値は、ここでは判定しない(nil)。
+    def key_state(encoded)
+      :legacy if KeySource.decode(encoded).authentication_key.nil?
+    rescue PqcRails::Error
+      :truncated
     rescue ArgumentError, TypeError, NoMethodError
-      false
+      nil
     end
 
     def previous_keys_result(name:, env_var:, credentials_key:)
       raw = KeySource.fetch(env_var: env_var, credentials_key: credentials_key)
-      count = raw.nil? ? 0 : (raw.is_a?(::Array) ? raw.size : raw.split(",").size)
+      entries = raw.nil? ? [] : (raw.is_a?(::Array) ? raw : raw.split(","))
+      count = entries.size
+      truncated = entries.index { |encoded| key_state(encoded.strip) == :truncated }
 
-      if count.zero?
+      if truncated
+        Result.new(name: name, ok: false,
+                   detail: "#{truncated + 1}世代目の旧鍵の値が途中で切れています。鍵の値を最後まで貼り直してください")
+      elsif count.zero?
         Result.new(name: name, ok: true, detail: "未設定(ローテーション中ではありません)")
       else
         Result.new(name: name, ok: true, detail: "#{count}世代の旧鍵を保持中(鍵ローテーション中)")

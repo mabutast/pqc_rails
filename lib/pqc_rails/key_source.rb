@@ -48,12 +48,25 @@ module PqcRails
     end
 
     # Base64から戻したバイト列は、鍵を取り出した後にゼロで埋める(鍵ペアが持つのは取り出したコピーだけ)。
+    # 公開鍵・秘密鍵が無い、または認証鍵が32バイトに足りない値は、途中で切れた鍵としてPqcRails::Errorを送出する。
     def decode(encoded)
       raw = Base64.strict_decode64(encoded)
-      public_key, secret_key, authentication_key = BlobPacking.unpack_all(raw)
+      public_key, secret_key, authentication_key = unpack_key(raw)
+      if secret_key.nil? ||
+         (authentication_key && authentication_key.bytesize != HybridKem::AUTHENTICATION_KEY_LENGTH)
+        SecretBuffer.wipe(secret_key, authentication_key)
+        raise PqcRails::Error, "the PQC key is truncated: re-copy the full key value"
+      end
+
       HybridKem::Keypair.new(public_key, secret_key, authentication_key)
     ensure
       SecretBuffer.wipe(raw)
+    end
+
+    def unpack_key(raw)
+      BlobPacking.unpack_all(raw)
+    rescue ArgumentError
+      raise PqcRails::Error, "the PQC key is truncated: re-copy the full key value"
     end
 
     # ENV、またはRails credentialsから現行鍵・旧鍵世代を読み込む、デフォルトの鍵ソース。
@@ -86,7 +99,19 @@ module PqcRails
         @previous_keypairs ||= begin
           raw = KeySource.fetch(env_var: @previous_env_var, credentials_key: @previous_credentials_key)
           entries = raw.nil? ? [] : (raw.is_a?(::Array) ? raw : raw.split(","))
-          entries.map { |encoded| KeySource.decode(encoded.strip) }
+          decode_generations(entries)
+        end
+      end
+
+      private
+
+      # 途中の世代が読めない時は、それまでに復元した世代の鍵をゼロで埋めてから、何世代目かを示して送出する。
+      def decode_generations(entries)
+        entries.each_with_index.with_object([]) do |(encoded, index), keypairs|
+          keypairs << KeySource.decode(encoded.strip)
+        rescue PqcRails::Error => e
+          keypairs.each { |keypair| SecretBuffer.wipe(keypair.secret_key, keypair.authentication_key) }
+          raise PqcRails::Error, "PQC #{@label} previous key ##{index + 1}: #{e.message}"
         end
       end
     end

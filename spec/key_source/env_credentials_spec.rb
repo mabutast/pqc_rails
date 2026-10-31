@@ -48,6 +48,20 @@ RSpec.describe PqcRails::KeySource::EnvCredentials do
   end
 
   describe "#previous_keypairs" do
+    it "途中の世代の値が切れている場合、何世代目かを示すPqcRails::Errorを送出し、復元済みの世代の鍵をゼロで埋める" do
+      raw = Base64.strict_decode64(PqcRails::KeySource.encode(another_previous_keypair))
+      ENV["PQC_TEST_PREVIOUS_KEYS"] =
+        [PqcRails::KeySource.encode(previous_keypair), Base64.strict_encode64(raw[0..-2])].join(",")
+      wiped = []
+      allow(PqcRails::SecretBuffer).to receive(:wipe).and_wrap_original do |original, *strings|
+        wiped << strings.map { |string| string&.dup }
+        original.call(*strings)
+      end
+
+      expect { source.previous_keypairs }.to raise_error(PqcRails::Error, /previous key #2: .*truncated/)
+      expect(wiped).to include([previous_keypair.secret_key, previous_keypair.authentication_key])
+    end
+
     it "未設定の場合は空配列を返す(ローテーション対象外の既定状態)" do
       ENV.delete("PQC_TEST_PREVIOUS_KEYS")
       allow(Rails).to receive(:application).and_return(nil)

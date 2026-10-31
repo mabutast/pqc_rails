@@ -90,5 +90,15 @@ RSpec.describe PqcRails::DhKem do
         dh_kem.decapsulate("\x00" * 32, "too_short")
       end.to raise_error(ArgumentError, /secret_key has wrong length/)
     end
+
+    it "空・1バイト長い暗号文、nilの公開鍵はArgumentErrorを送出する" do
+      dh_kem = described_class.new
+      keypair = dh_kem.generate_keypair
+
+      expect { dh_kem.decapsulate("", keypair.secret_key) }.to raise_error(ArgumentError, /ciphertext has wrong length/)
+      expect { dh_kem.decapsulate("\x00".b * 33, keypair.secret_key) }
+        .to raise_error(ArgumentError, /ciphertext has wrong length/)
+      expect { dh_kem.encapsulate(nil) }.to raise_error(ArgumentError, /public_key must be a String/)
+    end
   end
 end

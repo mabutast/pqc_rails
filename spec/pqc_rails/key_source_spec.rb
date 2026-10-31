@@ -26,6 +26,25 @@ RSpec.describe PqcRails::KeySource do
       expect(decoded.public_key).to eq(keypair.public_key)
       expect(decoded.authentication_key).to be_nil
     end
+
+    it "途中で切れた鍵の値(認証鍵が32バイトに足りない・秘密鍵が無い・空)はPqcRails::Errorを送出する" do
+      raw = Base64.strict_decode64(described_class.encode(keypair))
+
+      public_key_end = 4 + keypair.public_key.bytesize
+      secret_key_end = public_key_end + 4 + keypair.secret_key.bytesize
+
+      [raw[0..-2], raw[0, 100], raw[0, 3], "", raw[0, public_key_end + 4 + 10], raw[0, secret_key_end + 2]]
+        .each do |truncated|
+        expect { described_class.decode(Base64.strict_encode64(truncated)) }
+          .to raise_error(PqcRails::Error, /truncated/)
+      end
+    end
+
+    it "33バイトの認証鍵はPqcRails::Errorを送出する" do
+      long = PqcRails::BlobPacking.pack_all(keypair.public_key, keypair.secret_key, "\x01".b * 33)
+
+      expect { described_class.decode(Base64.strict_encode64(long)) }.to raise_error(PqcRails::Error)
+    end
   end
 
   around do |example|

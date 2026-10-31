@@ -148,6 +148,36 @@ RSpec.describe PqcRails::Kem do
         end.to raise_error(ArgumentError, /ciphertext has wrong length/)
       end
     end
+
+    it "空・1バイト・1バイト長い・1バイト短い公開鍵・暗号文・秘密鍵は、どれもArgumentErrorを送出する" do
+      described_class.open(alg_name) do |kem|
+        keypair = kem.generate_keypair
+        ciphertext = kem.encapsulate(keypair.public_key).ciphertext
+
+        { "public_key" => keypair.public_key, "ciphertext" => ciphertext, "secret_key" => keypair.secret_key }
+          .each do |name, valid|
+            ["", "\x00".b, "#{valid}\x00".b, valid[0..-2]].each do |bad|
+              call = lambda do
+                case name
+                when "public_key" then kem.encapsulate(bad)
+                when "ciphertext" then kem.decapsulate(bad, keypair.secret_key)
+                else kem.decapsulate(ciphertext, bad)
+                end
+              end
+              expect(&call).to raise_error(ArgumentError, /#{name} has wrong length/)
+            end
+          end
+      end
+    end
+
+    it "nilを渡すとArgumentErrorを送出する(NoMethodErrorにしない)" do
+      described_class.open(alg_name) do |kem|
+        keypair = kem.generate_keypair
+
+        expect { kem.encapsulate(nil) }.to raise_error(ArgumentError, /public_key must be a String/)
+        expect { kem.decapsulate(nil, keypair.secret_key) }.to raise_error(ArgumentError, /ciphertext must be a String/)
+      end
+    end
   end
 
   describe "#free" do

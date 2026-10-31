@@ -157,6 +157,28 @@ RSpec.describe PqcRails::HybridKem do
     end
   end
 
+  describe "壊れた入力" do
+    it "空・nil・長さの欄だけ・古典側だけの公開鍵・暗号文・秘密鍵は、どれもArgumentErrorを送出する" do
+      described_class.open(pq_alg_name) do |hybrid|
+        keypair = hybrid.generate_keypair
+        ciphertext = hybrid.encapsulate(keypair.public_key).ciphertext
+
+        { public_key: keypair.public_key, ciphertext: ciphertext, secret_key: keypair.secret_key }.each do |name, valid|
+          [nil, "", "\x00".b, valid[0, 4], valid[0, 36], valid[0..-2]].each do |bad|
+            call = lambda do
+              case name
+              when :public_key then hybrid.encapsulate(bad)
+              when :ciphertext then hybrid.decapsulate(bad, keypair.secret_key)
+              else hybrid.decapsulate(ciphertext, bad)
+              end
+            end
+            expect(&call).to raise_error(ArgumentError, /truncated|wrong length|must be a String/)
+          end
+        end
+      end
+    end
+  end
+
   describe "#free" do
     it "free後にencapsulateを呼ぶとPqcRails::Errorを送出する" do
       hybrid = described_class.new(pq_alg_name)

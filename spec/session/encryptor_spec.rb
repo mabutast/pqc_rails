@@ -115,6 +115,26 @@ RSpec.describe PqcRails::Session::Encryptor do
       expect(PqcRails::HybridKem).not_to have_received(:open)
     end
 
+    it "途中で切れたCookie(見出しだけ・本体の途中まで)はPqcRails::Errorを送出する" do
+      bytes = decoded(encryptor.encrypt({ "user_id" => 1 }))
+      header_length = 4 + bytes.getbyte(1)
+
+      [bytes[0, 1], bytes[0, 3], bytes[0, header_length], bytes[0, header_length + 3],
+       bytes[0, header_length + 40], bytes[0..-2]].each do |bad|
+        expect { encryptor.decrypt(Base64.strict_encode64(bad)) }.to raise_error(PqcRails::Error)
+      end
+    end
+
+    it "途中で切れた旧形式(v0)のCookieもPqcRails::Errorを送出する" do
+      PqcRails.configuration.ciphertext_format = :v0
+      bytes = decoded(encryptor.encrypt({ "user_id" => 1 }))
+      PqcRails.configuration.ciphertext_format = :v1
+
+      [bytes[0, 2], bytes[0, 4], bytes[0, 40], bytes[0..-2]].each do |bad|
+        expect { encryptor.decrypt(Base64.strict_encode64(bad)) }.to raise_error(PqcRails::Error)
+      end
+    end
+
     it "未知の形式バージョンはPqcRails::Errorを送出する" do
       bytes = decoded(encryptor.encrypt({ "user_id" => 1 }))
       bytes.setbyte(0, 2)
