@@ -41,7 +41,15 @@ module PqcRails
       iv + cipher.auth_tag + ciphertext
     end
 
+    # IVと認証タグに満たない入力は、OpenSSLに短い認証タグを設定する前にArgumentErrorにする
+    # (GCMは短い認証タグでも検証を行うため、タグの長さはここで保証する)。
     def decrypt(encrypted, associated_data: nil)
+      validate_string!(encrypted, "encrypted")
+      if encrypted.bytesize < IV_LENGTH + TAG_LENGTH
+        raise ArgumentError,
+              "encrypted is too short: expected at least #{IV_LENGTH + TAG_LENGTH} bytes, got #{encrypted.bytesize}"
+      end
+
       iv         = encrypted[0, IV_LENGTH]
       tag        = encrypted[IV_LENGTH, TAG_LENGTH]
       ciphertext = encrypted[(IV_LENGTH + TAG_LENGTH)..]

@@ -15,13 +15,17 @@ module PqcRails
       [first.bytesize].pack("N") + first + [second.bytesize].pack("N") + second
     end
 
+    # 長さの欄が欠けている、または本体が長さの欄より短い場合はArgumentErrorを送出する。
+    # 2つ目より後ろのバイト列は読まない(3要素の鍵を2要素として読む0.3.0以前と同じ読み方)。
     def unpack(blob)
-      first_length = blob[0, 4].unpack1("N")
-      first = copy(blob, 4, first_length)
+      raise ArgumentError, "packed blob must be a String, got #{blob.class}" unless blob.is_a?(String)
+
+      first_length = read_length(blob, 0)
+      first = copy_exact(blob, 4, first_length)
 
       second_offset = 4 + first_length
-      second_length = blob[second_offset, 4].unpack1("N")
-      second = copy(blob, second_offset + 4, second_length)
+      second_length = read_length(blob, second_offset)
+      second = copy_exact(blob, second_offset + 4, second_length)
 
       [first, second]
     end
@@ -41,6 +45,18 @@ module PqcRails
         offset += 4 + length
       end
       parts
+    end
+
+    def read_length(blob, offset)
+      raise ArgumentError, "packed blob is truncated: missing length field" if offset + 4 > blob.bytesize
+
+      blob.unpack1("@#{offset}N")
+    end
+
+    def copy_exact(blob, offset, length)
+      raise ArgumentError, "packed blob is truncated: expected #{length} bytes" if offset + length > blob.bytesize
+
+      copy(blob, offset, length)
     end
 
     # blobのoffsetからlengthバイトを、新しく確保した領域にコピーして返す。offsetが範囲外ならnilを返す。

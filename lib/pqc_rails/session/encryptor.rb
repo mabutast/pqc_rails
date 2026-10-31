@@ -33,20 +33,23 @@ module PqcRails
 
       # 先頭バイトで形式を判別する。旧形式(v0)は先頭がKEM暗号文の4バイト長(ビッグエンディアン)で、
       # KEM暗号文は16MB未満のため先頭バイトは必ず0になる。1以上なら形式バージョンとして読む。
+      # 途中で切れた・壊れたCookieは、どの段で見つかってもPqcRails::Errorにする。
       def decrypt(blob)
         bytes = Base64.strict_decode64(blob)
-
-        serialized =
-          case bytes.getbyte(0)
-          when 0 then open_legacy(bytes)
-          when CiphertextFormat::VERSION then open_v1(bytes)
-          else raise PqcRails::Error, "unsupported ciphertext format version: #{bytes.getbyte(0).inspect}"
-          end
-
-        Marshal.load(serialized)
+        Marshal.load(open_cookie(bytes))
       end
 
       private
+
+      def open_cookie(bytes)
+        case bytes.getbyte(0)
+        when 0 then open_legacy(bytes)
+        when CiphertextFormat::VERSION then open_v1(bytes)
+        else raise PqcRails::Error, "unsupported ciphertext format version: #{bytes.getbyte(0).inspect}"
+        end
+      rescue OpenSSL::Cipher::CipherError, ArgumentError => e
+        raise PqcRails::Error, e.message
+      end
 
       # 旧形式(v0): [4バイト長][KEM暗号文][4バイト長][AES暗号文]
       def seal_legacy(serialized)
@@ -83,6 +86,10 @@ module PqcRails
 
       def open_v1(bytes)
         algorithm_id_length = bytes.getbyte(1)
+        if algorithm_id_length.nil? || bytes.bytesize < 4 + algorithm_id_length
+          raise PqcRails::Error, "the cookie is truncated: missing the format header"
+        end
+
         algorithm_id = bytes[2, algorithm_id_length]
         key_id = bytes[2 + algorithm_id_length, 2].unpack1("H4")
         body = bytes[(4 + algorithm_id_length)..]
@@ -99,8 +106,6 @@ module PqcRails
           shared_secret = hybrid.decapsulate(ciphertext, @keypair.secret_key)
           data_key = CiphertextFormat.data_key(shared_secret, @keypair.authentication_key)
           EnvelopeCipher.new(data_key).decrypt(encrypted, associated_data: associated_data)
-        rescue OpenSSL::Cipher::CipherError, ArgumentError => e
-          raise PqcRails::Error, e.message
         end
       end
     end

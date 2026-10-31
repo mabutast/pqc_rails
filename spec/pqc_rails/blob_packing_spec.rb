@@ -42,6 +42,25 @@ RSpec.describe PqcRails::BlobPacking do
       expect(described_class.unpack(described_class.pack_all("a", "b", "c"))).to eq(%w[a b])
     end
   end
+
+  describe ".unpack の不正な入力" do
+    let(:blob) { described_class.pack("classical", "post-quantum") }
+
+    it "nilはArgumentErrorを送出する" do
+      expect { described_class.unpack(nil) }.to raise_error(ArgumentError, /must be a String/)
+    end
+
+    it "長さの欄が欠けている(空・1バイト・1つ目だけ)とArgumentErrorを送出する" do
+      ["", "\x00".b, blob[0, 4], blob[0, 4 + "classical".bytesize]].each do |bad|
+        expect { described_class.unpack(bad) }.to raise_error(ArgumentError, /truncated/)
+      end
+    end
+
+    it "長さの欄より本体が短い(末尾が切れている)とArgumentErrorを送出する" do
+      expect { described_class.unpack(blob[0..-2]) }.to raise_error(ArgumentError, /truncated/)
+      expect { described_class.unpack(blob[0, 6]) }.to raise_error(ArgumentError, /truncated/)
+    end
+  end
   # 取り出した値(秘密鍵など)をゼロ埋めした時に、元のバイト列の領域まで消せるように、
   # 元の領域を共有しない独立したコピーとして返す。共有している文字列に書き込むと、
   # 書き込んだ側だけが別の領域へコピーされ、元の領域の秘密鍵は残る。

@@ -85,6 +85,19 @@ RSpec.describe PqcRails::Cipher do
         cipher.decrypt(message, key: keypair)
       end.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
     end
+
+    it "途中で切れた・空のkem_ctとpayloadは、ActiveRecord::Encryption::Errors::Decryptionを送出する" do
+      original = cipher.encrypt("hello pqc", key: keypair)
+
+      [["", original.payload], [original.headers[:kem_ct][0, 40], original.payload],
+       [original.headers[:kem_ct], original.payload[0, 20]]].each do |kem_ct, payload|
+        message = ActiveRecord::Encryption::Message.new(payload: payload)
+        original.headers.each { |name, value| message.headers[name] = value unless name.to_s == "kem_ct" }
+        message.headers[:kem_ct] = kem_ct
+
+        expect { cipher.decrypt(message, key: keypair) }.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
+      end
+    end
   end
 
   describe "暗号文のメタデータ(形式バージョン・アルゴリズムID・鍵ID)" do

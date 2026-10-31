@@ -72,4 +72,24 @@ RSpec.describe PqcRails::EnvelopeCipher do
       end.to raise_error(OpenSSL::Cipher::CipherError)
     end
   end
+
+  describe "#decrypt の短い入力" do
+    let(:cipher) { described_class.new(key) }
+
+    it "IVと認証タグ(28バイト)に満たない入力は、短い認証タグを設定せずにArgumentErrorを送出する" do
+      encrypted = cipher.encrypt("hello")
+
+      ["", encrypted[0, 12], encrypted[0, 20], encrypted[0, 27]].each do |bad|
+        expect { cipher.decrypt(bad) }.to raise_error(ArgumentError, /encrypted is too short/)
+      end
+    end
+
+    it "nilはArgumentErrorを送出する" do
+      expect { cipher.decrypt(nil) }.to raise_error(ArgumentError, /encrypted must be a String/)
+    end
+
+    it "空の平文の暗号文(ちょうど28バイト)は復号できる" do
+      expect(cipher.decrypt(cipher.encrypt(""))).to eq("")
+    end
+  end
 end
