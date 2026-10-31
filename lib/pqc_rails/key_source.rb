@@ -99,7 +99,19 @@ module PqcRails
         @previous_keypairs ||= begin
           raw = KeySource.fetch(env_var: @previous_env_var, credentials_key: @previous_credentials_key)
           entries = raw.nil? ? [] : (raw.is_a?(::Array) ? raw : raw.split(","))
-          entries.map { |encoded| KeySource.decode(encoded.strip) }
+          decode_generations(entries)
+        end
+      end
+
+      private
+
+      # 途中の世代が読めない時は、それまでに復元した世代の鍵をゼロで埋めてから、何世代目かを示して送出する。
+      def decode_generations(entries)
+        entries.each_with_index.with_object([]) do |(encoded, index), keypairs|
+          keypairs << KeySource.decode(encoded.strip)
+        rescue PqcRails::Error => e
+          keypairs.each { |keypair| SecretBuffer.wipe(keypair.secret_key, keypair.authentication_key) }
+          raise PqcRails::Error, "PQC #{@label} previous key ##{index + 1}: #{e.message}"
         end
       end
     end

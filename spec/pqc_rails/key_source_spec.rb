@@ -39,6 +39,12 @@ RSpec.describe PqcRails::KeySource do
           .to raise_error(PqcRails::Error, /truncated/)
       end
     end
+
+    it "33バイトの認証鍵はPqcRails::Errorを送出する" do
+      long = PqcRails::BlobPacking.pack_all(keypair.public_key, keypair.secret_key, "\x01".b * 33)
+
+      expect { described_class.decode(Base64.strict_encode64(long)) }.to raise_error(PqcRails::Error)
+    end
   end
 
   around do |example|

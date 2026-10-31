@@ -59,12 +59,10 @@ module PqcRails
       blob.unpack1("@#{offset}N")
     end
 
-    # blobのoffsetからlengthバイトを、新しく確保した領域にコピーして返す。offsetが範囲外ならnilを返す。
+    # blobのoffsetからlengthバイトを、新しく確保した領域にコピーして返す。範囲は呼び出し側が確かめる。
     # byteslice・blob[...]は、末尾まで切り出すとblob自身も共有の状態に変えるため、一時的にでも使わない。
     # その状態のblobに書き込むと、書き込みはblobの新しいコピーに対して行われ、元の領域は残る。
     def copy(blob, offset, length)
-      return nil if offset > blob.bytesize
-
       blob.unpack1("@#{offset}a#{length}").force_encoding(blob.encoding)
     end
   end
