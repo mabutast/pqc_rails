@@ -118,6 +118,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `bundle install` now builds liboqs correctly when the gem is installed under a path containing
   spaces. The build scripts run `git` and `cmake` directly with argument lists instead of through
   a shell, so the install path is no longer split or interpreted by the shell.
+- Truncated, empty or `nil` keys and ciphertexts now raise `ArgumentError` with a message stating
+  that the input is truncated or has the wrong length, instead of `TypeError` or `NoMethodError`. This covers `PqcRails::Kem`,
+  `PqcRails::DhKem`, `PqcRails::HybridKem` and `PqcRails::EnvelopeCipher`. An `EnvelopeCipher`
+  ciphertext shorter than the IV and the 16-byte authentication tag is rejected before decryption.
+- A truncated session cookie now raises `PqcRails::Error`, for both the current and the 0.3.0
+  format. `PqcRails::Session::PqcCookieStore` treats it as an unreadable session as before.
 
 ## [0.3.0] - 2026-09-25
 
