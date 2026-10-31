@@ -36,16 +36,21 @@ module PqcRails
       parts.map { |part| [part.bytesize].pack("N") + part }.join
     end
 
-    # pack_allの逆。長さの欄が途中で足りなくなった場合は、そこまでに読めた分を返す。
+    # pack_allの逆。本体が長さの欄より短い、または末尾に長さの欄にも満たない余りがある場合は
+    # ArgumentErrorを送出する(途中で切れた値を、要素の少ない値として読まないため)。
     def unpack_all(blob)
-      parts = []
+      raise ArgumentError, "packed blob must be a String, got #{blob.class}" unless blob.is_a?(String)
+
+      lengths = []
       offset = 0
-      while offset + 4 <= blob.bytesize
-        length = blob[offset, 4].unpack1("N")
-        parts << copy(blob, offset + 4, length)
+      while offset < blob.bytesize
+        length = read_length(blob, offset)
+        raise ArgumentError, "packed blob is truncated: expected #{length} bytes" if offset + 4 + length > blob.bytesize
+
+        lengths << [offset + 4, length]
         offset += 4 + length
       end
-      parts
+      lengths.map { |start, length| copy(blob, start, length) }
     end
 
     def read_length(blob, offset)

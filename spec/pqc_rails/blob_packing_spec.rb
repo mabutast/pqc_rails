@@ -43,6 +43,20 @@ RSpec.describe PqcRails::BlobPacking do
     end
   end
 
+  describe ".unpack_all の不正な入力" do
+    let(:blob) { described_class.pack_all("public", "secret", "authentication") }
+
+    it "本体が長さの欄より短い・長さの欄の途中で切れているとArgumentErrorを送出する" do
+      [blob[0..-2], blob[0, 4 + 6 + 4 + 3], blob[0, 4 + 6 + 4 + 6 + 2]].each do |bad|
+        expect { described_class.unpack_all(bad) }.to raise_error(ArgumentError, /truncated/)
+      end
+    end
+
+    it "空のバイト列は要素0個として読む" do
+      expect(described_class.unpack_all("")).to eq([])
+    end
+  end
+
   describe ".unpack の不正な入力" do
     let(:blob) { described_class.pack("classical", "post-quantum") }
 

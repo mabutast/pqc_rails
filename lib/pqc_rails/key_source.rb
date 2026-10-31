@@ -51,7 +51,7 @@ module PqcRails
     # 公開鍵・秘密鍵が無い、または認証鍵が32バイトに足りない値は、途中で切れた鍵としてPqcRails::Errorを送出する。
     def decode(encoded)
       raw = Base64.strict_decode64(encoded)
-      public_key, secret_key, authentication_key = BlobPacking.unpack_all(raw)
+      public_key, secret_key, authentication_key = unpack_key(raw)
       if secret_key.nil? ||
          (authentication_key && authentication_key.bytesize != HybridKem::AUTHENTICATION_KEY_LENGTH)
         SecretBuffer.wipe(secret_key, authentication_key)
@@ -61,6 +61,12 @@ module PqcRails
       HybridKem::Keypair.new(public_key, secret_key, authentication_key)
     ensure
       SecretBuffer.wipe(raw)
+    end
+
+    def unpack_key(raw)
+      BlobPacking.unpack_all(raw)
+    rescue ArgumentError
+      raise PqcRails::Error, "the PQC key is truncated: re-copy the full key value"
     end
 
     # ENV、またはRails credentialsから現行鍵・旧鍵世代を読み込む、デフォルトの鍵ソース。
