@@ -172,7 +172,7 @@ RSpec.describe PqcRails::HybridKem do
               else hybrid.decapsulate(ciphertext, bad)
               end
             end
-            expect(&call).to raise_error(ArgumentError)
+            expect(&call).to raise_error(ArgumentError, /truncated|wrong length|must be a String/)
           end
         end
       end

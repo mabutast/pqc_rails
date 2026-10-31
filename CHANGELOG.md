@@ -124,6 +124,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ciphertext shorter than the IV and the 16-byte authentication tag is rejected before decryption.
 - A truncated session cookie now raises `PqcRails::Error`, for both the current and the 0.3.0
   format. `PqcRails::Session::PqcCookieStore` treats it as an unreadable session as before.
+- A truncated key value in `ENV` or Rails credentials now raises `PqcRails::Error` when the key is
+  loaded. Previously a key whose authentication key was cut short was used as is, and data
+  written with it could not be read with the complete key.
 
 ## [0.3.0] - 2026-09-25
 

@@ -48,9 +48,16 @@ module PqcRails
     end
 
     # Base64から戻したバイト列は、鍵を取り出した後にゼロで埋める(鍵ペアが持つのは取り出したコピーだけ)。
+    # 公開鍵・秘密鍵が無い、または認証鍵が32バイトに足りない値は、途中で切れた鍵としてPqcRails::Errorを送出する。
     def decode(encoded)
       raw = Base64.strict_decode64(encoded)
       public_key, secret_key, authentication_key = BlobPacking.unpack_all(raw)
+      if secret_key.nil? ||
+         (authentication_key && authentication_key.bytesize != HybridKem::AUTHENTICATION_KEY_LENGTH)
+        SecretBuffer.wipe(secret_key, authentication_key)
+        raise PqcRails::Error, "the PQC key is truncated: re-copy the full key value"
+      end
+
       HybridKem::Keypair.new(public_key, secret_key, authentication_key)
     ensure
       SecretBuffer.wipe(raw)
