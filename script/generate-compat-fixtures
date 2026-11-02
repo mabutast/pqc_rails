@@ -1,0 +1,67 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# spec/fixtures/compat/ の検査データ(以前の版が書いた暗号文)を作る。
+#
+# 引数の lib ディレクトリにある pqc_rails を読み込み、その版の鍵生成で DB 用とセッション用の鍵を作り、
+# ActiveRecord::Encryption で DB カラムに書いた値と、セッション Cookie の値を JSON で標準出力に出す。
+# 鍵の値はその版の KeySource.encode の形(0.3.0 以前は認証鍵を持たない2要素)で残す。
+# 検査データは一度作ったら作り直さない。作り直すと、以前の版が書いたデータを今のコードで読めるかを
+# 確かめられなくなる。新しい形式を足した時だけ、その形式のファイルを足す。
+#
+# 使い方(リポジトリの直下で):
+#   git worktree add --detach tmp/compat-v0.3.0 v0.3.0
+#   bundle exec ruby script/generate-compat-fixtures tmp/compat-v0.3.0/lib > spec/fixtures/compat/pqc_rails-0.3.0.json
+#   bundle exec ruby script/generate-compat-fixtures lib > spec/fixtures/compat/format-v1.json
+#   git worktree remove tmp/compat-v0.3.0
+
+require "json"
+require "active_record"
+require "sqlite3"
+
+lib = File.expand_path(ARGV.fetch(0) { abort "usage: #{$PROGRAM_NAME} <lib directory of pqc_rails>" })
+require File.join(lib, "pqc_rails")
+
+RECORD_PLAINTEXT = "pqc_rails compat fixture: 長く保存されるデータ"
+SESSION_DATA = { "session_id" => "compat-fixture-session", "user_id" => 42, "flash" => "保存した" }.freeze
+
+def generate_keypair
+  PqcRails::HybridKem.open(PqcRails::Cipher::DEFAULT_PQ_ALG_NAME, &:generate_keypair)
+end
+
+def write_record(record_key)
+  ENV["PQC_RECORD_KEY"] = record_key
+  ENV.delete("PQC_RECORD_PREVIOUS_KEYS")
+  PqcRails::ActiveRecord::Context.install!
+
+  ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
+  ActiveRecord::Migration.verbose = false
+  ActiveRecord::Schema.define { create_table(:compat_records) { |t| t.text :secret } }
+  model = Class.new(ActiveRecord::Base) do
+    self.table_name = "compat_records"
+    encrypts :secret
+  end
+
+  record = model.create!(secret: RECORD_PLAINTEXT)
+  model.connection.select_value("SELECT secret FROM compat_records WHERE id = #{record.id}")
+end
+
+record_key = PqcRails::KeySource.encode(generate_keypair)
+session_keypair = generate_keypair
+
+fixture = {
+  "pqc_rails_version" => PqcRails::VERSION,
+  "pq_alg_name" => PqcRails::Cipher::DEFAULT_PQ_ALG_NAME.to_s,
+  "record" => {
+    "key" => record_key,
+    "plaintext" => RECORD_PLAINTEXT,
+    "stored_value" => write_record(record_key)
+  },
+  "session" => {
+    "key" => PqcRails::KeySource.encode(session_keypair),
+    "data" => SESSION_DATA,
+    "cookie_value" => PqcRails::Session::Encryptor.new(session_keypair).encrypt(SESSION_DATA)
+  }
+}
+
+puts JSON.pretty_generate(fixture)

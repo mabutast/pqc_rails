@@ -9,6 +9,8 @@ repos:
     hooks:
       - id: detect-secrets
         args: ['--baseline', '.secrets.baseline']
+        # 互換性テストの検査データ。テスト専用に公開している鍵と暗号文で、JSONなのでpragmaを書けない。
+        exclude: ^spec/fixtures/compat/
 
   - repo: local
     hooks:
