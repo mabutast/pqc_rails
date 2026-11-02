@@ -9,6 +9,8 @@ repos:
     hooks:
       - id: detect-secrets
         args: ['--baseline', '.secrets.baseline']
+        # 互換性テストの検査データ。テスト専用に公開している鍵と暗号文で、JSONなのでpragmaを書けない。
+        exclude: ^spec/fixtures/compat/(pqc_rails-0\.3\.0|pqc_rails-0\.3\.0-ml_kem_512|format-v1)\.json$
 
   - repo: local
     hooks:

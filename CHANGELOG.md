@@ -130,6 +130,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the key is loaded, and `rails pqc_rails:status` reports it instead of stopping. This also applies
   to previous keys, so a cut-short previous key stops the application in the same way as a missing
   current key. Previously such a key loaded and failed only when it was used.
+- Encrypted ActiveRecord attributes holding non-ASCII text (for example Japanese) are now read back
+  as UTF-8 strings. Previously they were returned with the `ASCII-8BIT` (binary) encoding, so they
+  did not compare equal to the original string and could raise `Encoding::CompatibilityError` when
+  combined with UTF-8 strings in views. Stored ciphertexts are unchanged; existing records read
+  correctly after updating. Binary attributes are still returned as binary. Strings in encodings
+  other than UTF-8 are not restored to their original encoding.
 
 ## [0.3.0] - 2026-09-25
 

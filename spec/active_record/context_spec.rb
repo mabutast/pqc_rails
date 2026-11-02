@@ -10,6 +10,7 @@ RSpec.describe PqcRails::ActiveRecord::Context do
     ::ActiveRecord::Schema.define do
       create_table :widgets do |t|
         t.string :secret
+        t.binary :payload
       end
     end
   end
@@ -19,6 +20,7 @@ RSpec.describe PqcRails::ActiveRecord::Context do
     Class.new(::ActiveRecord::Base) do
       self.table_name = "widgets"
       encrypts :secret
+      encrypts :payload
     end
   end
 
@@ -43,6 +45,16 @@ RSpec.describe PqcRails::ActiveRecord::Context do
     widget = widget_class.create!(secret: "hello pqc")
 
     expect(widget_class.find(widget.id).secret).to eq("hello pqc")
+  end
+
+  it "binary型の属性は、UTF-8として不正なバイト列もそのまま読み出す" do
+    bytes = "\xFF\x00\xE6\x97".b * 100
+    widget = widget_class.create!(payload: bytes)
+
+    payload = widget_class.find(widget.id).payload
+
+    expect(payload.encoding).to eq(Encoding::BINARY)
+    expect(payload).to eq(bytes)
   end
 
   it "別のインストール(別の鍵ペア)で暗号化されたものは復号に失敗する" do
