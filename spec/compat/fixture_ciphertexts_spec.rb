@@ -71,12 +71,14 @@ RSpec.describe "以前の版が書いた暗号文の読み込み(固定の検査
         infos = record_values.map { |value| PqcRails::ActiveRecord::CiphertextInfo.parse(value.fetch("stored_value")) }
         compressed = record_values.map { |value| JSON.parse(value.fetch("stored_value")).dig("h", "c") }
         cookie_first_byte = Base64.strict_decode64(fixture.dig("session", "cookie_value")).getbyte(0)
-        keypair = PqcRails::KeySource.decode(fixture.dig("record", "key"))
+        keypairs = %w[record session].map { |target| PqcRails::KeySource.decode(fixture.dig(target, "key")) }
 
         expect(infos.map(&:format_version)).to all(eq(format_version))
         expect(compressed).to include(true)
         expect(cookie_first_byte).to eq(format_version)
-        expect(keypair.authentication_key.nil?).to eq(format_version.zero?)
+        expect(keypairs.map { |keypair| keypair.authentication_key.nil? }).to all(eq(format_version.zero?))
+        # 旧形式の検査データは、リリースのタグ(v0.3.0)で書いたものだけを置く。
+        expect(fixture.fetch("written_by")).to eq("pqc_rails v0.3.0") if format_version.zero?
       end
 
       it "DBカラムの暗号文を、今のコードで元の平文に戻せる" do
