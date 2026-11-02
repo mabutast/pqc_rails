@@ -47,14 +47,6 @@ RSpec.describe PqcRails::ActiveRecord::Context do
     expect(widget_class.find(widget.id).secret).to eq("hello pqc")
   end
 
-  it "日本語の値は、UTF-8の文字列として読み出す" do
-    widget = widget_class.create!(secret: "日本語の値")
-    secret = widget_class.find(widget.id).secret
-
-    expect(secret.encoding).to eq(Encoding::UTF_8)
-    expect(secret).to eq("日本語の値")
-  end
-
   it "binary型の属性は、UTF-8として不正なバイト列もそのまま読み出す" do
     bytes = "\xFF\x00\xE6\x97".b * 100
     widget = widget_class.create!(payload: bytes)

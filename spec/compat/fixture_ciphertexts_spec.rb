@@ -54,8 +54,11 @@ RSpec.describe "以前の版が書いた暗号文の読み込み(固定の検査
     record_class.find(id).secret
   end
 
+  # 旧形式(v0)は鍵の導出にアルゴリズム名を指定された書き方のまま使うため、0.3.0のREADMEが案内した
+  # 既定(:ml_kem_768)と:ml_kem_512の両方を持つ。
   {
     "pqc_rails-0.3.0.json" => 0,
+    "pqc_rails-0.3.0-ml_kem_512.json" => 0,
     "format-v1.json" => 1
   }.each do |file_name, format_version|
     context "#{file_name}(形式バージョン #{format_version})" do

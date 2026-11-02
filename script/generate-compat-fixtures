@@ -7,14 +7,19 @@
 # ActiveRecord::Encryption で DB カラムに書いた値と、セッション Cookie の値を JSON で標準出力に出す。
 # DB の値は、Rails の Encryptor が圧縮しない短い値と、圧縮する長い値(140 バイト超)の2つを書く。
 # 鍵の値はその版の KeySource.encode の形(0.3.0 以前は認証鍵を持たない2要素)で残す。
-# written_by には、読み込んだ lib のバージョンと git のコミットを記録する。
+# 2つ目の引数は pq_alg_name(既定はその版の既定のアルゴリズム)。旧形式(v0)は鍵の導出にアルゴリズム名を
+# 指定された書き方のまま使うため、利用者に案内した書き方ごとに検査データを持つ。
+# written_by には、lib がリリースのタグにあればそのタグを、無ければ「unreleased」とコミットを記録する。
 #
-# 公開した版で書いた検査データは作り直さない。作り直すと、その版が書いたデータを今のコードで
-# 読めるかを確かめられなくなる。新しい形式を足した時だけ、その形式のファイルを足す。
+# リリースのタグで書いた検査データは作り直さない。作り直すと、その版が書いたデータを今のコードで
+# 読めるかを確かめられなくなる。unreleased の検査データは、その形式を初めて含む版をリリースした後に、
+# そのタグで作り直す。新しい形式を足した時は、その形式のファイルを足す。
 #
 # 使い方(リポジトリの直下で):
 #   git worktree add --detach tmp/compat-v0.3.0 v0.3.0
 #   bundle exec ruby script/generate-compat-fixtures tmp/compat-v0.3.0/lib > spec/fixtures/compat/pqc_rails-0.3.0.json
+#   bundle exec ruby script/generate-compat-fixtures tmp/compat-v0.3.0/lib ml_kem_512 \
+#     > spec/fixtures/compat/pqc_rails-0.3.0-ml_kem_512.json
 #   bundle exec ruby script/generate-compat-fixtures lib > spec/fixtures/compat/format-v1.json
 #   git worktree remove tmp/compat-v0.3.0
 
@@ -31,11 +36,14 @@ RECORD_PLAINTEXTS = [
   "pqc_rails compat fixture (compressed): #{'暗号文の互換性を確かめるための長い値。' * 8}"
 ].freeze
 SESSION_DATA = { "session_id" => "compat-fixture-session", "user_id" => 42, "flash" => "保存した" }.freeze
-PQ_ALG_NAME = PqcRails::Cipher::DEFAULT_PQ_ALG_NAME
+PQ_ALG_NAME = ARGV[1] ? ARGV[1].to_sym : PqcRails::Cipher::DEFAULT_PQ_ALG_NAME
 
-def git_commit(dir)
-  commit, status = Open3.capture2("git", "-C", dir, "rev-parse", "--short", "HEAD")
-  status.success? ? commit.strip : "unknown"
+def written_by(dir)
+  tag, tag_status = Open3.capture2("git", "-C", dir, "describe", "--tags", "--exact-match", err: File::NULL)
+  return "pqc_rails #{tag.strip}" if tag_status.success?
+
+  commit, = Open3.capture2("git", "-C", dir, "rev-parse", "--short", "HEAD")
+  "unreleased (commit #{commit.strip})"
 end
 
 def generate_keypair
@@ -57,8 +65,7 @@ def write_records(record_key)
 
   RECORD_PLAINTEXTS.map do |plaintext|
     record = model.create!(secret: plaintext)
-    stored = model.connection.select_value("SELECT secret FROM compat_records WHERE id = #{record.id}")
-    { "plaintext" => plaintext, "stored_value" => stored }
+    { "plaintext" => plaintext, "stored_value" => record.ciphertext_for(:secret) }
   end
 end
 
@@ -66,7 +73,7 @@ record_key = PqcRails::KeySource.encode(generate_keypair)
 session_keypair = generate_keypair
 
 fixture = {
-  "written_by" => "pqc_rails #{PqcRails::VERSION} (commit #{git_commit(lib)})",
+  "written_by" => written_by(lib),
   "pq_alg_name" => PQ_ALG_NAME.to_s,
   "record" => {
     "key" => record_key,
