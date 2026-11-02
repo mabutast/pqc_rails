@@ -118,6 +118,8 @@ module PqcRails
 
     # 各鍵ペアで復号を試す。authenticatedがtrue(v1)ならAES鍵をCiphertextFormat.data_keyで導き、
     # false(旧形式)ならKEMの共有鍵をそのままAES鍵にする。
+    # 復号した値は、Rails標準のActiveRecord::Encryption::Cipherの既定と同じUTF-8として返す
+    # (binary型の属性は、ActiveModelの型がBINARYに付け直す)。
     def try_keypairs(encrypted_message, keypairs, pq_alg_name:, associated_data:, authenticated:)
       raise PqcRails::Error, "no decryption key matches the message's key id" if keypairs.empty?
 
@@ -129,7 +131,8 @@ module PqcRails
         keypairs.each do |keypair|
           shared_secret = hybrid.decapsulate(kem_ciphertext, keypair.secret_key)
           data_key = authenticated ? CiphertextFormat.data_key(shared_secret, keypair.authentication_key) : shared_secret
-          return EnvelopeCipher.new(data_key).decrypt(encrypted_message.payload, associated_data: associated_data)
+          clear_text = EnvelopeCipher.new(data_key).decrypt(encrypted_message.payload, associated_data: associated_data)
+          return clear_text.force_encoding(Encoding::UTF_8)
         rescue OpenSSL::Cipher::CipherError, PqcRails::Error, ArgumentError, TypeError => e
           last_error = e
         end

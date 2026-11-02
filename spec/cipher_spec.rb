@@ -29,6 +29,21 @@ RSpec.describe PqcRails::Cipher do
       expect(cipher.decrypt(message, key: keypair)).to eq("hello pqc")
     end
 
+    # Rails標準のActiveRecord::Encryption::Cipherと同じく、復号した値はUTF-8として返す。
+    # BINARYのまま返すと、日本語などの値がUTF-8の文字列と比べて一致せず、ビューで連結すると
+    # Encoding::CompatibilityErrorになる。
+    it "日本語の値を、UTF-8の文字列として復号する(新旧どちらの形式でも)" do
+      %i[v1 v0].each do |format|
+        PqcRails.configuration.ciphertext_format = format
+        decrypted = cipher.decrypt(cipher.encrypt("日本語の値", key: keypair), key: keypair)
+
+        expect(decrypted.encoding).to eq(Encoding::UTF_8)
+        expect(decrypted).to eq("日本語の値")
+      end
+    ensure
+      PqcRails.configuration.ciphertext_format = :v1
+    end
+
     it "Railsのkey:インターフェースに準拠し、keyが配列でも復号できる(鍵ローテーション互換)" do
       other_keypair = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }
       message = cipher.encrypt("hello pqc", key: keypair)
