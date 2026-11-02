@@ -29,7 +29,7 @@ RSpec.describe PqcRails::Cipher do
       expect(cipher.decrypt(message, key: keypair)).to eq("hello pqc")
     end
 
-    # Rails標準のActiveRecord::Encryption::Cipherと同じく、復号した値はUTF-8として返す。
+    # 復号した値はUTF-8として返す(Rails標準のActiveRecord::Encryption::Cipherの既定と同じ)。
     # BINARYのまま返すと、日本語などの値がUTF-8の文字列と比べて一致せず、ビューで連結すると
     # Encoding::CompatibilityErrorになる。
     it "日本語の値を、UTF-8の文字列として復号する(新旧どちらの形式でも)" do
