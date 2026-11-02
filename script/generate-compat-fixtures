@@ -5,9 +5,12 @@
 #
 # 引数の lib ディレクトリにある pqc_rails を読み込み、その版の鍵生成で DB 用とセッション用の鍵を作り、
 # ActiveRecord::Encryption で DB カラムに書いた値と、セッション Cookie の値を JSON で標準出力に出す。
+# DB の値は、Rails の Encryptor が圧縮しない短い値と、圧縮する長い値(140 バイト超)の2つを書く。
 # 鍵の値はその版の KeySource.encode の形(0.3.0 以前は認証鍵を持たない2要素)で残す。
-# 検査データは一度作ったら作り直さない。作り直すと、以前の版が書いたデータを今のコードで読めるかを
-# 確かめられなくなる。新しい形式を足した時だけ、その形式のファイルを足す。
+# written_by には、読み込んだ lib のバージョンと git のコミットを記録する。
+#
+# 公開した版で書いた検査データは作り直さない。作り直すと、その版が書いたデータを今のコードで
+# 読めるかを確かめられなくなる。新しい形式を足した時だけ、その形式のファイルを足す。
 #
 # 使い方(リポジトリの直下で):
 #   git worktree add --detach tmp/compat-v0.3.0 v0.3.0
@@ -16,23 +19,33 @@
 #   git worktree remove tmp/compat-v0.3.0
 
 require "json"
+require "open3"
 require "active_record"
 require "sqlite3"
 
 lib = File.expand_path(ARGV.fetch(0) { abort "usage: #{$PROGRAM_NAME} <lib directory of pqc_rails>" })
 require File.join(lib, "pqc_rails")
 
-RECORD_PLAINTEXT = "pqc_rails compat fixture: 長く保存されるデータ"
+RECORD_PLAINTEXTS = [
+  "pqc_rails compat fixture: 長く保存されるデータ",
+  "pqc_rails compat fixture (compressed): #{'暗号文の互換性を確かめるための長い値。' * 8}"
+].freeze
 SESSION_DATA = { "session_id" => "compat-fixture-session", "user_id" => 42, "flash" => "保存した" }.freeze
+PQ_ALG_NAME = PqcRails::Cipher::DEFAULT_PQ_ALG_NAME
 
-def generate_keypair
-  PqcRails::HybridKem.open(PqcRails::Cipher::DEFAULT_PQ_ALG_NAME, &:generate_keypair)
+def git_commit(dir)
+  commit, status = Open3.capture2("git", "-C", dir, "rev-parse", "--short", "HEAD")
+  status.success? ? commit.strip : "unknown"
 end
 
-def write_record(record_key)
+def generate_keypair
+  PqcRails::HybridKem.open(PQ_ALG_NAME, &:generate_keypair)
+end
+
+def write_records(record_key)
   ENV["PQC_RECORD_KEY"] = record_key
   ENV.delete("PQC_RECORD_PREVIOUS_KEYS")
-  PqcRails::ActiveRecord::Context.install!
+  PqcRails::ActiveRecord::Context.install!(pq_alg_name: PQ_ALG_NAME)
 
   ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
   ActiveRecord::Migration.verbose = false
@@ -42,25 +55,27 @@ def write_record(record_key)
     encrypts :secret
   end
 
-  record = model.create!(secret: RECORD_PLAINTEXT)
-  model.connection.select_value("SELECT secret FROM compat_records WHERE id = #{record.id}")
+  RECORD_PLAINTEXTS.map do |plaintext|
+    record = model.create!(secret: plaintext)
+    stored = model.connection.select_value("SELECT secret FROM compat_records WHERE id = #{record.id}")
+    { "plaintext" => plaintext, "stored_value" => stored }
+  end
 end
 
 record_key = PqcRails::KeySource.encode(generate_keypair)
 session_keypair = generate_keypair
 
 fixture = {
-  "pqc_rails_version" => PqcRails::VERSION,
-  "pq_alg_name" => PqcRails::Cipher::DEFAULT_PQ_ALG_NAME.to_s,
+  "written_by" => "pqc_rails #{PqcRails::VERSION} (commit #{git_commit(lib)})",
+  "pq_alg_name" => PQ_ALG_NAME.to_s,
   "record" => {
     "key" => record_key,
-    "plaintext" => RECORD_PLAINTEXT,
-    "stored_value" => write_record(record_key)
+    "values" => write_records(record_key)
   },
   "session" => {
     "key" => PqcRails::KeySource.encode(session_keypair),
     "data" => SESSION_DATA,
-    "cookie_value" => PqcRails::Session::Encryptor.new(session_keypair).encrypt(SESSION_DATA)
+    "cookie_value" => PqcRails::Session::Encryptor.new(session_keypair, pq_alg_name: PQ_ALG_NAME).encrypt(SESSION_DATA)
   }
 }
 

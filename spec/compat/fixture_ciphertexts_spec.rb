@@ -8,14 +8,8 @@ require "sqlite3"
 # 同じテストの中で書いて読むテストは、書く側と読む側の両方が同じように変わると通ってしまう
 # (HKDFのinfoやヘッダーの並びを誤って変えた場合など)。固定の検査データは書いた時点の形のまま残るので、
 # 利用者のDBやブラウザに残っている古いデータが読めなくなる変更をここで検出する。
-# 検査データの作り方は script/generate-compat-fixtures を参照。検査データは作り直さない。
+# 検査データの作り方は script/generate-compat-fixtures を参照。
 RSpec.describe "以前の版が書いた暗号文の読み込み(固定の検査データ)" do
-  FIXTURE_DIR = File.expand_path("../fixtures/compat", __dir__)
-
-  def self.load_fixture(name)
-    JSON.parse(File.read(File.join(FIXTURE_DIR, name)))
-  end
-
   before(:all) do
     ::ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
     ::ActiveRecord::Migration.verbose = false
@@ -31,61 +25,85 @@ RSpec.describe "以前の版が書いた暗号文の読み込み(固定の検査
     end
   end
 
+  # 旧形式の受け付けは既定(受け付ける)に固定する。ほかのspecの設定が残っていても結果が変わらないように。
   around do |example|
-    original_key = ENV.fetch("PQC_RECORD_KEY", nil)
-    original_previous = ENV.fetch("PQC_RECORD_PREVIOUS_KEYS", nil)
+    configuration = PqcRails.configuration
+    original = [ENV.fetch("PQC_RECORD_KEY", nil), ENV.fetch("PQC_RECORD_PREVIOUS_KEYS", nil),
+                configuration.accept_legacy_records, configuration.accept_legacy_cookies_until]
+    configuration.accept_legacy_records = true
+    configuration.accept_legacy_cookies_until = nil
     example.run
   ensure
-    ENV["PQC_RECORD_KEY"] = original_key
-    ENV["PQC_RECORD_PREVIOUS_KEYS"] = original_previous
+    ENV["PQC_RECORD_KEY"], ENV["PQC_RECORD_PREVIOUS_KEYS"] = original[0], original[1]
+    configuration.accept_legacy_records = original[2]
+    configuration.accept_legacy_cookies_until = original[3]
+  end
+
+  def new_key_value(pq_alg_name)
+    PqcRails::KeySource.encode(PqcRails::HybridKem.open(pq_alg_name, &:generate_keypair))
   end
 
   # 暗号化された値をそのままカラムに入れ、モデル経由で読む(利用者のDBに残っている値を読むのと同じ道筋)。
-  def read_stored_value(record_fixture)
-    ENV["PQC_RECORD_KEY"] = record_fixture.fetch("key")
-    ENV["PQC_RECORD_PREVIOUS_KEYS"] = nil
-    PqcRails::ActiveRecord::Context.install!
+  def read_stored_value(stored_value, current_key:, previous_keys: nil, pq_alg_name:)
+    ENV["PQC_RECORD_KEY"] = current_key
+    ENV["PQC_RECORD_PREVIOUS_KEYS"] = previous_keys
+    PqcRails::ActiveRecord::Context.install!(pq_alg_name: pq_alg_name)
 
     connection = record_class.connection
-    connection.execute("INSERT INTO compat_records (secret) VALUES (#{connection.quote(record_fixture.fetch('stored_value'))})")
-    record_class.find(connection.select_value("SELECT MAX(id) FROM compat_records"))
+    id = connection.insert("INSERT INTO compat_records (secret) VALUES (#{connection.quote(stored_value)})")
+    record_class.find(id).secret
   end
 
-  def open_cookie(session_fixture)
-    keypair = PqcRails::KeySource.decode(session_fixture.fetch("key"))
-    PqcRails::Session::Encryptor.new(keypair).decrypt(session_fixture.fetch("cookie_value"))
-  end
-
-  [
-    ["pqc_rails-0.3.0.json", 0],
-    ["format-v1.json", 1]
-  ].each do |file_name, format_version|
+  {
+    "pqc_rails-0.3.0.json" => 0,
+    "format-v1.json" => 1
+  }.each do |file_name, format_version|
     context "#{file_name}(形式バージョン #{format_version})" do
-      let(:fixture) { self.class.load_fixture(file_name) }
+      let(:fixture) { JSON.parse(File.read(File.expand_path("../fixtures/compat/#{file_name}", __dir__))) }
+      let(:pq_alg_name) { fixture.fetch("pq_alg_name").to_sym }
+      let(:record_values) { fixture.dig("record", "values") }
 
-      it "検査データが想定した形式で書かれている" do
-        info = PqcRails::ActiveRecord::CiphertextInfo.parse(fixture.dig("record", "stored_value"))
+      # 検査データを作り直して形が変わった時に、ここで気付けるようにする。
+      it "検査データが想定した形式で書かれている(圧縮した値を含む)" do
+        infos = record_values.map { |value| PqcRails::ActiveRecord::CiphertextInfo.parse(value.fetch("stored_value")) }
+        compressed = record_values.map { |value| JSON.parse(value.fetch("stored_value")).dig("h", "c") }
         cookie_first_byte = Base64.strict_decode64(fixture.dig("session", "cookie_value")).getbyte(0)
+        keypair = PqcRails::KeySource.decode(fixture.dig("record", "key"))
 
-        expect(info.format_version).to eq(format_version)
+        expect(infos.map(&:format_version)).to all(eq(format_version))
+        expect(compressed).to include(true)
         expect(cookie_first_byte).to eq(format_version)
+        expect(keypair.authentication_key.nil?).to eq(format_version.zero?)
       end
 
       it "DBカラムの暗号文を、今のコードで元の平文に戻せる" do
-        record = read_stored_value(fixture.fetch("record"))
+        record_values.each do |value|
+          decrypted = read_stored_value(value.fetch("stored_value"), current_key: fixture.dig("record", "key"),
+                                                                     pq_alg_name: pq_alg_name)
 
-        expect(record.secret).to eq(fixture.dig("record", "plaintext"))
+          expect(decrypted).to eq(value.fetch("plaintext"))
+        end
+      end
+
+      # 鍵をローテーションした後(新しい鍵が現在、検査データの鍵が旧鍵)に、古いレコードを読む道筋。
+      # 0.3.0からの更新手順(docs/MIGRATION.md)は、この状態を通る。
+      it "検査データの鍵を旧鍵にしても、DBカラムの暗号文を元の平文に戻せる" do
+        record_values.each do |value|
+          decrypted = read_stored_value(value.fetch("stored_value"), current_key: new_key_value(pq_alg_name),
+                                                                     previous_keys: fixture.dig("record", "key"),
+                                                                     pq_alg_name: pq_alg_name)
+
+          expect(decrypted).to eq(value.fetch("plaintext"))
+        end
       end
 
       it "セッションCookieの暗号文を、今のコードで元のデータに戻せる" do
-        expect(open_cookie(fixture.fetch("session"))).to eq(fixture.dig("session", "data"))
+        session = fixture.fetch("session")
+        encryptor = PqcRails::Session::Encryptor.new(PqcRails::KeySource.decode(session.fetch("key")),
+                                                     pq_alg_name: pq_alg_name)
+
+        expect(encryptor.decrypt(session.fetch("cookie_value"))).to eq(session.fetch("data"))
       end
     end
-  end
-
-  it "0.3.0の検査データの鍵は、認証鍵を持たない0.3.0の形式のまま残っている" do
-    keypair = PqcRails::KeySource.decode(self.class.load_fixture("pqc_rails-0.3.0.json").dig("record", "key"))
-
-    expect(keypair.authentication_key).to be_nil
   end
 end
