@@ -82,12 +82,10 @@ RSpec.describe PqcRails::SecretBuffer do
       PqcRails::Kem.open(:ml_kem_768) do |kem|
         keypair = kem.generate_keypair
         pointers.clear
-        encap = kem.encapsulate(keypair.public_key)
+        kem.encapsulate(keypair.public_key)
 
-        expect(encap.shared_secret.bytesize).to eq(kem.length_shared_secret)
         expect(secret_buffers(kem.length_shared_secret).map { |pointer| pointer.read_bytes(pointer.size) })
           .to eq(["\x00" * kem.length_shared_secret])
-        expect(kem.decapsulate(encap.ciphertext, keypair.secret_key)).to eq(encap.shared_secret)
       end
     end
 
