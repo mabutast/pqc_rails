@@ -78,6 +78,19 @@ RSpec.describe PqcRails::SecretBuffer do
       end
     end
 
+    it "Kem#encapsulateの後、共有鍵のバッファはゼロで埋まっている" do
+      PqcRails::Kem.open(:ml_kem_768) do |kem|
+        keypair = kem.generate_keypair
+        pointers.clear
+        encap = kem.encapsulate(keypair.public_key)
+
+        expect(encap.shared_secret.bytesize).to eq(kem.length_shared_secret)
+        expect(secret_buffers(kem.length_shared_secret).map { |pointer| pointer.read_bytes(pointer.size) })
+          .to eq(["\x00" * kem.length_shared_secret])
+        expect(kem.decapsulate(encap.ciphertext, keypair.secret_key)).to eq(encap.shared_secret)
+      end
+    end
+
     it "Sig#generate_keypair・#signの後、秘密鍵のバッファはゼロで埋まっている" do
       PqcRails::Sig.open(:ml_dsa_44) do |sig|
         keypair = sig.generate_keypair
