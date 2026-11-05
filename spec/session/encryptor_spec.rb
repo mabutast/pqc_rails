@@ -135,6 +135,18 @@ RSpec.describe PqcRails::Session::Encryptor do
       end
     end
 
+    it "末尾に余分なバイトがあるCookie(新形式・旧形式)はPqcRails::Errorを送出する" do
+      PqcRails.configuration.ciphertext_format = :v0
+      legacy = decoded(encryptor.encrypt({ "user_id" => 1 }))
+      PqcRails.configuration.ciphertext_format = :v1
+      current = decoded(encryptor.encrypt({ "user_id" => 1 }))
+
+      [legacy, current].each do |bytes|
+        expect { encryptor.decrypt(Base64.strict_encode64(bytes + "\x00".b)) }
+          .to raise_error(PqcRails::Error, /trailing/)
+      end
+    end
+
     it "未知の形式バージョンはPqcRails::Errorを送出する" do
       bytes = decoded(encryptor.encrypt({ "user_id" => 1 }))
       bytes.setbyte(0, 2)

@@ -79,6 +79,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with ML-KEM-768. Ciphertexts written in the 0.3.0 format are still decrypted, using the
   configured algorithm. Ciphertexts written in the new format cannot be decrypted by 0.3.0 or
   earlier, so roll back only data written with `ciphertext_format = :v0`.
+- `PqcRails::HybridKem` public keys and ciphertexts, the KEM ciphertext of encrypted ActiveRecord
+  attributes and session cookies with extra bytes after their last component now raise
+  `ArgumentError` (`ActiveRecord::Encryption::Errors::Decryption` for attributes, `PqcRails::Error`
+  for cookies). Previously the extra bytes were ignored, so the same plaintext could have more than
+  one valid encoding and a value with appended data was accepted silently. Values written by
+  pqc_rails never have extra bytes, so existing records, cookies and keys read as before. Hybrid
+  secret keys and key values are read as before.
 
 ### Security
 

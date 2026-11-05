@@ -61,7 +61,7 @@ module PqcRails
 
       def open_legacy(bytes)
         CiphertextFormat.ensure_legacy_cookie_accepted!
-        ciphertext, encrypted = BlobPacking.unpack(bytes)
+        ciphertext, encrypted = BlobPacking.unpack(bytes, exact: true)
 
         HybridKem.open(@pq_alg_name) do |hybrid|
           shared_secret = hybrid.decapsulate(ciphertext, @keypair.secret_key)
@@ -100,7 +100,7 @@ module PqcRails
 
         pq_alg_name = CiphertextFormat.pq_alg_name_for(algorithm_id, configured: @pq_alg_name)
         associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id)
-        ciphertext, encrypted = BlobPacking.unpack(body)
+        ciphertext, encrypted = BlobPacking.unpack(body, exact: true)
 
         HybridKem.open(pq_alg_name) do |hybrid|
           shared_secret = hybrid.decapsulate(ciphertext, @keypair.secret_key)

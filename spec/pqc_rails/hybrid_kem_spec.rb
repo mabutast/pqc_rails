@@ -177,6 +177,26 @@ RSpec.describe PqcRails::HybridKem do
         end
       end
     end
+
+    it "末尾に余分なバイトがある公開鍵・暗号文はArgumentErrorを送出する" do
+      described_class.open(pq_alg_name) do |hybrid|
+        keypair = hybrid.generate_keypair
+        ciphertext = hybrid.encapsulate(keypair.public_key).ciphertext
+
+        expect { hybrid.encapsulate(keypair.public_key + "\x00".b) }.to raise_error(ArgumentError, /trailing/)
+        expect { hybrid.decapsulate(ciphertext + "\x00".b, keypair.secret_key) }
+          .to raise_error(ArgumentError, /trailing/)
+      end
+    end
+
+    it "秘密鍵は、末尾に余分なバイトがあっても今までどおり読む" do
+      described_class.open(pq_alg_name) do |hybrid|
+        keypair = hybrid.generate_keypair
+        encap = hybrid.encapsulate(keypair.public_key)
+
+        expect(hybrid.decapsulate(encap.ciphertext, keypair.secret_key + "\x00".b)).to eq(encap.shared_secret)
+      end
+    end
   end
 
   describe "#free" do

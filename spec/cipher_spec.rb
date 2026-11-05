@@ -101,11 +101,12 @@ RSpec.describe PqcRails::Cipher do
       end.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
     end
 
-    it "途中で切れた・空のkem_ctとpayloadは、ActiveRecord::Encryption::Errors::Decryptionを送出する" do
+    it "途中で切れた・空・末尾に余分なバイトがあるkem_ctと、途中で切れたpayloadは、ActiveRecord::Encryption::Errors::Decryptionを送出する" do
       original = cipher.encrypt("hello pqc", key: keypair)
 
       [["", original.payload], [original.headers[:kem_ct][0, 40], original.payload],
-       [original.headers[:kem_ct], original.payload[0, 20]]].each do |kem_ct, payload|
+       [original.headers[:kem_ct], original.payload[0, 20]],
+       [original.headers[:kem_ct] + "\x00".b, original.payload]].each do |kem_ct, payload|
         message = ActiveRecord::Encryption::Message.new(payload: payload)
         original.headers.each { |name, value| message.headers[name] = value unless name.to_s == "kem_ct" }
         message.headers[:kem_ct] = kem_ct

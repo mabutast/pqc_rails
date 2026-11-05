@@ -71,7 +71,7 @@ module PqcRails
     def encapsulate(public_key)
       ensure_not_freed!
 
-      classical_public_key, pq_public_key = BlobPacking.unpack(public_key)
+      classical_public_key, pq_public_key = BlobPacking.unpack(public_key, exact: true)
       classical_encap = @classical.encapsulate(classical_public_key)
       pq_encap = @pq.encapsulate(pq_public_key)
 
@@ -85,7 +85,7 @@ module PqcRails
     def decapsulate(ciphertext, secret_key)
       ensure_not_freed!
 
-      classical_ciphertext, pq_ciphertext = BlobPacking.unpack(ciphertext)
+      classical_ciphertext, pq_ciphertext = BlobPacking.unpack(ciphertext, exact: true)
       classical_secret_key, pq_secret_key = BlobPacking.unpack(secret_key)
 
       classical_shared = @classical.decapsulate(classical_ciphertext, classical_secret_key)
