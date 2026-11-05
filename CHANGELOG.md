@@ -79,6 +79,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with ML-KEM-768. Ciphertexts written in the 0.3.0 format are still decrypted, using the
   configured algorithm. Ciphertexts written in the new format cannot be decrypted by 0.3.0 or
   earlier, so roll back only data written with `ciphertext_format = :v0`.
+- `PqcRails::HybridKem` public keys and ciphertexts, the KEM ciphertext of encrypted ActiveRecord
+  attributes and session cookies with extra bytes after their last component now raise
+  `ArgumentError` (`ActiveRecord::Encryption::Errors::Decryption` for attributes, `PqcRails::Error`
+  for cookies). Previously the extra bytes were ignored, so the same plaintext could have more than
+  one valid encoding and a value with appended data was accepted silently. Values written by
+  pqc_rails never have extra bytes, so existing records, cookies and keys read as before. Hybrid
+  secret keys and key values are read as before.
 
 ### Security
 
@@ -94,9 +101,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   key; reject them with `accept_legacy_records` and `accept_legacy_cookies_until` once they are no
   longer needed.
 - Secret keys and shared secrets passed to and from liboqs are now zeroed in the native buffers
-  after each key generation, decapsulation and signature. Previously these buffers were freed by
-  the garbage collector without being cleared. Secret keys held as Ruby Strings cannot be wiped
-  reliably and stay in memory for the life of the process; see "中間値の破棄" in
+  after each key generation, encapsulation, decapsulation and signature. Previously these buffers
+  were freed by the garbage collector without being cleared. Secret keys held as Ruby Strings cannot
+  be wiped reliably and stay in memory for the life of the process; see "中間値の破棄" in
   docs/THREAT_MODEL.md.
 - Fewer copies of secret keys are left in Ruby memory. Keys are decoded once per key source and
   kept, instead of the previous keys being decoded again on every decryption, and the decoded key

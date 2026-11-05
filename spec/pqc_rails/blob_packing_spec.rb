@@ -74,6 +74,12 @@ RSpec.describe PqcRails::BlobPacking do
       expect { described_class.unpack(blob[0..-2]) }.to raise_error(ArgumentError, /truncated/)
       expect { described_class.unpack(blob[0, 6]) }.to raise_error(ArgumentError, /truncated/)
     end
+
+    it "exact: trueのとき、2つ目より後ろに余分なバイトがあるとArgumentErrorを送出する" do
+      expect(described_class.unpack(blob, exact: true)).to eq(%w[classical post-quantum])
+      expect { described_class.unpack(blob + "\x00", exact: true) }.to raise_error(ArgumentError, /trailing/)
+      expect { described_class.unpack(blob[0..-2], exact: true) }.to raise_error(ArgumentError, /truncated/)
+    end
   end
   # 取り出した値(秘密鍵など)をゼロ埋めした時に、元のバイト列の領域まで消せるように、
   # 元の領域を共有しない独立したコピーとして返す。共有している文字列に書き込むと、

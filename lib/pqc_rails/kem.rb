@@ -69,18 +69,19 @@ module PqcRails
       ensure_not_freed!
       validate_length!(public_key, length_public_key, "public_key")
 
-      ciphertext    = FFI::MemoryPointer.new(:uint8, length_ciphertext)
-      shared_secret = FFI::MemoryPointer.new(:uint8, length_shared_secret)
-      pk_ptr        = FFI::MemoryPointer.new(:uint8, public_key.bytesize)
+      ciphertext = FFI::MemoryPointer.new(:uint8, length_ciphertext)
+      pk_ptr     = FFI::MemoryPointer.new(:uint8, public_key.bytesize)
       pk_ptr.put_bytes(0, public_key)
 
-      status = Ffi::Kem.OQS_KEM_encaps(@kem_ptr, ciphertext, shared_secret, pk_ptr)
-      raise PqcRails::Error, "OQS_KEM_encaps failed (status=#{status})" unless status.zero?
+      SecretBuffer.with(length_shared_secret) do |shared_secret|
+        status = Ffi::Kem.OQS_KEM_encaps(@kem_ptr, ciphertext, shared_secret, pk_ptr)
+        raise PqcRails::Error, "OQS_KEM_encaps failed (status=#{status})" unless status.zero?
 
-      Encapsulation.new(
-        ciphertext.read_bytes(length_ciphertext),
-        shared_secret.read_bytes(length_shared_secret)
-      )
+        Encapsulation.new(
+          ciphertext.read_bytes(length_ciphertext),
+          shared_secret.read_bytes(length_shared_secret)
+        )
+      end
     end
 
     def decapsulate(ciphertext, secret_key)

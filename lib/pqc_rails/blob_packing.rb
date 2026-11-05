@@ -17,15 +17,19 @@ module PqcRails
 
     # 長さの欄が欠けている、または本体が長さの欄より短い場合はArgumentErrorを送出する。
     # 2つの長さを確かめてからコピーするため、例外の時は秘密鍵のコピーを作らない。
-    # 2つ目より後ろのバイト列は読まない(3要素の鍵を2要素として読む0.3.0以前と同じ読み方)。
-    def unpack(blob)
+    # 既定では2つ目より後ろのバイト列は読まない(3要素の鍵を2要素として読む0.3.0以前と同じ読み方)。
+    # exact: trueのときは、2つ目より後ろに余分なバイトがあればArgumentErrorを送出する。
+    # 暗号文・公開鍵で、同じ値に別の書き方ができることと、末尾が壊れた値を黙って受け付けることを防ぐ。
+    def unpack(blob, exact: false)
       raise ArgumentError, "packed blob must be a String, got #{blob.class}" unless blob.is_a?(String)
 
       first_length = read_length(blob, 0)
       second_offset = 4 + first_length
       second_length = read_length(blob, second_offset)
-      if second_offset + 4 + second_length > blob.bytesize
-        raise ArgumentError, "packed blob is truncated: expected #{second_length} bytes"
+      packed_length = second_offset + 4 + second_length
+      raise ArgumentError, "packed blob is truncated: expected #{second_length} bytes" if packed_length > blob.bytesize
+      if exact && packed_length < blob.bytesize
+        raise ArgumentError, "packed blob has #{blob.bytesize - packed_length} trailing bytes"
       end
 
       [copy(blob, 4, first_length), copy(blob, second_offset + 4, second_length)]
