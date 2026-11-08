@@ -44,6 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- docs/THREAT_MODEL.md describes what the in-memory secret key is protected from before what it is
+  not: the key never reaches the database, backups or logs, and an attacker who can read the running
+  process's memory is treated as holding that process's privileges, as in any software that keeps
+  keys in-process. The facts and recommended mitigations are unchanged.
 - **Requires Ruby 3.3 or later.** Ruby 3.2 reached its end of life on 2026-04-01 and is no longer
   supported. Ruby 4.0 is now tested in CI alongside 3.3 and 3.4.
 - README adds ML-DSA key and signature sizes (and why SLH-DSA is not registered), explains the
