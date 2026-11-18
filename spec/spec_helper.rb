@@ -1,5 +1,14 @@
 # frozen_string_literal: true
 
+# COVERAGE=1 の時だけ、行と分岐のカバレッジを coverage/ に書く。ライブラリより先に読み込む必要がある
+if ENV["COVERAGE"]
+  require "simplecov"
+  SimpleCov.start do
+    enable_coverage :branch
+    add_filter "/spec/"
+  end
+end
+
 require_relative "../lib/pqc_rails"
 
 RSpec.configure do |config|

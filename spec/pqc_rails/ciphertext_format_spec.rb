@@ -37,6 +37,12 @@ RSpec.describe PqcRails::CiphertextFormat do
         described_class.pq_alg_name_for("ML-KEM-768", configured: :ml_kem_768)
       end.to raise_error(PqcRails::CiphertextFormat::UnsupportedAlgorithmError)
     end
+
+    it "PQ側の名前が空のIDは、設定のアルゴリズム名が空文字でも拒否する" do
+      expect do
+        described_class.pq_alg_name_for("X25519+", configured: "")
+      end.to raise_error(PqcRails::CiphertextFormat::UnsupportedAlgorithmError)
+    end
   end
 
   describe ".canonical_pq_alg_name" do
@@ -104,6 +110,28 @@ RSpec.describe PqcRails::CiphertextFormat do
       PqcRails.configuration.ciphertext_format = :v0
 
       expect(described_class.write_legacy?).to be(true)
+    end
+  end
+
+  describe ".ensure_legacy_cookie_accepted!" do
+    let(:deadline) { Time.utc(2026, 12, 1) }
+
+    around do |example|
+      original = PqcRails.configuration.accept_legacy_cookies_until
+      PqcRails.configuration.accept_legacy_cookies_until = deadline
+      example.run
+    ensure
+      PqcRails.configuration.accept_legacy_cookies_until = original
+    end
+
+    it "期限ちょうどの時刻は、まだ旧形式のCookieを受け付ける" do
+      expect { described_class.ensure_legacy_cookie_accepted!(now: deadline) }.not_to raise_error
+    end
+
+    it "期限を1秒でも過ぎたら、旧形式のCookieを拒否する" do
+      expect do
+        described_class.ensure_legacy_cookie_accepted!(now: deadline + 1)
+      end.to raise_error(PqcRails::Error, /legacy/)
     end
   end
 end

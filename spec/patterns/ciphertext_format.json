@@ -1,0 +1,465 @@
+{
+  "test_command": "bundle exec rspec spec/pqc_rails/ciphertext_format_spec.rb spec/cipher_spec.rb spec/session/encryptor_spec.rb spec/compat",
+  "rows": [
+    {
+      "id": "algorithm-id-format",
+      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.algorithm_id",
+      "pattern": "アルゴリズムIDの書き方",
+      "source": "spec",
+      "source_ref": "README「暗号文の形式」：アルゴリズムID（例: X25519+ML-KEM-768）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "古典側の曲線とliboqs名を+でつないだ文字列を返す"
+        }
+      ],
+      "guarantee": "X25519 と liboqs 名を + でつないだ ID になる",
+      "mutants": [
+        {
+          "id": "separator",
+          "kind": "定数を変える",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "SEPARATOR = \"+\"",
+          "replace": "SEPARATOR = \"-\"",
+          "result": "killed"
+        },
+        {
+          "id": "curve",
+          "kind": "定数を変える",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "CLASSICAL_CURVE = \"X25519\"",
+          "replace": "CLASSICAL_CURVE = \"X448\"",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "registered-algorithm-accepted",
+      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.pq_alg_name_for",
+      "pattern": "レジストリに登録されたアルゴリズムの ID",
+      "source": "spec",
+      "source_ref": "README「暗号文の形式」：復号に使うのはレジストリに登録されたものと、設定で指定したものだけ",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "レジストリに登録されたアルゴリズムのIDから、レジストリのシンボルを返す"
+        }
+      ],
+      "guarantee": "設定と違っても、レジストリにあれば受け付けてシンボルを返す",
+      "mutants": [
+        {
+          "id": "drop-registry",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "Algorithms::KEMS.values.any? { |algorithm| algorithm.liboqs_name == pq_name } ||",
+          "replace": "false ||",
+          "result": "killed"
+        },
+        {
+          "id": "no-canonical",
+          "kind": "戻り値を変える",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "registered ? registered.name : liboqs_name",
+          "replace": "liboqs_name",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "configured-algorithm-accepted",
+      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.pq_alg_name_for",
+      "pattern": "レジストリに無いが設定で指定したアルゴリズムの ID",
+      "source": "spec",
+      "source_ref": "README「暗号文の形式」：設定で指定したものは復号に使う",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "レジストリ未登録でも、設定で指定したアルゴリズムと同じなら受け付ける"
+        }
+      ],
+      "guarantee": "設定と同じアルゴリズムなら、レジストリに無くても受け付ける",
+      "mutants": [
+        {
+          "id": "drop-configured",
+          "kind": "条件を常に偽にする",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "Algorithms.resolve_kem_name(configured) == pq_name",
+          "replace": "false",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "unknown-algorithm-rejected",
+      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.pq_alg_name_for",
+      "pattern": "レジストリにも設定にも無いアルゴリズムの ID",
+      "source": "spec",
+      "source_ref": "README「暗号文の形式」：それ以外のアルゴリズムは復号に使わない",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "レジストリ未登録で設定とも異なるアルゴリズムは拒否する"
+        },
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "レジストリ未登録で設定とも異なるアルゴリズムIDは拒否する"
+        }
+      ],
+      "guarantee": "UnsupportedAlgorithmError になり、復号に使われない",
+      "mutants": [
+        {
+          "id": "drop-allowed-check",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "unless curve == CLASSICAL_CURVE && allowed_pq_name?(pq_name, configured)",
+          "replace": "unless curve == CLASSICAL_CURVE",
+          "result": "killed"
+        },
+        {
+          "id": "drop-raise",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "raise UnsupportedAlgorithmError, \"unsupported algorithm id: #{algorithm_id.inspect}\"",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "registry-any-to-all",
+          "kind": "演算子・論理を入れ替える",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "Algorithms::KEMS.values.any? {",
+          "replace": "Algorithms::KEMS.values.none? {",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "non-x25519-rejected",
+      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.pq_alg_name_for",
+      "pattern": "古典側の曲線が X25519 でない ID",
+      "source": "code",
+      "source_ref": "pq_alg_name_for の curve == CLASSICAL_CURVE",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "X25519以外の古典側の曲線は拒否する"
+        }
+      ],
+      "guarantee": "UnsupportedAlgorithmError になる",
+      "mutants": [
+        {
+          "id": "curve-always-true",
+          "kind": "条件を常に真にする",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "unless curve == CLASSICAL_CURVE &&",
+          "replace": "unless true &&",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "malformed-id-rejected",
+      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.allowed_pq_name?",
+      "pattern": "+ の後ろが空・+ が無い ID（設定の名前が空文字の時も）",
+      "source": "code",
+      "source_ref": "allowed_pq_name? の nil・空文字の判定",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "形の崩れたIDは拒否する"
+        },
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "PQ側の名前が空のIDは、設定のアルゴリズム名が空文字でも拒否する"
+        }
+      ],
+      "guarantee": "UnsupportedAlgorithmError になる",
+      "mutants": [
+        {
+          "id": "drop-empty-guard",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "return false if pq_name.nil? || pq_name.empty?",
+          "replace": "",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "header-tamper-detected",
+      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.associated_data",
+      "pattern": "形式バージョン・アルゴリズムID・鍵IDの書き換え",
+      "source": "spec",
+      "source_ref": "README「暗号文の形式」：これらの値は追加認証データに含まれ、書き換えられた暗号文は復号できない",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "形式バージョン・アルゴリズムID・鍵IDを1本の文字列にまとめる"
+        },
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "アルゴリズムIDを書き換えると復号できない"
+        },
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "鍵IDを書き換えると復号できない"
+        }
+      ],
+      "guarantee": "アルゴリズムID・鍵IDのどちらを書き換えても復号できない",
+      "mutants": [
+        {
+          "id": "drop-algorithm-id",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "\"pqc_rails:v#{VERSION}:#{algorithm_id}:#{key_id}\"",
+          "replace": "\"pqc_rails:v#{VERSION}:#{key_id}\"",
+          "result": "killed"
+        },
+        {
+          "id": "drop-key-id",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "\"pqc_rails:v#{VERSION}:#{algorithm_id}:#{key_id}\"",
+          "replace": "\"pqc_rails:v#{VERSION}:#{algorithm_id}\"",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "origin-authentication",
+      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.data_key",
+      "pattern": "公開鍵だけで暗号文を作る（作成元の認証）",
+      "source": "spec",
+      "source_ref": "README「暗号文の形式」・docs/THREAT_MODEL.md「作成元の認証」：AES 鍵は共有鍵と認証鍵の両方から導く",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "KEMの共有鍵そのものとは異なる"
+        },
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "認証鍵が異なれば、同じ共有鍵からでも異なるAES鍵になる"
+        }
+      ],
+      "guarantee": "認証鍵を知らなければ、同じ共有鍵から同じ AES 鍵を作れない",
+      "mutants": [
+        {
+          "id": "drop-auth-key",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "hkdf(shared_secret + authentication_key, DATA_KEY_INFO)",
+          "replace": "hkdf(shared_secret, DATA_KEY_INFO)",
+          "result": "killed"
+        },
+        {
+          "id": "shared-secret-as-key",
+          "kind": "戻り値を変える",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "hkdf(shared_secret + authentication_key, DATA_KEY_INFO)",
+          "replace": "shared_secret",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "missing-authentication-key",
+      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.data_key",
+      "pattern": "認証鍵を持たない鍵（0.3.0 以前）で新しい形式を書く",
+      "source": "spec",
+      "source_ref": "README「暗号文の形式」：MissingAuthenticationKeyError が発生する",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "認証鍵が無い鍵ペアではPqcRails::MissingAuthenticationKeyErrorを送出する"
+        }
+      ],
+      "guarantee": "MissingAuthenticationKeyError になる",
+      "mutants": [
+        {
+          "id": "never-nil",
+          "kind": "条件を常に偽にする",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "if authentication_key.nil?",
+          "replace": "if false",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "data-key-derivation",
+      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.hkdf",
+      "pattern": "AES 鍵の導き方（長さ・salt・info）",
+      "source": "code",
+      "source_ref": "hkdf と DATA_KEY_INFO・KEY_LENGTH",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "KEMの共有鍵と認証鍵から32バイトのAES鍵を導く"
+        },
+        {
+          "file": "spec/compat/fixture_ciphertexts_spec.rb",
+          "name": "DBカラムの暗号文を、今のコードで元の平文に戻せる"
+        }
+      ],
+      "guarantee": "32 バイトの鍵で、過去の版が書いた暗号文を今も復号できる",
+      "mutants": [
+        {
+          "id": "key-length",
+          "kind": "定数を±1する",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "KEY_LENGTH = 32",
+          "replace": "KEY_LENGTH = 31",
+          "result": "killed"
+        },
+        {
+          "id": "salt",
+          "kind": "定数を変える",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "salt: \"\"",
+          "replace": "salt: \"x\"",
+          "result": "killed"
+        },
+        {
+          "id": "info",
+          "kind": "定数を変える",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "DATA_KEY_INFO = \"pqc_rails:v#{VERSION}:data-key\".freeze",
+          "replace": "DATA_KEY_INFO = \"pqc_rails:v#{VERSION}:data\".freeze",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "key-id",
+      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.key_id",
+      "pattern": "鍵IDの求め方",
+      "source": "code",
+      "source_ref": "key_id：公開鍵の SHA-1 の先頭 4 文字",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "公開鍵のSHA-1の先頭2バイトを16進4文字で返す"
+        }
+      ],
+      "guarantee": "ActiveRecord::KeyProvider::Key#id と同じ値になる",
+      "mutants": [
+        {
+          "id": "length",
+          "kind": "定数を±1する",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "Digest::SHA1.hexdigest(public_key)[0, 4]",
+          "replace": "Digest::SHA1.hexdigest(public_key)[0, 5]",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "legacy-records-rejected",
+      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.ensure_legacy_record_accepted!",
+      "pattern": "accept_legacy_records = false で旧形式の DB カラムを読む",
+      "source": "spec",
+      "source_ref": "README「暗号文の形式」：旧形式を受け付けない設定",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "accept_legacy_records = false のとき、旧形式のデータを拒否する"
+        }
+      ],
+      "guarantee": "PqcRails::Error になる",
+      "mutants": [
+        {
+          "id": "always-accept",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "return if PqcRails.configuration.accept_legacy_records",
+          "replace": "return",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "legacy-cookie-deadline",
+      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.ensure_legacy_cookie_accepted!",
+      "pattern": "旧形式の Cookie の受け付け期限（前・後・ちょうど・期限なし）",
+      "source": "spec",
+      "source_ref": "README「暗号文の形式」：accept_legacy_cookies_until を過ぎると旧形式の Cookie を読まない。既定は nil で期限なし",
+      "tests": [
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "期限を過ぎたら旧形式のCookieを拒否する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "期限前は旧形式のCookieを読む"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "旧形式で書かれたCookieを、新形式で書く設定のまま復号できる"
+        },
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "期限ちょうどの時刻は、まだ旧形式のCookieを受け付ける"
+        },
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "期限を1秒でも過ぎたら、旧形式のCookieを拒否する"
+        }
+      ],
+      "guarantee": "期限の前・期限ちょうど・期限なしは読み、1秒でも過ぎたら拒否する",
+      "mutants": [
+        {
+          "id": "boundary",
+          "kind": "境界をずらす",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "now <= deadline",
+          "replace": "now < deadline",
+          "result": "killed"
+        },
+        {
+          "id": "drop-nil",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "return if deadline.nil? || now <= deadline",
+          "replace": "return if now <= deadline",
+          "result": "killed"
+        },
+        {
+          "id": "invert",
+          "kind": "条件を反転する",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "now <= deadline",
+          "replace": "now > deadline",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "write-legacy-setting",
+      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.write_legacy?",
+      "pattern": "ciphertext_format = :v0 のとき旧形式で書く",
+      "source": "spec",
+      "source_ref": "README の公開 API：Configuration#ciphertext_format",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "既定では新形式で書く"
+        },
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "ciphertext_format = :v0 のときは旧形式で書く"
+        }
+      ],
+      "guarantee": "既定は新形式、:v0 の時だけ旧形式",
+      "mutants": [
+        {
+          "id": "invert",
+          "kind": "条件を反転する",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "ciphertext_format == :v0",
+          "replace": "ciphertext_format != :v0",
+          "result": "killed"
+        }
+      ]
+    }
+  ]
+}
