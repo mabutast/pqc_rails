@@ -164,5 +164,91 @@ RSpec.describe PqcRails::StatusCheck do
     ensure
       ::ActiveRecord::Encryption.configure(primary_key: nil, deterministic_key: nil, key_derivation_salt: nil)
     end
+
+    describe "暗号化している属性" do
+      let!(:model) do
+        Class.new(::ActiveRecord::Base) do
+          self.table_name = "status_check_people"
+          def self.name = "StatusCheckPerson"
+          encrypts :email
+          encrypts :phone
+        end
+      end
+
+      it "encryptsで暗号化している属性を、モデル名と属性名で一覧にする" do
+        attributes = result_for(described_class.run, "暗号化している属性")
+
+        expect(attributes.ok).to be true
+        expect(attributes.detail).to include("StatusCheckPerson(email, phone)")
+      end
+
+      it "抽象クラスと名前の無いクラスは一覧に入れない" do
+        Class.new(::ActiveRecord::Base) do
+          self.abstract_class = true
+          encrypts :secret
+        end
+
+        attributes = result_for(described_class.run, "暗号化している属性")
+
+        expect(attributes.detail).not_to include("secret")
+      end
+
+      it "暗号化している属性が無い場合、モデルが読み込まれているかを確かめるよう案内する" do
+        allow(::ActiveRecord::Base).to receive(:descendants).and_return([])
+
+        attributes = result_for(described_class.run, "暗号化している属性")
+
+        expect(attributes.ok).to be true
+        expect(attributes.detail).to include("見つかりません")
+      end
+
+      it "Rails.applicationがあれば、一覧を作る前にモデルを読み込む(eager_load!)" do
+        fake_app = double("Rails.application", middleware: [], credentials: {})
+        allow(fake_app).to receive(:eager_load!)
+        allow(Rails).to receive(:application).and_return(fake_app)
+
+        described_class.run
+
+        expect(fake_app).to have_received(:eager_load!)
+      end
+    end
+
+    describe "使うアルゴリズム" do
+      it "DBとセッションが新しく暗号化する時のアルゴリズムIDを報告する" do
+        ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(keypair)
+        PqcRails::ActiveRecord::Context.install!(pq_alg_name: :ml_kem_512)
+        middleware_item = double("middleware_item", klass: PqcRails::Session::PqcCookieStore,
+                                                    args: [{ pq_alg_name: :ml_kem_1024 }])
+        allow(Rails).to receive(:application)
+          .and_return(double("Rails.application", middleware: [middleware_item], credentials: {}))
+
+        algorithms = result_for(described_class.run, "使うアルゴリズム")
+
+        expect(algorithms.ok).to be true
+        expect(algorithms.detail).to include("DB: X25519+ML-KEM-512")
+        expect(algorithms.detail).to include("セッション: X25519+ML-KEM-1024")
+      ensure
+        ::ActiveRecord::Encryption.configure(primary_key: nil, deterministic_key: nil, key_derivation_salt: nil)
+      end
+
+      it "セッションでpq_alg_nameを指定していなければ既定のアルゴリズムを報告する" do
+        middleware_item = double("middleware_item", klass: PqcRails::Session::PqcCookieStore, args: [{}])
+        allow(Rails).to receive(:application)
+          .and_return(double("Rails.application", middleware: [middleware_item], credentials: {}))
+
+        algorithms = result_for(described_class.run, "使うアルゴリズム")
+
+        expect(algorithms.detail).to include("セッション: X25519+ML-KEM-768")
+      end
+
+      it "pqc_railsを使っていない側は、使っていないと報告する" do
+        ::ActiveRecord::Encryption.configure(primary_key: nil, deterministic_key: nil, key_derivation_salt: nil)
+
+        algorithms = result_for(described_class.run, "使うアルゴリズム")
+
+        expect(algorithms.detail).to include("DB: pqc_railsを使っていません")
+        expect(algorithms.detail).to include("セッション: pqc_railsを使っていません")
+      end
+    end
   end
 end

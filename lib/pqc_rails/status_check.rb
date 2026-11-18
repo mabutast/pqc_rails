@@ -33,7 +33,9 @@ module PqcRails
                               env_var: ActiveRecord::KeyProvider::PREVIOUS_ENV_VAR,
                               credentials_key: ActiveRecord::KeyProvider::PREVIOUS_CREDENTIALS_KEY),
         session_store_result,
-        active_record_encryption_result
+        active_record_encryption_result,
+        encrypted_attributes_result,
+        algorithms_result
       ]
     end
 
@@ -112,6 +114,60 @@ module PqcRails
       end
     rescue StandardError => e
       Result.new(name: "ActiveRecord::Encryption", ok: false, detail: "確認できませんでした(#{e.message})")
+    end
+
+    # encryptsで暗号化している属性の一覧。件数・暗号文の内訳は数えない(pqc_rails Proのpqc_rails:pro:inventory)。
+    # rakeタスクの:environmentはモデルを読み込まないので、一覧を作る前にeager_load!する。
+    def encrypted_attributes_result
+      name = "暗号化している属性"
+      return Result.new(name: name, ok: true, detail: "activerecordが読み込まれていません") unless defined?(::ActiveRecord::Base)
+
+      app = rails_application
+      app.eager_load! if app.respond_to?(:eager_load!)
+      listed = encrypted_models.map { |model| "#{model.name}(#{model.encrypted_attributes.map(&:to_s).sort.join(', ')})" }
+      if listed.empty?
+        Result.new(name: name, ok: true,
+                   detail: "見つかりません。encrypts を書いたモデルが読み込まれているか確認してください")
+      else
+        Result.new(name: name, ok: true, detail: listed.join(", "))
+      end
+    rescue StandardError => e
+      Result.new(name: name, ok: false, detail: "確認できませんでした(#{e.message})")
+    end
+
+    def encrypted_models
+      ::ActiveRecord::Base.descendants
+                          .reject { |model| model.abstract_class? || model.name.nil? }
+                          .select { |model| model.respond_to?(:encrypted_attributes) && model.encrypted_attributes.present? }
+                          .sort_by(&:name)
+    end
+
+    # DBとセッションが新しく暗号化する時に暗号文へ書くアルゴリズムID。
+    def algorithms_result
+      Result.new(name: "使うアルゴリズム", ok: true,
+                 detail: "DB: #{record_algorithm_id}、セッション: #{session_algorithm_id}")
+    end
+
+    def record_algorithm_id
+      cipher = defined?(::ActiveRecord::Encryption) && ::ActiveRecord::Encryption.context.cipher
+      cipher.is_a?(PqcRails::Cipher) ? cipher.algorithm_id : "pqc_railsを使っていません"
+    rescue StandardError
+      "確認できませんでした"
+    end
+
+    def session_algorithm_id
+      app = rails_application
+      item = app&.middleware&.find { |m| m.klass == PqcRails::Session::PqcCookieStore }
+      return "pqc_railsを使っていません" unless item
+
+      options = item.respond_to?(:args) ? item.args.grep(::Hash).last : nil
+      CiphertextFormat.algorithm_id((options || {})[:pq_alg_name] || Session::Encryptor::DEFAULT_PQ_ALG_NAME)
+    rescue StandardError
+      "確認できませんでした"
+    end
+
+    def rails_application
+      ::Rails.application if defined?(::Rails) && ::Rails.respond_to?(:application)
     end
   end
 end

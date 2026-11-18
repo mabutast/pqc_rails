@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 namespace :pqc_rails do
-  desc "Check pqc_rails' runtime configuration (keys, session store, ActiveRecord::Encryption)"
+  desc "Check pqc_rails' runtime configuration (keys, session store, ActiveRecord::Encryption) and list encrypted attributes and algorithms"
   task status: :environment do
     results = PqcRails::StatusCheck.run
 
@@ -9,6 +9,7 @@ namespace :pqc_rails do
       icon = result.ok ? "✅" : "❌"
       puts "#{icon} #{result.name}: #{result.detail}"
     end
+    puts "暗号文の件数・鍵とアルゴリズムごとの内訳・CBOM は、pqc_rails Pro の rails pqc_rails:pro:inventory で出せます"
 
     exit(1) if results.any? { |result| !result.ok }
   end
