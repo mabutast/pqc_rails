@@ -399,7 +399,7 @@ end
 
 ## ステータス確認
 
-`rails pqc_rails:status` で、鍵の設定状況・セッションストア・`ActiveRecord::Encryption` の設定が実際に有効になっているかを確認できます。
+`rails pqc_rails:status` で、鍵の設定状況・セッションストア・`ActiveRecord::Encryption` の設定が実際に有効になっているかを確認できます。あわせて、`encrypts` で暗号化している属性の一覧と、DB・セッションが新しく暗号化する時のアルゴリズムを表示します。
 
 ```
 $ rails pqc_rails:status
@@ -410,6 +410,9 @@ $ rails pqc_rails:status
 ✅ DBレコード旧鍵 (PQC_RECORD_PREVIOUS_KEYS): 未設定(ローテーション中ではありません)
 ✅ セッションストア: :pqc_cookie_store が有効です
 ❌ ActiveRecord::Encryption: PqcRails::ActiveRecord::Context.install! が呼ばれていません
+✅ 暗号化している属性: Patient(diagnosis, note), User(phone)
+✅ 使うアルゴリズム: DB: pqc_railsを使っていません、セッション: X25519+ML-KEM-768
+暗号文の件数・鍵とアルゴリズムごとの内訳・CBOM は、pqc_rails Pro の rails pqc_rails:pro:inventory で出せます
 ```
 
 鍵の未設定（`MissingKeyError`）は実際に暗号化・復号が走るまで発覚しない遅延的なエラーです。デプロイ前や導入直後にこのコマンドで能動的に確認することで、本番トラフィックで初めて気づくという事態を避けられます。いずれかのチェックが失敗している場合、終了コードは1になります（CI・デプロイフックへの組み込みにも使えます）。
