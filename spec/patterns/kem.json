@@ -1,0 +1,285 @@
+{
+  "test_command": "bundle exec rspec spec/pqc_rails/kem_spec.rb",
+  "rows": [
+    {
+      "id": "round-trip",
+      "pattern": "鍵の生成 → カプセル化 → デカプセル化",
+      "source": "spec",
+      "source_ref": "kem.rb の使い方の例：shared == encap.shared_secret",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "送信側と受信側で共有秘密が一致する"
+        },
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "仕様通りの長さの公開鍵・秘密鍵を生成する"
+        }
+      ],
+      "guarantee": "送信側と受信側の共有秘密が一致し、鍵は仕様の長さになる",
+      "mutants": [
+        {
+          "id": "short-secret",
+          "kind": "定数を±1する",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "ciphertext.read_bytes(length_ciphertext),\n          shared_secret.read_bytes(length_shared_secret)",
+          "replace": "ciphertext.read_bytes(length_ciphertext),\n          shared_secret.read_bytes(length_shared_secret - 1)",
+          "result": "killed"
+        },
+        {
+          "id": "swap-decaps-args",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "OQS_KEM_decaps(@kem_ptr, shared_secret, ct_ptr, sk_ptr)",
+          "replace": "OQS_KEM_decaps(@kem_ptr, shared_secret, sk_ptr, ct_ptr)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "unknown-algorithm",
+      "pattern": "liboqs に無いアルゴリズム名",
+      "source": "spec",
+      "source_ref": "kem.rb：OQS_KEM_new が失敗したら PqcRails::Error",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "未知のアルゴリズム名を渡すとPqcRails::Errorを送出する"
+        }
+      ],
+      "guarantee": "PqcRails::Error になり、NULL のポインタを使わない",
+      "mutants": [
+        {
+          "id": "skip-null-check",
+          "kind": "条件を常に偽にする",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "if @kem_ptr.null?",
+          "replace": "if false",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "liboqs-failure",
+      "pattern": "liboqs が鍵の生成・カプセル化・デカプセル化で失敗を返す",
+      "source": "code",
+      "source_ref": "generate_keypair・encapsulate・decapsulate の status.zero? の判定（分岐カバレッジで未実行）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "鍵の生成が失敗したら、PqcRails::Errorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "カプセル化が失敗したら、PqcRails::Errorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "デカプセル化が失敗したら、共有秘密を返さずにPqcRails::Errorを送出する"
+        }
+      ],
+      "guarantee": "PqcRails::Error になり、中身の決まらないバッファを鍵や共有秘密として返さない",
+      "mutants": [
+        {
+          "id": "keypair",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "raise PqcRails::Error, \"OQS_KEM_keypair failed (status=#{status})\" unless status.zero?",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "encaps",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "raise PqcRails::Error, \"OQS_KEM_encaps failed (status=#{status})\" unless status.zero?",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "decaps",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "raise PqcRails::Error, \"OQS_KEM_decaps failed (status=#{status})\" unless status.zero?",
+          "replace": "nil",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "input-length",
+      "pattern": "公開鍵・暗号文・秘密鍵の長さが違う（空・1バイト・±1バイト）",
+      "source": "spec",
+      "source_ref": "length_validation.rb：FFI へ渡す前に、長さの違う入力を必ず止める",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "長さが不正なpublic_keyを渡すとArgumentErrorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "空・1バイト・1バイト長い・1バイト短い公開鍵・暗号文・秘密鍵は、どれもArgumentErrorを送出する"
+        }
+      ],
+      "guarantee": "長さが1バイトでも違えば ArgumentError になり、liboqs に渡らない",
+      "mutants": [
+        {
+          "id": "skip-public-key",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "validate_length!(public_key, length_public_key, \"public_key\")",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "skip-ciphertext",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "validate_length!(ciphertext, length_ciphertext, \"ciphertext\")",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "skip-secret-key",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "validate_length!(secret_key, length_secret_key, \"secret_key\")",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "accept-any-length",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/length_validation.rb",
+          "find": "return if bytes.bytesize == expected_length",
+          "replace": "return",
+          "result": "killed"
+        },
+        {
+          "id": "off-by-one",
+          "kind": "境界をずらす",
+          "file": "lib/pqc_rails/length_validation.rb",
+          "find": "return if bytes.bytesize == expected_length",
+          "replace": "return if bytes.bytesize >= expected_length",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "nil-input",
+      "pattern": "nil を渡す",
+      "source": "spec",
+      "source_ref": "length_validation.rb：文字列でない値(nil等)も ArgumentError",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "nilを渡すとArgumentErrorを送出する(NoMethodErrorにしない)"
+        }
+      ],
+      "guarantee": "NoMethodError ではなく ArgumentError になる",
+      "mutants": [
+        {
+          "id": "skip-string-check",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/length_validation.rb",
+          "find": "raise ArgumentError, \"#{name} must be a String, got #{bytes.class}\" unless bytes.is_a?(String)",
+          "replace": "nil",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "implicit-rejection",
+      "pattern": "改ざんした暗号文・別の秘密鍵でデカプセル化する",
+      "source": "spec",
+      "source_ref": "ML-KEM の暗黙的拒否（FIPS 203）：例外を出さず、秘密鍵と暗号文から決まる別の共有鍵を返す",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "どの位置を1バイト改変しても、例外を出さずに元と異なる共有鍵を返す"
+        },
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "同じ改ざん暗号文には毎回同じ共有鍵を返す"
+        },
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "誤った秘密鍵でdecapsulateすると別の共有秘密になる"
+        }
+      ],
+      "guarantee": "改ざんしても例外にならず、元と違う共有鍵を、同じ入力には毎回同じ値で返す",
+      "mutants": [
+        {
+          "id": "ignore-ciphertext",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "ct_ptr.put_bytes(0, ciphertext)",
+          "replace": "ct_ptr.put_bytes(0, \"\\0\" * ciphertext.bytesize)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "use-after-free",
+      "pattern": "free の後に使う・free を2回呼ぶ",
+      "source": "spec",
+      "source_ref": "kem.rb：kem.free で C のメモリを解放する",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "free後にメソッドを呼ぶとPqcRails::Errorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "freeを複数回呼んでもエラーにならない"
+        }
+      ],
+      "guarantee": "解放後の使用は PqcRails::Error になり、2回目の free は何もしない",
+      "mutants": [
+        {
+          "id": "skip-freed-check",
+          "kind": "条件を常に偽にする",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "has already been freed\" if @freed",
+          "replace": "has already been freed\" if false",
+          "result": "killed"
+        },
+        {
+          "id": "double-free",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "      return if @freed\n",
+          "replace": "",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "open-failure",
+      "pattern": "Kem.open でアルゴリズムの生成そのものが失敗する",
+      "source": "code",
+      "source_ref": "Kem.open の ensure の kem&.free（分岐カバレッジで未実行）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "アルゴリズムの生成が失敗したら、その例外をそのまま伝える"
+        },
+        {
+          "file": "spec/pqc_rails/kem_spec.rb",
+          "name": "ブロックを抜けたら解放する"
+        }
+      ],
+      "guarantee": "生成の失敗が PqcRails::Error のまま伝わり、後始末の NoMethodError に置き換わらない",
+      "mutants": [
+        {
+          "id": "no-safe-nav",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "kem&.free",
+          "replace": "kem.free",
+          "result": "killed"
+        }
+      ]
+    }
+  ]
+}

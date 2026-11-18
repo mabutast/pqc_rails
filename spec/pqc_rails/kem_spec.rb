@@ -195,4 +195,47 @@ RSpec.describe PqcRails::Kem do
       expect { kem.free }.not_to raise_error
     end
   end
+
+  describe "liboqsが失敗を返した時" do
+    let(:kem) { described_class.new(alg_name) }
+    let(:keypair) { kem.generate_keypair }
+
+    after { kem.free }
+
+    it "鍵の生成が失敗したら、PqcRails::Errorを送出する" do
+      allow(PqcRails::Ffi::Kem).to receive(:OQS_KEM_keypair).and_return(-1)
+
+      expect { kem.generate_keypair }.to raise_error(PqcRails::Error, /OQS_KEM_keypair failed \(status=-1\)/)
+    end
+
+    it "カプセル化が失敗したら、PqcRails::Errorを送出する" do
+      public_key = keypair.public_key
+      allow(PqcRails::Ffi::Kem).to receive(:OQS_KEM_encaps).and_return(-1)
+
+      expect { kem.encapsulate(public_key) }.to raise_error(PqcRails::Error, /OQS_KEM_encaps failed \(status=-1\)/)
+    end
+
+    it "デカプセル化が失敗したら、共有秘密を返さずにPqcRails::Errorを送出する" do
+      ciphertext = kem.encapsulate(keypair.public_key).ciphertext
+      allow(PqcRails::Ffi::Kem).to receive(:OQS_KEM_decaps).and_return(-1)
+
+      expect do
+        kem.decapsulate(ciphertext, keypair.secret_key)
+      end.to raise_error(PqcRails::Error, /OQS_KEM_decaps failed \(status=-1\)/)
+    end
+  end
+
+  describe ".open" do
+    it "アルゴリズムの生成が失敗したら、その例外をそのまま伝える(後始末でNoMethodErrorにしない)" do
+      expect do
+        described_class.open("NOT-A-REAL-KEM") { nil }
+      end.to raise_error(PqcRails::Error, /OQS_KEM_new failed/)
+    end
+
+    it "ブロックを抜けたら解放する" do
+      kem = described_class.open(alg_name) { _1 }
+
+      expect { kem.generate_keypair }.to raise_error(PqcRails::Error, /already been freed/)
+    end
+  end
 end
