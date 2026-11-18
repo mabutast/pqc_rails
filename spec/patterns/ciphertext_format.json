@@ -3,7 +3,6 @@
   "rows": [
     {
       "id": "algorithm-id-format",
-      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.algorithm_id",
       "pattern": "アルゴリズムIDの書き方",
       "source": "spec",
       "source_ref": "README「暗号文の形式」：アルゴリズムID（例: X25519+ML-KEM-768）",
@@ -35,7 +34,6 @@
     },
     {
       "id": "registered-algorithm-accepted",
-      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.pq_alg_name_for",
       "pattern": "レジストリに登録されたアルゴリズムの ID",
       "source": "spec",
       "source_ref": "README「暗号文の形式」：復号に使うのはレジストリに登録されたものと、設定で指定したものだけ",
@@ -67,7 +65,6 @@
     },
     {
       "id": "configured-algorithm-accepted",
-      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.pq_alg_name_for",
       "pattern": "レジストリに無いが設定で指定したアルゴリズムの ID",
       "source": "spec",
       "source_ref": "README「暗号文の形式」：設定で指定したものは復号に使う",
@@ -91,7 +88,6 @@
     },
     {
       "id": "unknown-algorithm-rejected",
-      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.pq_alg_name_for",
       "pattern": "レジストリにも設定にも無いアルゴリズムの ID",
       "source": "spec",
       "source_ref": "README「暗号文の形式」：それ以外のアルゴリズムは復号に使わない",
@@ -135,7 +131,6 @@
     },
     {
       "id": "non-x25519-rejected",
-      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.pq_alg_name_for",
       "pattern": "古典側の曲線が X25519 でない ID",
       "source": "code",
       "source_ref": "pq_alg_name_for の curve == CLASSICAL_CURVE",
@@ -159,7 +154,6 @@
     },
     {
       "id": "malformed-id-rejected",
-      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.allowed_pq_name?",
       "pattern": "+ の後ろが空・+ が無い ID（設定の名前が空文字の時も）",
       "source": "code",
       "source_ref": "allowed_pq_name? の nil・空文字の判定",
@@ -187,7 +181,6 @@
     },
     {
       "id": "header-tamper-detected",
-      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.associated_data",
       "pattern": "形式バージョン・アルゴリズムID・鍵IDの書き換え",
       "source": "spec",
       "source_ref": "README「暗号文の形式」：これらの値は追加認証データに含まれ、書き換えられた暗号文は復号できない",
@@ -227,7 +220,6 @@
     },
     {
       "id": "origin-authentication",
-      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.data_key",
       "pattern": "公開鍵だけで暗号文を作る（作成元の認証）",
       "source": "spec",
       "source_ref": "README「暗号文の形式」・docs/THREAT_MODEL.md「作成元の認証」：AES 鍵は共有鍵と認証鍵の両方から導く",
@@ -263,7 +255,6 @@
     },
     {
       "id": "missing-authentication-key",
-      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.data_key",
       "pattern": "認証鍵を持たない鍵（0.3.0 以前）で新しい形式を書く",
       "source": "spec",
       "source_ref": "README「暗号文の形式」：MissingAuthenticationKeyError が発生する",
@@ -287,7 +278,6 @@
     },
     {
       "id": "data-key-derivation",
-      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.hkdf",
       "pattern": "AES 鍵の導き方（長さ・salt・info）",
       "source": "code",
       "source_ref": "hkdf と DATA_KEY_INFO・KEY_LENGTH",
@@ -331,7 +321,6 @@
     },
     {
       "id": "key-id",
-      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.key_id",
       "pattern": "鍵IDの求め方",
       "source": "code",
       "source_ref": "key_id：公開鍵の SHA-1 の先頭 4 文字",
@@ -355,7 +344,6 @@
     },
     {
       "id": "legacy-records-rejected",
-      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.ensure_legacy_record_accepted!",
       "pattern": "accept_legacy_records = false で旧形式の DB カラムを読む",
       "source": "spec",
       "source_ref": "README「暗号文の形式」：旧形式を受け付けない設定",
@@ -379,7 +367,6 @@
     },
     {
       "id": "legacy-cookie-deadline",
-      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.ensure_legacy_cookie_accepted!",
       "pattern": "旧形式の Cookie の受け付け期限（前・後・ちょうど・期限なし）",
       "source": "spec",
       "source_ref": "README「暗号文の形式」：accept_legacy_cookies_until を過ぎると旧形式の Cookie を読まない。既定は nil で期限なし",
@@ -435,7 +422,6 @@
     },
     {
       "id": "write-legacy-setting",
-      "target": "lib/pqc_rails/ciphertext_format.rb CiphertextFormat.write_legacy?",
       "pattern": "ciphertext_format = :v0 のとき旧形式で書く",
       "source": "spec",
       "source_ref": "README の公開 API：Configuration#ciphertext_format",
