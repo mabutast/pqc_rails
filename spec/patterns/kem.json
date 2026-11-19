@@ -334,6 +334,14 @@
           "find": "kem&.free",
           "replace": "kem.free",
           "result": "killed"
+        },
+        {
+          "id": "error-class-runtime",
+          "kind": "例外の種類を変える",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "raise PqcRails::Error,\n              \"OQS_KEM_new failed",
+          "replace": "raise RuntimeError,\n              \"OQS_KEM_new failed",
+          "result": "killed"
         }
       ]
     }
