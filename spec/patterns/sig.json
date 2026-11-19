@@ -24,7 +24,7 @@
       "mutants": [
         {
           "id": "sign-message-zeroed",
-          "kind": "引数・順番を入れ替える",
+          "kind": "確かめる処理を消す",
           "file": "lib/pqc_rails/sig.rb",
           "find": "message_ptr.put_bytes(0, message)\n\n      # signatureバッファ",
           "replace": "message_ptr.put_bytes(0, \"\\0\" * message.bytesize)\n\n      # signatureバッファ",
@@ -71,7 +71,7 @@
       "mutants": [
         {
           "id": "ml-dsa-65-to-44",
-          "kind": "定数・長さ・回数を±1する",
+          "kind": "戻り値を空・nil・固定値にする",
           "file": "lib/pqc_rails/algorithms.rb",
           "find": "name: :ml_dsa_65, liboqs_name: \"ML-DSA-65\"",
           "replace": "name: :ml_dsa_65, liboqs_name: \"ML-DSA-44\"",
@@ -79,7 +79,7 @@
         },
         {
           "id": "ml-dsa-87-to-65",
-          "kind": "定数・長さ・回数を±1する",
+          "kind": "戻り値を空・nil・固定値にする",
           "file": "lib/pqc_rails/algorithms.rb",
           "find": "name: :ml_dsa_87, liboqs_name: \"ML-DSA-87\"",
           "replace": "name: :ml_dsa_87, liboqs_name: \"ML-DSA-65\"",
@@ -226,8 +226,8 @@
     {
       "id": "empty-message",
       "pattern": "空のメッセージ",
-      "source": "spec",
-      "source_ref": "README：sign・verify の message は任意のバイト列（空も含む境界）",
+      "source": "code",
+      "source_ref": "sig.rb の sign・verify：message は「署名対象のバイト列」（String）で、長さの制限を書いていない。空文字列もそのバイト列の境界として扱う",
       "tests": [
         {
           "file": "spec/pqc_rails/sig_spec.rb",
