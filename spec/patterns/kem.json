@@ -56,6 +56,14 @@
           "find": "if @kem_ptr.null?",
           "replace": "if false",
           "result": "killed"
+        },
+        {
+          "id": "error-class-runtime",
+          "kind": "例外の種類を変える",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "raise PqcRails::Error,\n              \"OQS_KEM_new failed",
+          "replace": "raise RuntimeError,\n              \"OQS_KEM_new failed",
+          "result": "killed"
         }
       ]
     },
@@ -110,6 +118,22 @@
           "file": "lib/pqc_rails/kem.rb",
           "find": "raise PqcRails::Error, \"OQS_KEM_decaps failed (status=#{status})\" unless status.zero?",
           "replace": "raise \"OQS_KEM_decaps failed (status=#{status})\" unless status.zero?",
+          "result": "killed"
+        },
+        {
+          "id": "keypair-error-class-runtime",
+          "kind": "例外の種類を変える",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "raise PqcRails::Error, \"OQS_KEM_keypair failed",
+          "replace": "raise RuntimeError, \"OQS_KEM_keypair failed",
+          "result": "killed"
+        },
+        {
+          "id": "encaps-error-class-runtime",
+          "kind": "例外の種類を変える",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "raise PqcRails::Error, \"OQS_KEM_encaps failed",
+          "replace": "raise RuntimeError, \"OQS_KEM_encaps failed",
           "result": "killed"
         }
       ]
@@ -170,6 +194,14 @@
           "find": "return if bytes.bytesize == expected_length",
           "replace": "return if bytes.bytesize >= expected_length",
           "result": "killed"
+        },
+        {
+          "id": "error-class-runtime",
+          "kind": "例外の種類を変える",
+          "file": "lib/pqc_rails/length_validation.rb",
+          "find": "raise ArgumentError,\n            \"#{name} has wrong length",
+          "replace": "raise RuntimeError,\n            \"#{name} has wrong length",
+          "result": "killed"
         }
       ]
     },
@@ -192,6 +224,14 @@
           "file": "lib/pqc_rails/length_validation.rb",
           "find": "raise ArgumentError, \"#{name} must be a String, got #{bytes.class}\" unless bytes.is_a?(String)",
           "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "error-class-runtime",
+          "kind": "例外の種類を変える",
+          "file": "lib/pqc_rails/length_validation.rb",
+          "find": "raise ArgumentError, \"#{name} must be a String",
+          "replace": "raise RuntimeError, \"#{name} must be a String",
           "result": "killed"
         }
       ]
@@ -258,6 +298,14 @@
           "file": "lib/pqc_rails/kem.rb",
           "find": "      return if @freed\n",
           "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "error-class-runtime",
+          "kind": "例外の種類を変える",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "raise PqcRails::Error, \"this PqcRails::Kem instance has already been freed\"",
+          "replace": "raise RuntimeError, \"this PqcRails::Kem instance has already been freed\"",
           "result": "killed"
         }
       ]

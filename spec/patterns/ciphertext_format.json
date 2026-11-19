@@ -245,7 +245,7 @@
       "mutants": [
         {
           "id": "drop-auth-key",
-          "kind": "確かめる処理を消す",
+          "kind": "鍵の導出を通さない・入力を1つ外す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
           "find": "hkdf(shared_secret + authentication_key, DATA_KEY_INFO)",
           "replace": "hkdf(shared_secret, DATA_KEY_INFO)",
@@ -253,7 +253,7 @@
         },
         {
           "id": "shared-secret-as-key",
-          "kind": "戻り値を変える",
+          "kind": "鍵の導出を通さない・入力を1つ外す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
           "find": "hkdf(shared_secret + authentication_key, DATA_KEY_INFO)",
           "replace": "shared_secret",
@@ -280,6 +280,14 @@
           "file": "lib/pqc_rails/ciphertext_format.rb",
           "find": "if authentication_key.nil?",
           "replace": "if false",
+          "result": "killed"
+        },
+        {
+          "id": "error-class-runtime",
+          "kind": "例外の種類を変える",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "raise MissingAuthenticationKeyError,\n",
+          "replace": "raise RuntimeError,\n",
           "result": "killed"
         }
       ]
