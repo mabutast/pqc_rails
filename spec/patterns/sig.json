@@ -248,18 +248,10 @@
     },
     {
       "id": "key-length",
-      "pattern": "秘密鍵・公開鍵の長さが違う（空・±1バイト・短い文字列）",
+      "pattern": "秘密鍵・公開鍵の長さが違う（空・±1バイト）",
       "source": "spec",
       "source_ref": "README「エラーハンドリング」：sign に渡す長さが不正なら ArgumentError。verify の public_key は sig.rb の verify のコメント（公開鍵は呼び出し側が管理する値なので例外にする）と THREAT_MODEL の入力長の行",
       "tests": [
-        {
-          "file": "spec/pqc_rails/sig_spec.rb",
-          "name": "長さが不正なsecret_keyでsignするとArgumentErrorを送出する"
-        },
-        {
-          "file": "spec/pqc_rails/sig_spec.rb",
-          "name": "長さが不正なpublic_keyでverifyするとArgumentErrorを送出する"
-        },
         {
           "file": "spec/pqc_rails/sig_spec.rb",
           "name": "空・1バイト長い・1バイト短いsecret_keyでsignすると、どれもArgumentErrorを送出する"

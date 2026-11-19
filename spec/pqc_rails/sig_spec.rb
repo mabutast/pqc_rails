@@ -219,25 +219,6 @@ RSpec.describe PqcRails::Sig do
   end
 
   describe "入力バリデーション" do
-    it "長さが不正なsecret_keyでsignするとArgumentErrorを送出する" do
-      described_class.open(alg_name) do |sig|
-        expect do
-          sig.sign(message, "too_short")
-        end.to raise_error(ArgumentError, /secret_key has wrong length/)
-      end
-    end
-
-    it "長さが不正なpublic_keyでverifyするとArgumentErrorを送出する" do
-      described_class.open(alg_name) do |sig|
-        keypair   = sig.generate_keypair
-        signature = sig.sign(message, keypair.secret_key)
-
-        expect do
-          sig.verify(message, signature, "too_short")
-        end.to raise_error(ArgumentError, /public_key has wrong length/)
-      end
-    end
-
     it "空・1バイト長い・1バイト短いsecret_keyでsignすると、どれもArgumentErrorを送出する" do
       described_class.open(alg_name) do |sig|
         secret_key = sig.generate_keypair.secret_key
