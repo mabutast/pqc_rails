@@ -70,6 +70,14 @@
       "guarantee": "各シンボルが FIPS 204 の長さの鍵・署名を作るアルゴリズムに解決され、往復で検証できる",
       "mutants": [
         {
+          "id": "ml-dsa-44-to-65",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/algorithms.rb",
+          "find": "name: :ml_dsa_44, liboqs_name: \"ML-DSA-44\"",
+          "replace": "name: :ml_dsa_44, liboqs_name: \"ML-DSA-65\"",
+          "result": "killed"
+        },
+        {
           "id": "ml-dsa-65-to-44",
           "kind": "戻り値を空・nil・固定値にする",
           "file": "lib/pqc_rails/algorithms.rb",
@@ -308,7 +316,7 @@
     {
       "id": "nil-key",
       "pattern": "鍵に nil を渡す",
-      "source": "spec",
+      "source": "code",
       "source_ref": "length_validation.rb：文字列でない値(nil等)も ArgumentError",
       "tests": [
         {
