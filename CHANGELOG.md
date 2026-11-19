@@ -46,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- docs/THREAT_MODEL.md states precisely how `PqcRails::Sig#verify` handles input lengths: a signature
+  longer than the maximum returns `false` without calling liboqs, a shorter one is checked by liboqs and
+  returns `false`, and a public key of the wrong length raises `ArgumentError`.
 - docs/THREAT_MODEL.md describes what the in-memory secret key is protected from before what it is
   not: the key never reaches the database, backups or logs, and an attacker who can read the running
   process's memory is treated as holding that process's privileges, as in any software that keeps
