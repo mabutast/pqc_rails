@@ -1,0 +1,483 @@
+{
+  "test_command": "bundle exec rspec spec/pqc_rails/sig_spec.rb spec/pqc_rails/secret_buffer_spec.rb",
+  "rows": [
+    {
+      "id": "round-trip",
+      "pattern": "鍵の生成 → 署名 → 検証",
+      "source": "spec",
+      "source_ref": "README「署名（DSA）の基本フロー」：verify は true",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "正しいメッセージ・署名・公開鍵の組み合わせではtrueを返す"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "仕様通りの長さの公開鍵・秘密鍵を生成する"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "署名のバイト長がlength_signature以下である"
+        }
+      ],
+      "guarantee": "同じ鍵ペアで作った署名は検証で true になり、鍵は仕様の長さになる",
+      "mutants": [
+        {
+          "id": "sign-message-zeroed",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "message_ptr.put_bytes(0, message)\n\n      # signatureバッファ",
+          "replace": "message_ptr.put_bytes(0, \"\\0\" * message.bytesize)\n\n      # signatureバッファ",
+          "result": "killed"
+        },
+        {
+          "id": "verify-args-swapped",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "        signature_ptr,\n        signature.bytesize,\n        public_key_ptr\n",
+          "replace": "        public_key_ptr,\n        signature.bytesize,\n        signature_ptr\n",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "parameter-sets",
+      "pattern": "ML-DSA-44/65/87 をシンボルで指定する",
+      "source": "spec",
+      "source_ref": "README「アルゴリズムの指定方法」と鍵長・署名長の表（FIPS 204）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "ml_dsa_44は公開鍵1312・秘密鍵2560・署名2420バイトで往復できる"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "ml_dsa_65は公開鍵1952・秘密鍵4032・署名3309バイトで往復できる"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "ml_dsa_87は公開鍵2592・秘密鍵4896・署名4627バイトで往復できる"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "シンボルでもアルゴリズムを指定できる(アルゴリズム抽象化レイヤー経由)"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "ML-DSA-44のNIST仕様値と一致する"
+        }
+      ],
+      "guarantee": "各シンボルが FIPS 204 の長さの鍵・署名を作るアルゴリズムに解決され、往復で検証できる",
+      "mutants": [
+        {
+          "id": "ml-dsa-65-to-44",
+          "kind": "定数・長さ・回数を±1する",
+          "file": "lib/pqc_rails/algorithms.rb",
+          "find": "name: :ml_dsa_65, liboqs_name: \"ML-DSA-65\"",
+          "replace": "name: :ml_dsa_65, liboqs_name: \"ML-DSA-44\"",
+          "result": "killed"
+        },
+        {
+          "id": "ml-dsa-87-to-65",
+          "kind": "定数・長さ・回数を±1する",
+          "file": "lib/pqc_rails/algorithms.rb",
+          "find": "name: :ml_dsa_87, liboqs_name: \"ML-DSA-87\"",
+          "replace": "name: :ml_dsa_87, liboqs_name: \"ML-DSA-65\"",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "unknown-algorithm",
+      "pattern": "liboqs に無いアルゴリズム名・未登録のシンボル",
+      "source": "spec",
+      "source_ref": "README「エラーハンドリング」：未知のアルゴリズム名は PqcRails::Error、未登録のシンボルは UnknownAlgorithmError",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "未知のアルゴリズム名を渡すとPqcRails::Errorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "未知のシンボルを渡すとUnknownAlgorithmErrorを送出する"
+        }
+      ],
+      "guarantee": "PqcRails::Error（シンボルは UnknownAlgorithmError）になり、NULL のポインタを使わない",
+      "mutants": [
+        {
+          "id": "null-check-false",
+          "kind": "条件を常に偽にする",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "if @sig_ptr.null?",
+          "replace": "if false",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "verify-false",
+      "pattern": "改ざんしたメッセージ・署名（先頭・末尾）、別の鍵ペアの公開鍵で検証する",
+      "source": "spec",
+      "source_ref": "README：verify は署名が無効でも例外を出さず false",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "メッセージが改竄されているとfalseを返す(例外は発生しない)"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "署名のバイト列自体が改竄されているとfalseを返す"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "署名の最後のバイトが改竄されていてもfalseを返す"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "異なる鍵ペアの公開鍵で検証するとfalseを返す"
+        }
+      ],
+      "guarantee": "どれも例外を出さずに false を返す",
+      "mutants": [
+        {
+          "id": "verify-always-true",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "      status.zero?\n    end",
+          "replace": "      true\n    end",
+          "result": "killed"
+        },
+        {
+          "id": "verify-message-dropped",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "        message_ptr,\n        message.bytesize,\n        signature_ptr,",
+          "replace": "        message_ptr,\n        0,\n        signature_ptr,",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "signature-too-long",
+      "pattern": "署名が length_signature より長い",
+      "source": "spec",
+      "source_ref": "THREAT_MODEL：FIPS 204 §3.6.2 署名の長さが違えば false",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "signatureがlength_signatureを超える長さの場合、liboqsに渡す前にfalseを返す(例外は発生しない)"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "signatureがlength_signatureを超える場合、OQS_SIG_verify自体を呼ばない(pqc_rails自身が事前に弾く)"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "正しいメッセージ・署名・公開鍵の組み合わせではtrueを返す"
+        }
+      ],
+      "guarantee": "1バイトでも長ければ liboqs を呼ばずに false、ちょうどの長さの正しい署名は true",
+      "mutants": [
+        {
+          "id": "oversize-guard-removed",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "return false if signature.bytesize > length_signature",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "oversize-ge",
+          "kind": "境界をずらす",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "return false if signature.bytesize > length_signature",
+          "replace": "return false if signature.bytesize >= length_signature",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "signature-too-short",
+      "pattern": "署名が空・1バイト短い",
+      "source": "spec",
+      "source_ref": "THREAT_MODEL：FIPS 204 §3.6.2 署名の長さが違えば false",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "signatureが空文字列の場合もfalseを返す(例外は発生しない)"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "signatureがlength_signatureより1バイト短い場合もfalseを返す(例外は発生しない)"
+        }
+      ],
+      "guarantee": "例外を出さずに false を返す（長さの照合は liboqs が行う）",
+      "mutants": [
+        {
+          "id": "short-accepted",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "      status.zero?\n    end",
+          "replace": "      status.zero? || signature.bytesize < length_signature\n    end",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "empty-message",
+      "pattern": "空のメッセージ",
+      "source": "spec",
+      "source_ref": "README：sign・verify の message は任意のバイト列（空も含む境界）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "空のメッセージにも署名・検証でき、別のメッセージの署名としては通らない"
+        }
+      ],
+      "guarantee": "空のメッセージにも署名・検証でき、その署名は別のメッセージでは false",
+      "mutants": [
+        {
+          "id": "empty-rejected",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "message_ptr.put_bytes(0, message)\n\n      # signatureバッファ",
+          "replace": "raise ArgumentError if message.empty?\n      message_ptr.put_bytes(0, message)\n\n      # signatureバッファ",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "key-length",
+      "pattern": "秘密鍵・公開鍵の長さが違う（空・±1バイト・短い文字列）",
+      "source": "spec",
+      "source_ref": "README「エラーハンドリング」：sign に渡す長さが不正なら ArgumentError、THREAT_MODEL：liboqs 呼び出し前に検証",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "長さが不正なsecret_keyでsignするとArgumentErrorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "長さが不正なpublic_keyでverifyするとArgumentErrorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "空・1バイト長い・1バイト短いsecret_keyでsignすると、どれもArgumentErrorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "空・1バイト長い・1バイト短いpublic_keyでverifyすると、どれもArgumentErrorを送出する"
+        }
+      ],
+      "guarantee": "長さが1バイトでも違えば ArgumentError になり、liboqs に渡らない",
+      "mutants": [
+        {
+          "id": "sign-validation-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "validate_length!(secret_key, length_secret_key, \"secret_key\")",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "verify-validation-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "validate_length!(public_key, length_public_key, \"public_key\")",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "verify-validation-wrong-length",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "validate_length!(public_key, length_public_key, \"public_key\")",
+          "replace": "validate_length!(public_key, length_secret_key, \"public_key\")",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "nil-key",
+      "pattern": "鍵に nil を渡す",
+      "source": "spec",
+      "source_ref": "length_validation.rb：文字列でない値(nil等)も ArgumentError",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "nilの鍵を渡すとArgumentErrorを送出する(NoMethodErrorにしない)"
+        }
+      ],
+      "guarantee": "NoMethodError ではなく ArgumentError になる",
+      "mutants": [
+        {
+          "id": "string-check-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/length_validation.rb",
+          "find": "raise ArgumentError, \"#{name} must be a String, got #{bytes.class}\" unless bytes.is_a?(String)",
+          "replace": "nil",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "liboqs-failure",
+      "pattern": "liboqs が鍵の生成・署名で失敗を返す",
+      "source": "code",
+      "source_ref": "generate_keypair・sign の status.zero? の判定（分岐カバレッジで未実行）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "鍵の生成が失敗したら、PqcRails::Errorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "署名が失敗したら、署名を返さずにPqcRails::Errorを送出する"
+        }
+      ],
+      "guarantee": "PqcRails::Error になり、中身の決まらないバッファを鍵や署名として返さない",
+      "mutants": [
+        {
+          "id": "keypair-raise-removed",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "raise PqcRails::Error, \"OQS_SIG_keypair failed (status=#{status})\" unless status.zero?",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "sign-raise-removed",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "raise PqcRails::Error, \"OQS_SIG_sign failed (status=#{status})\" unless status.zero?",
+          "replace": "nil",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "signature-written-length",
+      "pattern": "liboqs が最大長より短い署名を書く",
+      "source": "spec",
+      "source_ref": "README：length_signature は最大長で、実際の署名はこれより短いことがある",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "liboqsが書いた長さの分だけを署名として返す(最大長のバッファの残りを含めない)"
+        }
+      ],
+      "guarantee": "signature_len に書かれた長さだけを返し、バッファの残りを付けない",
+      "mutants": [
+        {
+          "id": "read-max-length",
+          "kind": "定数・長さ・回数を±1する",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "signature_ptr.read_bytes(actual_signature_len)",
+          "replace": "signature_ptr.read_bytes(length_signature)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "secret-buffer-wipe",
+      "pattern": "鍵の生成・署名の後の秘密鍵の C のバッファ",
+      "source": "spec",
+      "source_ref": "THREAT_MODEL「中間値の破棄」：秘密鍵を置く C のバッファは使い終わりにゼロで埋める",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/secret_buffer_spec.rb",
+          "name": "Sig#generate_keypair・#signの後、秘密鍵のバッファはゼロで埋まっている"
+        }
+      ],
+      "guarantee": "generate_keypair・sign の後、秘密鍵の長さのバッファがすべてゼロになっている",
+      "mutants": [
+        {
+          "id": "sign-plain-buffer",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "status = SecretBuffer.with(secret_key.bytesize, secret_key) do |secret_key_ptr|",
+          "replace": "status = [FFI::MemoryPointer.new(:uint8, secret_key.bytesize).tap { _1.put_bytes(0, secret_key) }].then do |(secret_key_ptr)|",
+          "result": "killed"
+        },
+        {
+          "id": "keypair-plain-buffer",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "SecretBuffer.with(length_secret_key) do |secret_key|",
+          "replace": "[FFI::MemoryPointer.new(:uint8, length_secret_key)].then do |(secret_key)|",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "use-after-free",
+      "pattern": "free の後に使う・free を2回呼ぶ",
+      "source": "spec",
+      "source_ref": "README「エラーハンドリング」：free 済みのインスタンスへの操作は PqcRails::Error",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "free後にメソッドを呼ぶとPqcRails::Errorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "freeを複数回呼んでもエラーにならない"
+        }
+      ],
+      "guarantee": "解放後の使用は PqcRails::Error になり、2回目の free は何もしない",
+      "mutants": [
+        {
+          "id": "freed-check-false",
+          "kind": "条件を常に偽にする",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "has already been freed\" if @freed",
+          "replace": "has already been freed\" if false",
+          "result": "killed"
+        },
+        {
+          "id": "double-free-guard-removed",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "      return if @freed\n",
+          "replace": "",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "open",
+      "pattern": "Sig.open のブロック形式（生成の失敗・ブロックを抜けた後）",
+      "source": "spec",
+      "source_ref": "README：open によるブロック形式をサポート（抜けたら解放）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "アルゴリズムの生成が失敗したら、その例外をそのまま伝える(後始末でNoMethodErrorにしない)"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "ブロックを抜けたら解放する"
+        }
+      ],
+      "guarantee": "生成の失敗が PqcRails::Error のまま伝わり、ブロックを抜けたら解放される",
+      "mutants": [
+        {
+          "id": "safe-nav-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "sig&.free",
+          "replace": "sig.free",
+          "result": "killed"
+        },
+        {
+          "id": "free-removed",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "sig&.free",
+          "replace": "nil",
+          "result": "killed"
+        }
+      ]
+    }
+  ]
+}
