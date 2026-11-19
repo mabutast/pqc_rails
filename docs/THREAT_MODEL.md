@@ -155,8 +155,8 @@ FIPS 203 §3.3(ML-KEM実装への要求事項)とFIPS 204 §3.6(追加の要求�
 | derandomized版など内部関数への制御されたアクセス | 満たしています(標準APIのみをFFI経由で呼び出し可能にしています) |
 | 共有鍵の鍵導出における承認済み手法(NIST SP 800-56C)の使用 | 満たしています(`HybridKem`はHKDF-SHA256で導出) |
 | 乱数生成器の強度がパラメータセットの要求以上 | 満たしています。liboqs 0.16.0のソースを直接監査して確認済みです。デフォルトはOS依存CSPRNG(macOS: `arc4random_buf`／Linux: `getentropy`／Windows: `BCryptGenRandom`)で、全パラメータセット(128/192/256bit)の要求強度を上回ります |
-| Encaps/Decaps・sign/verifyの入力長チェック | 満たしています(公開鍵・秘密鍵・暗号文・署名すべての長さをliboqs呼び出し前に検証します) |
-| 公開鍵・署名の長さチェック、不一致ならfalseを返す(FIPS204 §3.6.2、SIGのみ) | 満たしています(`Sig#verify`が`signature`の長さをliboqs呼び出し前に検証します) |
+| Encaps/Decaps・sign/verifyの入力長チェック | 満たしています(公開鍵・秘密鍵・暗号文の長さをliboqs呼び出し前に検証し、違えば`ArgumentError`にします。署名の長さの扱いは次の行のとおりです) |
+| 公開鍵・署名の長さチェック、不一致ならfalseを返す(FIPS204 §3.6.2、SIGのみ) | 満たしています。`Sig#verify`は、最大長より長い`signature`をliboqsを呼ばずに`false`にし、それより短い`signature`はliboqsが長さを照合して`false`を返します。`public_key`の長さが違う場合は、検証を行わずに`ArgumentError`にします(呼び出し側の鍵の設定の誤りとして扱うためです) |
 | 署名生成のhedged/deterministic選択(FIPS204 §3.6.4、SIGのみ) | 満たしています。liboqs 0.16.0は全ML-DSAパラメータセットでhedged署名のみをビルドし、deterministicへ切り替えるビルドオプションはありません |
 | 中間値の破棄 | 満たしています。ML-KEM実装(`mlkem-native`)・ML-DSA実装(`mldsa-native`)ともに機微な中間値をゼロクリアし、それぞれFIPS203 §3.3・FIPS204 §3.6.3に明示的に準拠します(ソースコード中のコメントで該当条項への参照が明記されています)。liboqs 0.15.0まではML-DSAの参照実装が`pqcrystals-dilithium-standard`(標準化前からの学術的reference実装)で同種の処理を行わずKEM/SIGで非対称でしたが、0.16.0で`mldsa-native`(FIPS204準拠を目的に新規開発されたハードニング実装)へ置き換わり解消しました。Rubyレイヤーでは、liboqsとの受け渡しに使うCのバッファ(`FFI::MemoryPointer`)のうち秘密鍵・共有鍵を置くものを、使い終わりにゼロで埋めます。鍵はプロセスごとに1回だけ復元して持ち続け、復元と復号の途中で作る秘密鍵のコピーも使い終わりにゼロで埋めます。プロセスが持ち続ける鍵の扱いは、下記の「秘密鍵をメモリに置く範囲」を参照してください |
 | 浮動小数点演算を使わない | 該当しません(pqc_railsは暗号計算そのものを実装しておらず、liboqsのC実装に委譲しています) |

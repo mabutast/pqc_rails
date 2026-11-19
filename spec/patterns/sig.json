@@ -161,7 +161,7 @@
       "id": "signature-too-long",
       "pattern": "署名が length_signature より長い",
       "source": "spec",
-      "source_ref": "THREAT_MODEL：FIPS 204 §3.6.2 署名の長さが違えば false",
+      "source_ref": "THREAT_MODEL：FIPS 204 §3.6.2 署名の長さが違えば false（長すぎる署名は pqc_rails が liboqs の前に弾く）",
       "tests": [
         {
           "file": "spec/pqc_rails/sig_spec.rb",
@@ -200,7 +200,7 @@
       "id": "signature-too-short",
       "pattern": "署名が空・1バイト短い",
       "source": "spec",
-      "source_ref": "THREAT_MODEL：FIPS 204 §3.6.2 署名の長さが違えば false",
+      "source_ref": "THREAT_MODEL：FIPS 204 §3.6.2 署名の長さが違えば false（短い署名の照合は liboqs が行う）",
       "tests": [
         {
           "file": "spec/pqc_rails/sig_spec.rb",
@@ -250,7 +250,7 @@
       "id": "key-length",
       "pattern": "秘密鍵・公開鍵の長さが違う（空・±1バイト・短い文字列）",
       "source": "spec",
-      "source_ref": "README「エラーハンドリング」：sign に渡す長さが不正なら ArgumentError、THREAT_MODEL：liboqs 呼び出し前に検証",
+      "source_ref": "README「エラーハンドリング」：sign に渡す長さが不正なら ArgumentError。verify の public_key は sig.rb の verify のコメント（公開鍵は呼び出し側が管理する値なので例外にする）と THREAT_MODEL の入力長の行",
       "tests": [
         {
           "file": "spec/pqc_rails/sig_spec.rb",
@@ -293,6 +293,22 @@
           "file": "lib/pqc_rails/sig.rb",
           "find": "validate_length!(public_key, length_public_key, \"public_key\")",
           "replace": "validate_length!(public_key, length_secret_key, \"public_key\")",
+          "result": "killed"
+        },
+        {
+          "id": "length-ge",
+          "kind": "境界をずらす",
+          "file": "lib/pqc_rails/length_validation.rb",
+          "find": "return if bytes.bytesize == expected_length",
+          "replace": "return if bytes.bytesize >= expected_length",
+          "result": "killed"
+        },
+        {
+          "id": "length-le",
+          "kind": "境界をずらす",
+          "file": "lib/pqc_rails/length_validation.rb",
+          "find": "return if bytes.bytesize == expected_length",
+          "replace": "return if bytes.bytesize <= expected_length",
           "result": "killed"
         }
       ]
@@ -421,10 +437,14 @@
         },
         {
           "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "free後のsign・verifyもPqcRails::Errorを送出する(解放済みのポインタをliboqsに渡さない)"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
           "name": "freeを複数回呼んでもエラーにならない"
         }
       ],
-      "guarantee": "解放後の使用は PqcRails::Error になり、2回目の free は何もしない",
+      "guarantee": "解放後の generate_keypair・sign・verify は PqcRails::Error になり、2回目の free は何もしない",
       "mutants": [
         {
           "id": "freed-check-false",
@@ -440,6 +460,22 @@
           "file": "lib/pqc_rails/sig.rb",
           "find": "      return if @freed\n",
           "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "sign-freed-check-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "    def sign(message, secret_key)\n      ensure_not_freed!\n",
+          "replace": "    def sign(message, secret_key)\n",
+          "result": "killed"
+        },
+        {
+          "id": "verify-freed-check-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "    def verify(message, signature, public_key)\n      ensure_not_freed!\n",
+          "replace": "    def verify(message, signature, public_key)\n",
           "result": "killed"
         }
       ]

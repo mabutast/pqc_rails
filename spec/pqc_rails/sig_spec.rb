@@ -279,6 +279,16 @@ RSpec.describe PqcRails::Sig do
       expect { sig.generate_keypair }.to raise_error(PqcRails::Error, /already been freed/)
     end
 
+    it "free後のsign・verifyもPqcRails::Errorを送出する(解放済みのポインタをliboqsに渡さない)" do
+      sig = described_class.new(alg_name)
+      keypair   = sig.generate_keypair
+      signature = sig.sign(message, keypair.secret_key)
+      sig.free
+
+      expect { sig.sign(message, keypair.secret_key) }.to raise_error(PqcRails::Error, /already been freed/)
+      expect { sig.verify(message, signature, keypair.public_key) }.to raise_error(PqcRails::Error, /already been freed/)
+    end
+
     it "freeを複数回呼んでもエラーにならない" do
       sig = described_class.new(alg_name)
       sig.free
