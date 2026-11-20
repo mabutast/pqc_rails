@@ -358,9 +358,13 @@
         {
           "file": "spec/pqc_rails/redacted_keypair_spec.rb",
           "name": "値の取り出し・to_a・==は変わらない"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_keypair_spec.rb",
+          "name": "公開鍵が文字列でなくても、表示で例外を出さず[FILTERED]にする"
         }
       ],
-      "guarantee": "どの表示にも秘密鍵・公開鍵のバイト列が出ず、秘密のメンバーごとに「名前=[FILTERED]」、公開鍵は「public_key=[バイト数 bytes]」と出る。読み出しメソッド・to_a・== は元のバイト列のまま",
+      "guarantee": "どの表示にも秘密鍵・公開鍵の値が出ず（生のバイト列・エスケープ・16進・Base64のどの形でも）、秘密のメンバーごとに「名前=[FILTERED]」、公開鍵は「public_key=[バイト数 bytes]」と出る。読み出しメソッド・to_a・== は元のバイト列のまま（違う鍵ペアは等しくならない）",
       "mutants": [
         {
           "id": "keypair-include-removed",
@@ -423,7 +427,31 @@
           "kind": "戻り値を空・nil・固定値にする",
           "file": "lib/pqc_rails/redacted_keypair.rb",
           "find": "return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
-          "replace": "return \"#{value.unpack1('H*')} [FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
+          "replace": "return \"[FILTERED] #{value.unpack1('H*')}\" unless PUBLIC_MEMBERS.include?(name)",
+          "result": "killed"
+        },
+        {
+          "id": "eq-always-true",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "find": "    def to_s = inspect\n",
+          "replace": "    def to_s = inspect\n\n    def ==(_other) = true\n",
+          "result": "killed"
+        },
+        {
+          "id": "secret-base64-appended",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "find": "return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
+          "replace": "return \"[FILTERED] #{[value].pack('m0')}\" unless PUBLIC_MEMBERS.include?(name)",
+          "result": "killed"
+        },
+        {
+          "id": "public-key-non-string-guard-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "find": "      return \"[FILTERED]\" unless value.respond_to?(:bytesize)\n",
+          "replace": "",
           "result": "killed"
         }
       ]
