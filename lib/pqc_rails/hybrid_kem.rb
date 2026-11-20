@@ -5,6 +5,7 @@ require_relative "blob_packing"
 require_relative "dh_kem"
 require_relative "kem"
 require_relative "secret_buffer"
+require_relative "redacted_keypair"
 
 module PqcRails
   # 古典ECDH(DhKem)とPQ KEM(liboqs経由のKem)を組み合わせたハイブリッドKEM。
@@ -38,7 +39,9 @@ module PqcRails
   class HybridKem
     # authentication_keyは、暗号文の作成元の認証に使う32バイトのランダムな共通鍵
     # (CiphertextFormat.data_key参照)。KEMの演算には使わない。0.3.0以前に生成した鍵は持たない(nil)。
-    Keypair = Struct.new(:public_key, :secret_key, :authentication_key)
+    Keypair = Struct.new(:public_key, :secret_key, :authentication_key) do
+      include RedactedKeypair
+    end
     AUTHENTICATION_KEY_LENGTH = 32
     Encapsulation = Struct.new(:ciphertext, :shared_secret)
 

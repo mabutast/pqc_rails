@@ -1,5 +1,5 @@
 {
-  "test_command": "bundle exec rspec spec/pqc_rails/kem_spec.rb",
+  "test_command": "bundle exec rspec spec/pqc_rails/kem_spec.rb spec/pqc_rails/redacted_keypair_spec.rb",
   "rows": [
     {
       "id": "round-trip",
@@ -341,6 +341,73 @@
           "file": "lib/pqc_rails/kem.rb",
           "find": "raise PqcRails::Error,\n              \"OQS_KEM_new failed",
           "replace": "raise RuntimeError,\n              \"OQS_KEM_new failed",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "keypair-redacted",
+      "pattern": "Kem::Keypair を inspect・to_s・pp・文字列への埋め込みで表示する",
+      "source": "spec",
+      "source_ref": "判断キュー nightly-pqc_rails-2026-11-20-keypair-inspect の回答（秘密鍵を [FILTERED] で伏せ、公開鍵は長さだけ。値の取り出しは変えない）と .claude/CLAUDE.md「コードレビューの追加観点」（鍵を inspect に出さない）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/redacted_keypair_spec.rb",
+          "name": "inspect・to_s・pretty_inspectに秘密の値が含まれず、[FILTERED]と公開鍵の長さが出る"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_keypair_spec.rb",
+          "name": "値の取り出し・to_a・==は変わらない"
+        }
+      ],
+      "guarantee": "どの表示にも秘密鍵・公開鍵のバイト列が出ず、[FILTERED] と公開鍵のバイト数が出る。secret_key・to_a・== は Struct のまま",
+      "mutants": [
+        {
+          "id": "keypair-include-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "      include RedactedKeypair\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "redact-secret-check-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "find": "      return \"[FILTERED]\" if SECRET_MEMBERS.include?(name)\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "redact-secret-check-inverted",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "find": "return \"[FILTERED]\" if SECRET_MEMBERS.include?(name)",
+          "replace": "return \"[FILTERED]\" unless SECRET_MEMBERS.include?(name)",
+          "result": "killed"
+        },
+        {
+          "id": "redact-to-s-removed",
+          "kind": "フレームワークが呼ぶメソッドを消す",
+          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "find": "    def to_s = inspect\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "redact-pretty-print-removed",
+          "kind": "フレームワークが呼ぶメソッドを消す",
+          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "find": "    def pretty_print(pp)\n      pp.text(inspect)\n    end\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "redact-public-key-raw",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "find": "return \"[#{value.bytesize} bytes]\" if value.is_a?(String)",
+          "replace": "return value.inspect if value.is_a?(String)",
           "result": "killed"
         }
       ]

@@ -102,6 +102,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Key pairs (`PqcRails::Sig::Keypair`, `Kem::Keypair`, `DhKem::Keypair` and
+  `HybridKem::Keypair`) no longer show secret key bytes in `inspect`, `to_s`, `pp` (used by IRB
+  and the Rails console) or string interpolation. Secret keys and the authentication key appear as
+  `[FILTERED]` and public keys as their length in bytes. `keypair.secret_key`, `to_a` and `==` are
+  unchanged.
 - Ciphertexts in the new format authenticate their creator. In 0.3.0 and earlier, the KEM shared
   secret was used directly as the AES-256-GCM key, so anyone who knew the public key could create
   ciphertexts that decrypt successfully: forged session cookies (for example with an arbitrary
