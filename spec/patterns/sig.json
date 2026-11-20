@@ -680,7 +680,7 @@
           "name": "値の取り出し・to_a・==は変わらない"
         }
       ],
-      "guarantee": "どの表示にも秘密鍵・公開鍵のバイト列が出ず、秘密のメンバーごとに「名前=[FILTERED]」、公開鍵は「public_key=[バイト数 bytes]」と出る。読み出しメソッド・to_a・== は元のバイト列のまま",
+      "guarantee": "どの表示にも秘密鍵・公開鍵の値が出ず（生のバイト列・エスケープ・16進・Base64のどの形でも）、秘密のメンバーごとに「名前=[FILTERED]」、公開鍵は「public_key=[バイト数 bytes]」と出る。読み出しメソッド・to_a・== は元のバイト列のまま（違う鍵ペアは等しくならない）。共通のモジュール（redacted_keypair.rb）を壊す壊し方は kem.json の同じ行に置く",
       "mutants": [
         {
           "id": "keypair-include-removed",
@@ -691,59 +691,11 @@
           "result": "killed"
         },
         {
-          "id": "redact-secret-check-removed",
-          "kind": "確かめる処理を消す",
-          "file": "lib/pqc_rails/redacted_keypair.rb",
-          "find": "      return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)\n",
-          "replace": "",
-          "result": "killed"
-        },
-        {
-          "id": "redact-secret-check-inverted",
-          "kind": "条件を反転する・常に真／偽にする",
-          "file": "lib/pqc_rails/redacted_keypair.rb",
-          "find": "return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
-          "replace": "return \"[FILTERED]\" if PUBLIC_MEMBERS.include?(name)",
-          "result": "killed"
-        },
-        {
-          "id": "redact-to-s-removed",
-          "kind": "フレームワークが呼ぶメソッドを消す",
-          "file": "lib/pqc_rails/redacted_keypair.rb",
-          "find": "    def to_s = inspect\n",
-          "replace": "",
-          "result": "killed"
-        },
-        {
-          "id": "redact-pretty-print-removed",
-          "kind": "フレームワークが呼ぶメソッドを消す",
-          "file": "lib/pqc_rails/redacted_keypair.rb",
-          "find": "    def pretty_print(pp)\n      pp.text(inspect)\n    end\n",
-          "replace": "",
-          "result": "killed"
-        },
-        {
-          "id": "redact-public-key-raw",
-          "kind": "戻り値を空・nil・固定値にする",
-          "file": "lib/pqc_rails/redacted_keypair.rb",
-          "find": "      \"[#{value.bytesize} bytes]\"\n",
-          "replace": "      value.inspect\n",
-          "result": "killed"
-        },
-        {
           "id": "secret-key-reader-filtered",
           "kind": "戻り値を空・nil・固定値にする",
           "file": "lib/pqc_rails/sig.rb",
           "find": "      include RedactedKeypair\n",
           "replace": "      include RedactedKeypair\n\n      def secret_key = \"[FILTERED]\"\n",
-          "result": "killed"
-        },
-        {
-          "id": "secret-shown-as-hex",
-          "kind": "戻り値を空・nil・固定値にする",
-          "file": "lib/pqc_rails/redacted_keypair.rb",
-          "find": "return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
-          "replace": "return \"#{value.unpack1('H*')} [FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
           "result": "killed"
         }
       ]

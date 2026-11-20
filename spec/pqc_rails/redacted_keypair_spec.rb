@@ -3,10 +3,12 @@
 require "pp"
 
 RSpec.describe "鍵ペア(Keypair)の表示" do
-  # 表示の文字列に、秘密の値のバイト列(生のままか、inspectのエスケープした形)が含まれないことを確かめる。
+  # 表示の文字列に、秘密の値が生のバイト列・inspectのエスケープ・16進・Base64のどの形でも含まれないことを確かめる。
   def expect_not_to_reveal(output, secret)
     expect(output.b).not_to include(secret.b)
     expect(output).not_to include(secret.inspect[1..-2])
+    expect(output.downcase).not_to include(secret.unpack1("H*"))
+    expect(output).not_to include([secret].pack("m0"))
   end
 
   def outputs_of(keypair)
@@ -30,15 +32,15 @@ RSpec.describe "鍵ペア(Keypair)の表示" do
 
     it "値の取り出し・to_a・==は変わらない" do
       copy = keypair.class.new(*keypair.to_a.map(&:dup))
+      other = keypair.class.new(*keypair.to_a.map { |value| value&.reverse })
 
       expect(copy).to eq(keypair)
+      expect(other).not_to eq(keypair)
       expect(keypair.to_a).to eq(keypair.members.map { |member| keypair[member] })
       # 読み出しメソッド(keypair.secret_keyなど)が、伏せた文字列ではなく元のバイト列を返す
       keypair.members.each_with_index do |member, index|
         expect(keypair.public_send(member)).to eq(keypair.to_a[index])
       end
-      secret_members.each { |member| expect(keypair.public_send(member)).not_to include("[FILTERED]") }
-      expect(keypair.secret_key.bytesize).to be > 0
     end
   end
 
@@ -52,6 +54,15 @@ RSpec.describe "鍵ペア(Keypair)の表示" do
     let(:keypair) { PqcRails::Kem.open(:ml_kem_768, &:generate_keypair) }
 
     it_behaves_like "秘密鍵を伏せる鍵ペア", %i[secret_key]
+
+    it "公開鍵が文字列でなくても、表示で例外を出さず[FILTERED]にする" do
+      odd = described_class.new(123, keypair.secret_key)
+
+      outputs_of(odd).each_value do |output|
+        expect(output).to include("public_key=[FILTERED]")
+        expect_not_to_reveal(output, keypair.secret_key)
+      end
+    end
   end
 
   describe PqcRails::DhKem::Keypair do
