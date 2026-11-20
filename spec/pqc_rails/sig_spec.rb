@@ -250,6 +250,37 @@ RSpec.describe PqcRails::Sig do
         expect { sig.verify(message, signature, nil) }.to raise_error(ArgumentError, /public_key must be a String/)
       end
     end
+
+    it "文字列でない署名(nil・数値)でverifyするとfalseを返す(例外は発生しない)" do
+      described_class.open(alg_name) do |sig|
+        keypair = sig.generate_keypair
+
+        [nil, 123].each do |bad|
+          expect(sig.verify(message, bad, keypair.public_key)).to be(false)
+        end
+      end
+    end
+
+    it "文字列でないメッセージ(nil・数値)でsignすると、ArgumentErrorを送出する" do
+      described_class.open(alg_name) do |sig|
+        secret_key = sig.generate_keypair.secret_key
+
+        [nil, 123].each do |bad|
+          expect { sig.sign(bad, secret_key) }.to raise_error(ArgumentError, /message must be a String/)
+        end
+      end
+    end
+
+    it "文字列でないメッセージ(nil・数値)でverifyすると、ArgumentErrorを送出する" do
+      described_class.open(alg_name) do |sig|
+        keypair   = sig.generate_keypair
+        signature = sig.sign(message, keypair.secret_key)
+
+        [nil, 123].each do |bad|
+          expect { sig.verify(bad, signature, keypair.public_key) }.to raise_error(ArgumentError, /message must be a String/)
+        end
+      end
+    end
   end
 
   describe "#free" do

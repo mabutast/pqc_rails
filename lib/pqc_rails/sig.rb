@@ -65,8 +65,10 @@ module PqcRails
     # @param message [String] 署名対象のバイト列
     # @param secret_key [String] バイト列
     # @return [String] 署名のバイト列(実際の長さは length_signature 以下のことがある)
+    # @raise [ArgumentError] messageが文字列でない場合
     def sign(message, secret_key)
       ensure_not_freed!
+      validate_string!(message, "message")
       validate_length!(secret_key, length_secret_key, "secret_key")
 
       message_ptr = FFI::MemoryPointer.new(:uint8, message.bytesize)
@@ -96,9 +98,11 @@ module PqcRails
     # @param message [String] 元のメッセージのバイト列
     # @param signature [String] 検証する署名のバイト列
     # @param public_key [String] バイト列
-    # @return [Boolean] 署名が正当であれば true
+    # @return [Boolean] 署名が正当であれば true。文字列でない署名は false
+    # @raise [ArgumentError] messageが文字列でない場合、public_keyが文字列でないか長さが違う場合
     def verify(message, signature, public_key)
       ensure_not_freed!
+      validate_string!(message, "message")
       validate_length!(public_key, length_public_key, "public_key")
 
       # FIPS 204 3.6.2 (Public-Key and Signature Length Checks) は、
@@ -107,6 +111,9 @@ module PqcRails
       # (verifyの契約上、不正な入力は例外ではなく検証失敗として扱う。上のpublic_keyチェックとは
       # 非対称だが、public_keyは通常呼び出し側が管理する信頼済みの値である一方、
       # signatureは検証対象そのもの=攻撃者制御下にありうる値のため、扱いを分けている)。
+      # 文字列でない署名(nil等)も同じ理由で検証失敗として扱う。messageは呼び出し側が作る値なので、
+      # 鍵と同じくArgumentErrorにする。
+      return false unless signature.is_a?(String)
       return false if signature.bytesize > length_signature
 
       message_ptr = FFI::MemoryPointer.new(:uint8, message.bytesize)

@@ -46,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `PqcRails::Sig#verify` returns `false` when the signature is not a String (for example `nil`
+  from a missing request parameter) instead of raising `NoMethodError`. `PqcRails::Sig#sign` and
+  `#verify` raise `ArgumentError` when the message is not a String, as they already do for keys.
 - docs/THREAT_MODEL.md states precisely how `PqcRails::Sig#verify` handles input lengths: a signature
   longer than the maximum returns `false` without calling liboqs, a shorter one is checked by liboqs and
   returns `false`, and a public key of the wrong length raises `ArgumentError`.

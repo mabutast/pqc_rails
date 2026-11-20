@@ -361,6 +361,92 @@
       ]
     },
     {
+      "id": "non-string-signature",
+      "pattern": "署名に nil・数値（文字列でない値）を渡して検証する",
+      "source": "spec",
+      "source_ref": "判断キュー nightly-pqc_rails-2026-11-20-sig-nil-input の回答：文字列でない署名は false（verify の「不正な署名は例外ではなく false」にそろえる）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "文字列でない署名(nil・数値)でverifyするとfalseを返す(例外は発生しない)"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "正しいメッセージ・署名・公開鍵の組み合わせではtrueを返す"
+        }
+      ],
+      "guarantee": "文字列でない署名は NoMethodError ではなく false になり、文字列の正しい署名は true のまま",
+      "mutants": [
+        {
+          "id": "non-string-sig-guard-removed",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "return false unless signature.is_a?(String)",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "non-string-sig-returns-true",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "return false unless signature.is_a?(String)",
+          "replace": "return true unless signature.is_a?(String)",
+          "result": "killed"
+        },
+        {
+          "id": "non-string-sig-inverted",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "return false unless signature.is_a?(String)",
+          "replace": "return false if signature.is_a?(String)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "non-string-message",
+      "pattern": "メッセージに nil・数値（文字列でない値）を渡して署名・検証する",
+      "source": "spec",
+      "source_ref": "判断キュー nightly-pqc_rails-2026-11-20-sig-nil-input の回答：文字列でないメッセージは鍵と同じ ArgumentError",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "文字列でないメッセージ(nil・数値)でsignすると、ArgumentErrorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "文字列でないメッセージ(nil・数値)でverifyすると、ArgumentErrorを送出する"
+        }
+      ],
+      "guarantee": "sign・verify のどちらでも、文字列でないメッセージは NoMethodError ではなく ArgumentError になる",
+      "mutants": [
+        {
+          "id": "sign-message-check-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "validate_string!(message, \"message\")\n      validate_length!(secret_key",
+          "replace": "validate_length!(secret_key",
+          "result": "killed"
+        },
+        {
+          "id": "verify-message-check-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "validate_string!(message, \"message\")\n      validate_length!(public_key",
+          "replace": "validate_length!(public_key",
+          "result": "killed"
+        },
+        {
+          "id": "message-error-class-runtime",
+          "kind": "例外の種類を変える",
+          "file": "lib/pqc_rails/length_validation.rb",
+          "find": "raise ArgumentError, \"#{name} must be a String",
+          "replace": "raise RuntimeError, \"#{name} must be a String",
+          "result": "killed"
+        }
+      ]
+    },
+    {
       "id": "liboqs-failure",
       "pattern": "liboqs が鍵の生成・署名で失敗を返す",
       "source": "code",
