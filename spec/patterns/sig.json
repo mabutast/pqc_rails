@@ -680,7 +680,7 @@
           "name": "値の取り出し・to_a・==は変わらない"
         }
       ],
-      "guarantee": "どの表示にも秘密鍵・公開鍵のバイト列が出ず、[FILTERED] と公開鍵のバイト数が出る。secret_key・to_a・== は Struct のまま",
+      "guarantee": "どの表示にも秘密鍵・公開鍵のバイト列が出ず、秘密のメンバーごとに「名前=[FILTERED]」、公開鍵は「public_key=[バイト数 bytes]」と出る。読み出しメソッド・to_a・== は元のバイト列のまま",
       "mutants": [
         {
           "id": "keypair-include-removed",
@@ -694,7 +694,7 @@
           "id": "redact-secret-check-removed",
           "kind": "確かめる処理を消す",
           "file": "lib/pqc_rails/redacted_keypair.rb",
-          "find": "      return \"[FILTERED]\" if SECRET_MEMBERS.include?(name)\n",
+          "find": "      return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)\n",
           "replace": "",
           "result": "killed"
         },
@@ -702,8 +702,8 @@
           "id": "redact-secret-check-inverted",
           "kind": "条件を反転する・常に真／偽にする",
           "file": "lib/pqc_rails/redacted_keypair.rb",
-          "find": "return \"[FILTERED]\" if SECRET_MEMBERS.include?(name)",
-          "replace": "return \"[FILTERED]\" unless SECRET_MEMBERS.include?(name)",
+          "find": "return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
+          "replace": "return \"[FILTERED]\" if PUBLIC_MEMBERS.include?(name)",
           "result": "killed"
         },
         {
@@ -726,8 +726,24 @@
           "id": "redact-public-key-raw",
           "kind": "戻り値を空・nil・固定値にする",
           "file": "lib/pqc_rails/redacted_keypair.rb",
-          "find": "return \"[#{value.bytesize} bytes]\" if value.is_a?(String)",
-          "replace": "return value.inspect if value.is_a?(String)",
+          "find": "      \"[#{value.bytesize} bytes]\"\n",
+          "replace": "      value.inspect\n",
+          "result": "killed"
+        },
+        {
+          "id": "secret-key-reader-filtered",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "      include RedactedKeypair\n",
+          "replace": "      include RedactedKeypair\n\n      def secret_key = \"[FILTERED]\"\n",
+          "result": "killed"
+        },
+        {
+          "id": "secret-shown-as-hex",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "find": "return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
+          "replace": "return \"#{value.unpack1('H*')} [FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
           "result": "killed"
         }
       ]

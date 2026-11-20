@@ -23,8 +23,8 @@ RSpec.describe "鍵ペア(Keypair)の表示" do
       outputs_of(keypair).each_value do |output|
         secret_members.each { |member| expect_not_to_reveal(output, keypair[member]) }
         expect_not_to_reveal(output, keypair.public_key)
-        expect(output).to include("[FILTERED]")
-        expect(output).to include("#{keypair.public_key.bytesize} bytes")
+        secret_members.each { |member| expect(output).to include("#{member}=[FILTERED]") }
+        expect(output).to include("public_key=[#{keypair.public_key.bytesize} bytes]")
       end
     end
 
@@ -33,7 +33,11 @@ RSpec.describe "鍵ペア(Keypair)の表示" do
 
       expect(copy).to eq(keypair)
       expect(keypair.to_a).to eq(keypair.members.map { |member| keypair[member] })
-      secret_members.each { |member| expect(keypair[member]).to be_a(String) }
+      # 読み出しメソッド(keypair.secret_keyなど)が、伏せた文字列ではなく元のバイト列を返す
+      keypair.members.each_with_index do |member, index|
+        expect(keypair.public_send(member)).to eq(keypair.to_a[index])
+      end
+      secret_members.each { |member| expect(keypair.public_send(member)).not_to include("[FILTERED]") }
       expect(keypair.secret_key.bytesize).to be > 0
     end
   end
