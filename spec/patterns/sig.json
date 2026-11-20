@@ -405,7 +405,7 @@
     },
     {
       "id": "non-string-message",
-      "pattern": "メッセージに nil・数値（文字列でない値）を渡して署名・検証する",
+      "pattern": "メッセージに nil・数値（文字列でない値）を渡して署名・検証する（署名も文字列でない場合を含む）",
       "source": "spec",
       "source_ref": "判断キュー nightly-pqc_rails-2026-11-20-sig-nil-input の回答：文字列でないメッセージは鍵と同じ ArgumentError",
       "tests": [
@@ -418,7 +418,7 @@
           "name": "文字列でないメッセージ(nil・数値)でverifyすると、ArgumentErrorを送出する"
         }
       ],
-      "guarantee": "sign・verify のどちらでも、文字列でないメッセージは NoMethodError ではなく ArgumentError になる",
+      "guarantee": "sign・verify のどちらでも、文字列でないメッセージは NoMethodError ではなく ArgumentError になる。verify では署名が文字列でなくても、false より先に ArgumentError になる",
       "mutants": [
         {
           "id": "sign-message-check-removed",
@@ -442,6 +442,14 @@
           "file": "lib/pqc_rails/length_validation.rb",
           "find": "raise ArgumentError, \"#{name} must be a String",
           "replace": "raise RuntimeError, \"#{name} must be a String",
+          "result": "killed"
+        },
+        {
+          "id": "verify-signature-check-before-message",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "    def verify(message, signature, public_key)\n      ensure_not_freed!\n",
+          "replace": "    def verify(message, signature, public_key)\n      ensure_not_freed!\n      return false unless signature.is_a?(String)\n",
           "result": "killed"
         }
       ]

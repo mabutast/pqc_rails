@@ -278,6 +278,8 @@ RSpec.describe PqcRails::Sig do
 
         [nil, 123].each do |bad|
           expect { sig.verify(bad, signature, keypair.public_key) }.to raise_error(ArgumentError, /message must be a String/)
+          # 署名も文字列でない時も、署名の判定(false)より先にメッセージの誤りを ArgumentError にする
+          expect { sig.verify(bad, bad, keypair.public_key) }.to raise_error(ArgumentError, /message must be a String/)
         end
       end
     end
