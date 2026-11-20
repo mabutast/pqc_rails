@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `PqcRails::Sig#verify` returns `false` when the signature is not a String (for example `nil`
+  from a missing request parameter) instead of raising `NoMethodError`. `PqcRails::Sig#sign` and
+  `#verify` raise `ArgumentError` instead of `NoMethodError` when the message is not a String, as
+  they already do for keys.
 - docs/THREAT_MODEL.md states precisely how `PqcRails::Sig#verify` handles input lengths: a signature
   longer than the maximum returns `false` without calling liboqs, a shorter one is checked by liboqs and
   returns `false`, and a public key of the wrong length raises `ArgumentError`.
@@ -98,6 +102,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Key pairs (`PqcRails::Sig::Keypair`, `Kem::Keypair`, `DhKem::Keypair` and
+  `HybridKem::Keypair`) no longer show secret key bytes in `inspect`, `to_s`, `pp` (used by IRB
+  and the Rails console) or string interpolation. Secret keys and the authentication key appear as
+  `[FILTERED]` and public keys as their length in bytes. `keypair.secret_key`, `to_a` and `==` are
+  unchanged.
 - Ciphertexts in the new format authenticate their creator. In 0.3.0 and earlier, the KEM shared
   secret was used directly as the AES-256-GCM key, so anyone who knew the public key could create
   ciphertexts that decrypt successfully: forged session cookies (for example with an arbitrary

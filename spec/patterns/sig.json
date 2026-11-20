@@ -1,5 +1,5 @@
 {
-  "test_command": "bundle exec rspec spec/pqc_rails/sig_spec.rb spec/pqc_rails/secret_buffer_spec.rb",
+  "test_command": "bundle exec rspec spec/pqc_rails/sig_spec.rb spec/pqc_rails/secret_buffer_spec.rb spec/pqc_rails/redacted_keypair_spec.rb",
   "rows": [
     {
       "id": "round-trip",
@@ -361,6 +361,100 @@
       ]
     },
     {
+      "id": "non-string-signature",
+      "pattern": "署名に nil・数値（文字列でない値）を渡して検証する",
+      "source": "spec",
+      "source_ref": "判断キュー nightly-pqc_rails-2026-11-20-sig-nil-input の回答：文字列でない署名は false（verify の「不正な署名は例外ではなく false」にそろえる）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "文字列でない署名(nil・数値)でverifyするとfalseを返す(例外は発生しない)"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "正しいメッセージ・署名・公開鍵の組み合わせではtrueを返す"
+        }
+      ],
+      "guarantee": "文字列でない署名は NoMethodError ではなく false になり、文字列の正しい署名は true のまま",
+      "mutants": [
+        {
+          "id": "non-string-sig-guard-removed",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "return false unless signature.is_a?(String)",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "non-string-sig-returns-true",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "return false unless signature.is_a?(String)",
+          "replace": "return true unless signature.is_a?(String)",
+          "result": "killed"
+        },
+        {
+          "id": "non-string-sig-inverted",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "return false unless signature.is_a?(String)",
+          "replace": "return false if signature.is_a?(String)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "non-string-message",
+      "pattern": "メッセージに nil・数値（文字列でない値）を渡して署名・検証する（署名も文字列でない場合を含む）",
+      "source": "spec",
+      "source_ref": "判断キュー nightly-pqc_rails-2026-11-20-sig-nil-input の回答：文字列でないメッセージは鍵と同じ ArgumentError",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "文字列でないメッセージ(nil・数値)でsignすると、ArgumentErrorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/sig_spec.rb",
+          "name": "文字列でないメッセージ(nil・数値)でverifyすると、ArgumentErrorを送出する"
+        }
+      ],
+      "guarantee": "sign・verify のどちらでも、文字列でないメッセージは NoMethodError ではなく ArgumentError になる。verify では署名が文字列でなくても、false より先に ArgumentError になる",
+      "mutants": [
+        {
+          "id": "sign-message-check-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "validate_string!(message, \"message\")\n      validate_length!(secret_key",
+          "replace": "validate_length!(secret_key",
+          "result": "killed"
+        },
+        {
+          "id": "verify-message-check-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "validate_string!(message, \"message\")\n      validate_length!(public_key",
+          "replace": "validate_length!(public_key",
+          "result": "killed"
+        },
+        {
+          "id": "message-error-class-runtime",
+          "kind": "例外の種類を変える",
+          "file": "lib/pqc_rails/length_validation.rb",
+          "find": "raise ArgumentError, \"#{name} must be a String",
+          "replace": "raise RuntimeError, \"#{name} must be a String",
+          "result": "killed"
+        },
+        {
+          "id": "verify-signature-check-before-message",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "    def verify(message, signature, public_key)\n      ensure_not_freed!\n",
+          "replace": "    def verify(message, signature, public_key)\n      ensure_not_freed!\n      return false unless signature.is_a?(String)\n",
+          "result": "killed"
+        }
+      ]
+    },
+    {
       "id": "liboqs-failure",
       "pattern": "liboqs が鍵の生成・署名で失敗を返す",
       "source": "code",
@@ -567,6 +661,89 @@
           "file": "lib/pqc_rails/sig.rb",
           "find": "raise PqcRails::Error,\n              \"OQS_SIG_new failed",
           "replace": "raise RuntimeError,\n              \"OQS_SIG_new failed",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "keypair-redacted",
+      "pattern": "Sig::Keypair を inspect・to_s・pp・文字列への埋め込みで表示する",
+      "source": "spec",
+      "source_ref": "判断キュー nightly-pqc_rails-2026-11-20-keypair-inspect の回答（秘密鍵を [FILTERED] で伏せ、公開鍵は長さだけ。値の取り出しは変えない）と .claude/CLAUDE.md「コードレビューの追加観点」（鍵を inspect に出さない）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/redacted_keypair_spec.rb",
+          "name": "inspect・to_s・pretty_inspectに秘密の値が含まれず、[FILTERED]と公開鍵の長さが出る"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_keypair_spec.rb",
+          "name": "値の取り出し・to_a・==は変わらない"
+        }
+      ],
+      "guarantee": "どの表示にも秘密鍵・公開鍵のバイト列が出ず、秘密のメンバーごとに「名前=[FILTERED]」、公開鍵は「public_key=[バイト数 bytes]」と出る。読み出しメソッド・to_a・== は元のバイト列のまま",
+      "mutants": [
+        {
+          "id": "keypair-include-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "      include RedactedKeypair\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "redact-secret-check-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "find": "      return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "redact-secret-check-inverted",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "find": "return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
+          "replace": "return \"[FILTERED]\" if PUBLIC_MEMBERS.include?(name)",
+          "result": "killed"
+        },
+        {
+          "id": "redact-to-s-removed",
+          "kind": "フレームワークが呼ぶメソッドを消す",
+          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "find": "    def to_s = inspect\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "redact-pretty-print-removed",
+          "kind": "フレームワークが呼ぶメソッドを消す",
+          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "find": "    def pretty_print(pp)\n      pp.text(inspect)\n    end\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "redact-public-key-raw",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "find": "      \"[#{value.bytesize} bytes]\"\n",
+          "replace": "      value.inspect\n",
+          "result": "killed"
+        },
+        {
+          "id": "secret-key-reader-filtered",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/sig.rb",
+          "find": "      include RedactedKeypair\n",
+          "replace": "      include RedactedKeypair\n\n      def secret_key = \"[FILTERED]\"\n",
+          "result": "killed"
+        },
+        {
+          "id": "secret-shown-as-hex",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "find": "return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
+          "replace": "return \"#{value.unpack1('H*')} [FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
           "result": "killed"
         }
       ]

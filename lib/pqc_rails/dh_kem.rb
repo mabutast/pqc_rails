@@ -2,6 +2,7 @@
 
 require "openssl"
 require_relative "length_validation"
+require_relative "redacted_keypair"
 
 module PqcRails
   # 古典的なECDH(X25519)を「KEM」のAPI形状(generate_keypair/encapsulate/decapsulate)で
@@ -23,7 +24,9 @@ module PqcRails
   class DhKem
     include LengthValidation
 
-    Keypair = Struct.new(:public_key, :secret_key)
+    Keypair = Struct.new(:public_key, :secret_key) do
+      include RedactedKeypair
+    end
     Encapsulation = Struct.new(:ciphertext, :shared_secret)
 
     KEY_LENGTH = 32

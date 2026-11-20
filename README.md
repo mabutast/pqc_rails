@@ -384,7 +384,8 @@ pqc_rails は現在 `0.y.z` 版で開発中です。将来 `1.0` を名乗る時
 - 未知のアルゴリズム名や、liboqs が有効化していないアルゴリズムを指定すると `PqcRails::Error` が発生します。
 - `encapsulate` / `decapsulate` / `sign` に渡すバイト列の長さが不正な場合は `ArgumentError` が発生します。
 - `free` 済みのインスタンスに対する操作は `PqcRails::Error` が発生します。
-- `PqcRails::Sig#verify` は、署名が無効な場合でも例外を発生させず `false` を返します（KEM とは異なる設計です）。
+- `PqcRails::Sig#verify` は、署名が無効な場合でも例外を発生させず `false` を返します（KEM とは異なる設計です）。署名が文字列でない値（`nil` など）の場合も `false` を返します。
+- `PqcRails::Sig#sign` / `#verify` に渡すメッセージが文字列でない場合は `ArgumentError` が発生します。
 - `ActiveRecord::Encryption` で復号に失敗した場合は `ActiveRecord::Encryption::Errors::Decryption` が発生します。
 - セッション Cookie が不正・改竄されている場合は空のセッションとして扱います（クラッシュしません）。
 - 環境変数にも Rails credentials にも鍵が設定されていない場合、`PqcRails::MissingKeyError`（`PqcRails::Error` のサブクラス）が発生します。`rails generate pqc_rails:install` を実行済みか確認してください。
