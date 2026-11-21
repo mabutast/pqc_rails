@@ -62,6 +62,14 @@ RSpec.describe PqcRails::KeySource::EnvCredentials do
       expect(wiped).to include([previous_keypair.secret_key, previous_keypair.authentication_key])
     end
 
+    it "途中の世代の値がシードだけの秘密鍵らしい場合、何世代目かを示すSeedOnlyKeyErrorを送出する" do
+      seed = Base64.strict_encode64("\x01".b + SecureRandom.random_bytes(63))
+      ENV["PQC_TEST_PREVIOUS_KEYS"] = [PqcRails::KeySource.encode(previous_keypair), seed].join(",")
+
+      expect { source.previous_keypairs }
+        .to raise_error(PqcRails::KeySource::SeedOnlyKeyError, /previous key #2: .*seed-only/)
+    end
+
     it "未設定の場合は空配列を返す(ローテーション対象外の既定状態)" do
       ENV.delete("PQC_TEST_PREVIOUS_KEYS")
       allow(Rails).to receive(:application).and_return(nil)

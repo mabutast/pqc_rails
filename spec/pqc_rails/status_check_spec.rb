@@ -79,6 +79,38 @@ RSpec.describe PqcRails::StatusCheck do
       expect(result_for(results, "liboqs")).not_to be_nil
     end
 
+    it "セッション鍵の値がシードだけの秘密鍵(64バイト)の場合、pqc_railsの鍵を設定するよう報告する" do
+      ENV["PQC_SESSION_KEY"] = Base64.strict_encode64("\x01".b + SecureRandom.random_bytes(63))
+
+      session_key = result_for(described_class.run, "セッション鍵 (PQC_SESSION_KEY)")
+      expect(session_key.ok).to be false
+      expect(session_key.detail).to include("シードだけの秘密鍵")
+      expect(session_key.detail).to include("rails generate pqc_rails:install")
+      expect(session_key.detail).not_to include("途中で切れて")
+    end
+
+    it "旧鍵の値がシードだけの秘密鍵(32バイト)の場合、何世代目かを報告する" do
+      good = PqcRails::KeySource.encode(keypair)
+      seed = Base64.strict_encode64("\x01".b + SecureRandom.random_bytes(31))
+      ENV["PQC_SESSION_PREVIOUS_KEYS"] = [good, seed].join(",")
+
+      previous = result_for(described_class.run, "セッション旧鍵 (PQC_SESSION_PREVIOUS_KEYS)")
+      expect(previous.ok).to be false
+      expect(previous.detail).to include("2世代目")
+      expect(previous.detail).to include("シードだけの秘密鍵")
+    end
+
+    it "旧鍵に途中で切れた値とシードだけの値が両方ある場合、途中で切れた方を報告する" do
+      good = PqcRails::KeySource.encode(keypair)
+      seed = Base64.strict_encode64("\x01".b + SecureRandom.random_bytes(31))
+      cut = Base64.strict_encode64(Base64.strict_decode64(good)[0..-4])
+      ENV["PQC_SESSION_PREVIOUS_KEYS"] = [seed, cut].join(",")
+
+      previous = result_for(described_class.run, "セッション旧鍵 (PQC_SESSION_PREVIOUS_KEYS)")
+      expect(previous.ok).to be false
+      expect(previous.detail).to include("2世代目の旧鍵の値が途中で切れています")
+    end
+
     it "旧鍵の値が途中で切れている場合、何世代目かを報告する" do
       good = PqcRails::KeySource.encode(keypair)
       cut = Base64.strict_encode64(Base64.strict_decode64(good)[0..-4])

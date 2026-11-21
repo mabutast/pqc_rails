@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A key value of 32 or 64 bytes whose first byte is not zero, such as most ML-KEM or ML-DSA seeds
+  (a pqc_rails key value always starts with a zero byte), now fails with a message saying it looks like a seed-only secret key and pointing to
+  `rails generate pqc_rails:install`, instead of saying the key is truncated. `rails pqc_rails:status`
+  reports the same. The error is still a `PqcRails::Error`, and which values are accepted is unchanged.
 - `PqcRails::Sig#verify` returns `false` when the signature is not a String (for example `nil`
   from a missing request parameter) instead of raising `NoMethodError`. `PqcRails::Sig#sign` and
   `#verify` raise `ArgumentError` instead of `NoMethodError` when the message is not a String, as
@@ -102,6 +106,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- When a key value cannot be read, the raised `PqcRails::Error` no longer carries the internal
+  unpacking error as its `cause`. That error's message held the first four bytes of the key value,
+  so error reports that include the cause could show part of a secret key or seed.
 - Key pairs (`PqcRails::Sig::Keypair`, `Kem::Keypair`, `DhKem::Keypair` and
   `HybridKem::Keypair`) no longer show secret key bytes in `inspect`, `to_s`, `pp` (used by IRB
   and the Rails console) or string interpolation. Secret keys and the authentication key appear as

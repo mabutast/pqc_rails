@@ -40,6 +40,30 @@ RSpec.describe PqcRails::KeySource do
       end
     end
 
+    it "シードだけの秘密鍵の長さ(32・64バイト)で先頭のバイトが0でない値は、シードだけの秘密鍵らしいと伝えるPqcRails::Errorを送出する" do
+      [["\x01".b, 32], ["\xFF".b, 64], ["\x80".b, 32]].each do |first, length|
+        seed = first + SecureRandom.random_bytes(length - 1)
+
+        expect { described_class.decode(Base64.strict_encode64(seed)) }
+          .to raise_error(PqcRails::KeySource::SeedOnlyKeyError, /seed-only secret key \(#{length} bytes\)/) { |e|
+            expect(e).to be_a(PqcRails::Error)
+            expect(e.cause).to be_nil
+            expect(e.message).not_to include("truncated")
+            expect(e.message).to include("rails generate pqc_rails:install")
+          }
+      end
+    end
+
+    it "鍵の値の頭の32・64バイト(先頭のバイトが0)と、シードの長さでない値は、途中で切れた鍵として扱う" do
+      raw = Base64.strict_decode64(described_class.encode(keypair))
+      expect(raw.getbyte(0)).to eq(0)
+
+      [raw[0, 32], raw[0, 64], "\x01".b * 31, "\x01".b * 33, "\x01".b * 63, "\x01".b * 65].each do |value|
+        expect { described_class.decode(Base64.strict_encode64(value)) }
+          .to raise_error(PqcRails::Error, /truncated/) { |e| expect(e.cause).to be_nil }
+      end
+    end
+
     it "33バイトの認証鍵はPqcRails::Errorを送出する" do
       long = PqcRails::BlobPacking.pack_all(keypair.public_key, keypair.secret_key, "\x01".b * 33)
 
