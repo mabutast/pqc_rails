@@ -41,8 +41,8 @@ RSpec.describe PqcRails::KeySource do
     end
 
     it "シードだけの秘密鍵の長さ(32・64バイト)で先頭のバイトが0でない値は、シードだけの秘密鍵らしいと伝えるPqcRails::Errorを送出する" do
-      [32, 64].each do |length|
-        seed = "\x01".b + SecureRandom.random_bytes(length - 1)
+      [["\x01".b, 32], ["\xFF".b, 64], ["\x80".b, 32]].each do |first, length|
+        seed = first + SecureRandom.random_bytes(length - 1)
 
         expect { described_class.decode(Base64.strict_encode64(seed)) }
           .to raise_error(PqcRails::KeySource::SeedOnlyKeyError, /seed-only secret key \(#{length} bytes\)/) { |e|

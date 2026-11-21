@@ -130,13 +130,13 @@ module PqcRails
 
       private
 
-      # 途中の世代が読めない時は、それまでに復元した世代の鍵をゼロで埋めてから、何世代目かを示して送出する。
+      # 途中の世代が読めない時は、それまでに復元した世代の鍵をゼロで埋めてから、何世代目かを示して同じ型の例外を送出する。
       def decode_generations(entries)
         entries.each_with_index.with_object([]) do |(encoded, index), keypairs|
           keypairs << KeySource.decode(encoded.strip)
         rescue PqcRails::Error => e
           keypairs.each { |keypair| SecretBuffer.wipe(keypair.secret_key, keypair.authentication_key) }
-          raise PqcRails::Error, "PQC #{@label} previous key ##{index + 1}: #{e.message}"
+          raise e.class, "PQC #{@label} previous key ##{index + 1}: #{e.message}"
         end
       end
     end
