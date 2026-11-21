@@ -96,7 +96,7 @@ end
 
 ### セッション（PqcCookieStore）
 
-`PqcCookieStore` は書き込み（`set_cookie`）には常に現行鍵のみを使い、読み込み（`get_cookie`）は現行鍵で復号できなかった場合に旧鍵世代を順に試します。手順は DB 側と同様に `PQC_SESSION_KEY` / `PQC_SESSION_PREVIOUS_KEYS`（または `pqc_session_key` / `pqc_session_previous_keys` credentials）を使います。
+`PqcCookieStore` は書き込み（`set_cookie`）には常に現行鍵のみを使い、読み込み（`get_cookie`）は現行鍵で復号できなかった場合に旧鍵世代を順に試します。各鍵では、Cookie の鍵IDが一致する時だけ復号を行い、一致しない鍵は使わずに次の鍵へ進みます（DB 側の「鍵IDが一致する鍵だけを試す」と同じ判定）。手順は DB 側と同様に `PQC_SESSION_KEY` / `PQC_SESSION_PREVIOUS_KEYS`（または `pqc_session_key` / `pqc_session_previous_keys` credentials）を使います。
 
 セッションは DB のレコードと異なり、Cookie の有効期限（`expire_after` 等）が過ぎれば自然に失効します。そのため `PQC_SESSION_PREVIOUS_KEYS` は「ローテーション後、旧鍵で発行されたセッションが有効期限切れになるまで」の一時的な設定として運用し、その期間を過ぎたら削除してください（DB側のような一括再暗号化の手順は不要です）。
 
