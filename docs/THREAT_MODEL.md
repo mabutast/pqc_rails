@@ -122,7 +122,7 @@ ML-KEM(FIPS 203)・ML-DSA(FIPS 204)はいずれも格子問題(Module-LWE/Module
 | 空セッション | 約1,770 bytes | 約1,300 bytes | 約170 bytes |
 | `user_id` + CSRFトークン程度 | 約1,850 bytes | 約1,400 bytes | 約260 bytes |
 
-固定オーバーヘッドの大半はML-KEM-768のciphertext(1,088byte)がBase64エンコードされた分です。単一Cookieの上限(多くのブラウザで4,096byte)には収まりますが、他のCookie(analytics・A/Bテスト用等)と合算されるリクエストヘッダ全体の上限(多くのサーバ/プロキシで8KB前後)には効いてくる可能性があります。よりサイズを抑えたい場合は`pq_alg_name: :ml_kem_512`を指定してください(NISTセキュリティレベルは768の「レベル3」から512の「レベル1」に下がります)。ActiveRecord::Encryption側(DBカラム)についても同様の増加が生じますが、こちらは未計測です。
+固定オーバーヘッドの大半はML-KEM-768のciphertext(1,088byte)がBase64エンコードされた分です。単一Cookieの上限(多くのブラウザで4,096byte)には収まりますが、他のCookie(analytics・A/Bテスト用等)と合算されるリクエストヘッダ全体の上限(多くのサーバ/プロキシで8KB前後)には効いてくる可能性があります。よりサイズを抑えたい場合は`pq_alg_name: :ml_kem_512`を指定してください(NISTセキュリティレベルは768の「レベル3」から512の「レベル1」に下がります)。ActiveRecord::Encryption側(DBカラム)は、Rails標準の暗号文と比べて約1,550 bytes増えます（ML-KEM-768、短い値での開発機の計測）。
 
 ### 対応していない範囲(スコープ外)
 
