@@ -150,12 +150,12 @@ Rails の `cookie_store` を ML-KEM ベースの PQC ストアで完全に置き
 
 #### Cookie サイズについて
 
-`HybridKem` の ciphertext を含むため、Cookie は Rails 標準（AES-256-GCM）より大きくなります。実測値（開発機、単純なセッション内容での計測）は次の通りです。
+`HybridKem` の ciphertext を含むため、Cookie は Rails 標準（AES-256-GCM）より大きくなります。実測値は次の通りです（開発機、ML-KEM-768。Cookie の値を URL エスケープした長さ。Rails 標準は ActiveSupport::MessageEncryptor で同じ内容を AES-256-GCM で暗号化した値）。
 
 | 内容                          | pqc_rails（ML-KEM-768、デフォルト） | Rails 標準 |
 | ----------------------------- | ------------------------------------ | ---------- |
-| 空セッション                   | 約1,770 bytes                        | 約170 bytes |
-| `user_id` + CSRF トークン程度 | 約1,850 bytes                        | 約260 bytes |
+| 空セッション                   | 約1,700 bytes                        | 約130 bytes |
+| `user_id` + CSRF トークン程度 | 約1,800 bytes                        | 約230 bytes |
 
 単一 Cookie の上限（多くのブラウザで4,096 bytes）には収まりますが、他の Cookie（analytics・A/B テスト用等）と合算されるリクエストヘッダ全体の上限（多くのサーバ/プロキシで8KB前後）には注意してください。
 
