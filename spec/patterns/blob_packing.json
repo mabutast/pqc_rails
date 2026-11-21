@@ -1,0 +1,224 @@
+{
+  "test_command": "bundle exec rspec spec/pqc_rails/blob_packing_spec.rb",
+  "rows": [
+    {
+      "id": "round-trip",
+      "pattern": "2つのバイト列を pack して unpack すると元に戻る",
+      "source": "code",
+      "source_ref": "BlobPacking.pack と unpack",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/blob_packing_spec.rb",
+          "name": "2つのバイト列を1本のバイト列にまとめ、元に戻せる"
+        }
+      ],
+      "guarantee": "2つのバイト列を pack して unpack すると、同じ2つの値が返る",
+      "mutants": [
+        {
+          "id": "length-prefix-endianness",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/blob_packing.rb",
+          "find": "[first.bytesize].pack(\"N\") + first",
+          "replace": "[first.bytesize].pack(\"V\") + first",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "pack-form",
+      "pattern": "2つのバイト列の形は、既存の鍵の形式（[4byte長][本体]を2回）と同じ",
+      "source": "code",
+      "source_ref": "BlobPacking.pack の形式（0.3.0 以前の鍵を読めるようにするため）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/blob_packing_spec.rb",
+          "name": "2つのバイト列はpackと同じ形になる(既存の鍵を読める)"
+        }
+      ],
+      "guarantee": "pack の出力は、長さ（ビッグエンディアンの4バイト）＋本体を2回並べた形になる",
+      "mutants": [
+        {
+          "id": "pack-as-pack-all-reversed",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/blob_packing.rb",
+          "find": "[first.bytesize].pack(\"N\") + first + [second.bytesize].pack(\"N\") + second",
+          "replace": "[second.bytesize].pack(\"N\") + second + [first.bytesize].pack(\"N\") + first",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "third-element-ignored",
+      "pattern": "3つ目以降がある値（既定の unpack）",
+      "source": "code",
+      "source_ref": "BlobPacking.unpack の exact: false の既定",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/blob_packing_spec.rb",
+          "name": "3つ目以降があっても、unpackは先頭2つだけを返す(0.3.0以前の読み方と同じ)"
+        }
+      ],
+      "guarantee": "exact: false では、3つ目以降を読まず先頭2つだけを返す",
+      "mutants": [
+        {
+          "id": "exact-flag-ignored",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/blob_packing.rb",
+          "find": "if exact && packed_length < blob.bytesize",
+          "replace": "if packed_length < blob.bytesize",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "unpack-truncated-second",
+      "pattern": "2つ目の本体が途中で切れている（unpack）",
+      "source": "code",
+      "source_ref": "BlobPacking.unpack の長さの確認",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/blob_packing_spec.rb",
+          "name": "長さの欄より本体が短い(末尾が切れている)とArgumentErrorを送出する"
+        }
+      ],
+      "guarantee": "本体が切れていれば ArgumentError にし、短い値を返さない",
+      "mutants": [
+        {
+          "id": "truncation-check-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/blob_packing.rb",
+          "find": "raise ArgumentError, \"packed blob is truncated: expected #{second_length} bytes\" if packed_length > blob.bytesize",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "truncation-check-off-by-one",
+          "kind": "定数・長さ・回数を±1する",
+          "file": "lib/pqc_rails/blob_packing.rb",
+          "find": "if packed_length > blob.bytesize",
+          "replace": "if packed_length > blob.bytesize + 1",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "unpack-exact-trailing",
+      "pattern": "exact: true で、末尾に余分なバイトがある",
+      "source": "code",
+      "source_ref": "BlobPacking.unpack の exact の確認",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/blob_packing_spec.rb",
+          "name": "exact: trueのとき、2つ目より後ろに余分なバイトがあるとArgumentErrorを送出する"
+        }
+      ],
+      "guarantee": "exact: true では、末尾の余分なバイトを ArgumentError にする",
+      "mutants": [
+        {
+          "id": "exact-check-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/blob_packing.rb",
+          "find": "raise ArgumentError, \"packed blob has #{blob.bytesize - packed_length} trailing bytes\"",
+          "replace": "nil",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "unpack-all-truncated",
+      "pattern": "unpack_all で、本体が長さの欄より短い、または末尾に余りがある",
+      "source": "code",
+      "source_ref": "BlobPacking.unpack_all の長さの確認",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/blob_packing_spec.rb",
+          "name": "本体が長さの欄より短い・長さの欄の途中で切れているとArgumentErrorを送出する"
+        }
+      ],
+      "guarantee": "途中で切れた値は ArgumentError にし、要素の少ない値として読まない",
+      "mutants": [
+        {
+          "id": "unpack-all-check-off-by-one",
+          "kind": "定数・長さ・回数を±1する",
+          "file": "lib/pqc_rails/blob_packing.rb",
+          "find": "raise ArgumentError, \"packed blob is truncated: expected #{length} bytes\" if offset + 4 + length > blob.bytesize",
+          "replace": "raise ArgumentError, \"packed blob is truncated: expected #{length} bytes\" if offset + 4 + length > blob.bytesize + 1",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "empty-input-zero-elements",
+      "pattern": "空のバイト列（unpack_all）",
+      "source": "code",
+      "source_ref": "BlobPacking.unpack_all のループの条件",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/blob_packing_spec.rb",
+          "name": "空のバイト列は要素0個として読む"
+        }
+      ],
+      "guarantee": "空のバイト列は要素0個の配列になり、例外にならない",
+      "mutants": [
+        {
+          "id": "loop-entered-on-empty",
+          "kind": "境界をずらす",
+          "file": "lib/pqc_rails/blob_packing.rb",
+          "find": "while offset < blob.bytesize",
+          "replace": "while offset <= blob.bytesize",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "nil-input",
+      "pattern": "nil を渡す（unpack・unpack_all）",
+      "source": "code",
+      "source_ref": "BlobPacking.unpack の String の確認",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/blob_packing_spec.rb",
+          "name": "nilはArgumentErrorを送出する"
+        }
+      ],
+      "guarantee": "nil は ArgumentError にする（FFI へ渡す前に止める）",
+      "mutants": [
+        {
+          "id": "string-guard-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/blob_packing.rb",
+          "find": "raise ArgumentError, \"packed blob must be a String, got #{blob.class}\" unless blob.is_a?(String)\n\n      first_length",
+          "replace": "first_length",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "unpacked-values-not-shared",
+      "pattern": "取り出した値は元のバイト列と領域を共有しない（ゼロ埋めを効かせるため）",
+      "source": "code",
+      "source_ref": "BlobPacking.copy（ファイル冒頭のコメント：取り出した値は独立したコピー）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/blob_packing_spec.rb",
+          "name": "unpackの値は、元のバイト列と領域を共有しない"
+        },
+        {
+          "file": "spec/pqc_rails/blob_packing_spec.rb",
+          "name": "unpack_allの値は、元のバイト列と領域を共有しない"
+        }
+      ],
+      "guarantee": "取り出した値を後でゼロ埋めしても、元のバイト列の領域は消えない（独立したコピーになる）",
+      "mutants": [
+        {
+          "id": "copy-shares-region",
+          "kind": "元の領域を返す（コピーを作らない）",
+          "file": "lib/pqc_rails/blob_packing.rb",
+          "find": "blob.unpack1(\"@#{offset}a#{length}\").force_encoding(blob.encoding)",
+          "replace": "blob.byteslice(offset, length)",
+          "result": "killed"
+        }
+      ]
+    }
+  ]
+}
