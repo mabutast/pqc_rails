@@ -84,7 +84,7 @@ RSpec.describe PqcRails::Cipher do
 
       expect do
         cipher.decrypt(malformed_message, key: keypair)
-      end.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
+      end.to raise_error(ActiveRecord::Encryption::Errors::Decryption, /kem_ct header/)
     end
   end
 
@@ -227,19 +227,52 @@ RSpec.describe PqcRails::Cipher do
     it "鍵IDが一致しない鍵では復号を試みない" do
       other_keypair = PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair }
       message = cipher.encrypt("hello pqc", key: keypair)
-      allow(PqcRails::HybridKem).to receive(:open).and_call_original
+      # 鍵IDが違う鍵では、KEMの復号（decapsulate）を1回しか呼ばない。違う鍵でも例外にならず別の値を返すため、
+      # HybridKem.openの回数では確かめられない。
+      expect_any_instance_of(PqcRails::HybridKem).to receive(:decapsulate).once.and_call_original
 
       expect(cipher.decrypt(message, key: [other_keypair, keypair])).to eq("hello pqc")
-      expect(PqcRails::HybridKem).to have_received(:open).once
+    end
+
+    it "読めない鍵（秘密鍵が途中で切れた鍵）が先にあっても、同じ鍵IDの次の鍵で復号する" do
+      message = cipher.encrypt("hello pqc", key: keypair)
+      truncated = PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key.byteslice(0...-1),
+                                                   keypair.authentication_key)
+
+      expect(cipher.decrypt(message, key: [truncated, keypair])).to eq("hello pqc")
+    end
+
+    it "pqc_railsの鍵ペアでない値（公開鍵だけを持つもの）は、鍵の候補にしない" do
+      message = cipher.encrypt("hello pqc", key: keypair)
+      public_only = Struct.new(:public_key).new(keypair.public_key)
+
+      expect(cipher.decrypt(message, key: [public_only, keypair])).to eq("hello pqc")
+    end
+
+    it "保存して読み戻した暗号文のヘッダーが文字列キーでも、同じように読む" do
+      message = cipher.encrypt("hello pqc", key: keypair)
+      message.headers.instance_variable_get(:@data).transform_keys!(&:to_s)
+
+      expect(cipher.decrypt(message, key: keypair)).to eq("hello pqc")
+    end
+
+    it "知らない形式バージョンの暗号文は、NoMethodErrorではなく形式バージョンを示すPqcRails::Errorにする" do
+      message = cipher.encrypt("hello pqc", key: keypair)
+      message.headers.instance_variable_get(:@data)[:pv] = 2
+
+      expect do
+        cipher.decrypt(message, key: keypair)
+      end.to raise_error(ActiveRecord::Encryption::Errors::Decryption, /unsupported ciphertext format version: 2/)
     end
 
     it "レジストリ未登録で設定とも異なるアルゴリズムIDは拒否する" do
       message = cipher.encrypt("hello pqc", key: keypair)
       message.headers.instance_variable_get(:@data)[:alg] = "X25519+HQC-1"
 
+      # 鍵が合わないことで失敗させず、アルゴリズムIDの拒否で止まることを確かめる（liboqsにHQCがあっても登録が無ければ拒否する）。
       expect do
         cipher.decrypt(message, key: keypair)
-      end.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
+      end.to raise_error(ActiveRecord::Encryption::Errors::Decryption, /unsupported algorithm id/)
     end
 
     context "ciphertext_format = :v0 のとき" do

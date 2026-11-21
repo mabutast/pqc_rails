@@ -67,7 +67,7 @@ module PqcRails
     rescue PqcRails::Error, ArgumentError, TypeError => e
       # pqc_railsの暗号文でない値(previous:のRails標準の暗号文)や、pqc_railsの鍵を含まない呼び出し
       # (previousスキームの導出鍵だけ)の失敗は、ActiveRecordが復号方式を順に試す過程の正常な失敗なので通知しない。
-      if keypairs&.any? && header(encrypted_message, :kem_ct)
+      if keypairs.any? && header(encrypted_message, :kem_ct)
         PqcRails.instrument_decryption_failure(target: :record, error: e)
       end
       raise ::ActiveRecord::Encryption::Errors::Decryption, e.message
@@ -146,7 +146,7 @@ module PqcRails
       candidate.respond_to?(:public_key) && candidate.respond_to?(:secret_key)
     end
 
-    # MessageSerializerで読み戻したMessageのheadersは、キーが文字列になる。
+    # headersのキーは、シンボルと文字列の両方を読む（キーの型が違う版のActiveRecordで読み戻した暗号文に備える）。
     def header(encrypted_message, name)
       encrypted_message.headers[name] || encrypted_message.headers[name.to_s]
     end
