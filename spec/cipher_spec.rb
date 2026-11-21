@@ -321,6 +321,10 @@ RSpec.describe PqcRails::Cipher do
     it "新しく暗号化するときに暗号文へ書くアルゴリズムIDを返す" do
       expect(described_class.new(pq_alg_name: "ML-KEM-768").algorithm_id).to eq("X25519+ML-KEM-768")
     end
+
+    it "pq_alg_name を省略すると ML-KEM-768 を使う（README と MIGRATION の既定）" do
+      expect(described_class.new.algorithm_id).to eq("X25519+ML-KEM-768")
+    end
   end
 
   describe "#key_length / #iv_length" do
