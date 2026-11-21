@@ -592,6 +592,29 @@
           "result": "killed"
         }
       ]
+    },
+    {
+      "id": "spec-default-algorithm",
+      "pattern": "pq_alg_name を省略すると ML-KEM-768 を使う",
+      "source": "spec",
+      "source_ref": "docs/MIGRATION.md・README（既定は ML-KEM-768）",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "pq_alg_name を省略すると ML-KEM-768 を使う（README と MIGRATION の既定）"
+        }
+      ],
+      "guarantee": "pq_alg_name を省略した Cipher は、暗号化に X25519+ML-KEM-768 を書く",
+      "mutants": [
+        {
+          "id": "default-algorithm-512",
+          "kind": "定数・長さ・回数を±1する",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "DEFAULT_PQ_ALG_NAME = :ml_kem_768",
+          "replace": "DEFAULT_PQ_ALG_NAME = :ml_kem_512",
+          "result": "killed"
+        }
+      ]
     }
   ]
 }
