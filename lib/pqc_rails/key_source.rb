@@ -73,10 +73,12 @@ module PqcRails
       SecretBuffer.wipe(raw)
     end
 
+    # BlobPackingのArgumentErrorは、値の先頭を長さの欄として読んだ数をメッセージに含む。値が秘密鍵の場合に
+    # 例外の原因(cause)からその数が報告に出ないよう、原因を付けずに送出する。
     def unpack_key(raw)
       BlobPacking.unpack_all(raw)
     rescue ArgumentError
-      raise invalid_key_error(raw)
+      raise invalid_key_error(raw), cause: nil
     end
 
     def invalid_key_error(raw)

@@ -47,6 +47,7 @@ RSpec.describe PqcRails::KeySource do
         expect { described_class.decode(Base64.strict_encode64(seed)) }
           .to raise_error(PqcRails::KeySource::SeedOnlyKeyError, /seed-only secret key \(#{length} bytes\)/) { |e|
             expect(e).to be_a(PqcRails::Error)
+            expect(e.cause).to be_nil
             expect(e.message).not_to include("truncated")
             expect(e.message).to include("rails generate pqc_rails:install")
           }
@@ -59,7 +60,7 @@ RSpec.describe PqcRails::KeySource do
 
       [raw[0, 32], raw[0, 64], "\x01".b * 31, "\x01".b * 33, "\x01".b * 63, "\x01".b * 65].each do |value|
         expect { described_class.decode(Base64.strict_encode64(value)) }
-          .to raise_error(PqcRails::Error, /truncated/)
+          .to raise_error(PqcRails::Error, /truncated/) { |e| expect(e.cause).to be_nil }
       end
     end
 
