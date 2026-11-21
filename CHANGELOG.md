@@ -46,8 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- A key value of 32 or 64 bytes that is not a pqc_rails key, such as an ML-KEM or ML-DSA seed, now
-  fails with a message saying it looks like a seed-only secret key and pointing to
+- A key value of 32 or 64 bytes whose first byte is not zero, such as most ML-KEM or ML-DSA seeds
+  (a pqc_rails key value always starts with a zero byte), now fails with a message saying it looks like a seed-only secret key and pointing to
   `rails generate pqc_rails:install`, instead of saying the key is truncated. `rails pqc_rails:status`
   reports the same. The error is still a `PqcRails::Error`, and which values are accepted is unchanged.
 - `PqcRails::Sig#verify` returns `false` when the signature is not a String (for example `nil`

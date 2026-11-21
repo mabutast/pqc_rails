@@ -45,7 +45,8 @@ RSpec.describe PqcRails::KeySource do
         seed = "\x01".b + SecureRandom.random_bytes(length - 1)
 
         expect { described_class.decode(Base64.strict_encode64(seed)) }
-          .to raise_error(PqcRails::Error, /seed-only secret key \(#{length} bytes\)/) { |e|
+          .to raise_error(PqcRails::KeySource::SeedOnlyKeyError, /seed-only secret key \(#{length} bytes\)/) { |e|
+            expect(e).to be_a(PqcRails::Error)
             expect(e.message).not_to include("truncated")
             expect(e.message).to include("rails generate pqc_rails:install")
           }
