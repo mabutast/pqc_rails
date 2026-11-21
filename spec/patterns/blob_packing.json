@@ -25,6 +25,29 @@
       ]
     },
     {
+      "id": "key-triple-form",
+      "pattern": "鍵の3要素（公開鍵・秘密鍵・認証鍵）を1本にまとめ、3つ返す",
+      "source": "spec",
+      "source_ref": "README「暗号文の形式」（鍵ペアは公開鍵・秘密鍵に加えて32バイトの認証鍵を持つ）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/blob_packing_spec.rb",
+          "name": "任意の個数のバイト列をラウンドトリップできる"
+        }
+      ],
+      "guarantee": "3つのバイト列を pack_all で1本にし、unpack_all で同じ3つを順に返す",
+      "mutants": [
+        {
+          "id": "pack-all-length-endianness",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/blob_packing.rb",
+          "find": "parts.map { |part| [part.bytesize].pack(\"N\") + part }.join",
+          "replace": "parts.map { |part| [part.bytesize].pack(\"V\") + part }.join",
+          "result": "killed"
+        }
+      ]
+    },
+    {
       "id": "pack-form",
       "pattern": "2つのバイト列の形は、既存の鍵の形式（[4byte長][本体]を2回）と同じ",
       "source": "code",
