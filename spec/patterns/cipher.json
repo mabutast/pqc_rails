@@ -1,0 +1,524 @@
+{
+  "test_command": "bundle exec rspec spec/cipher_spec.rb",
+  "rows": [
+    {
+      "id": "round-trip",
+      "pattern": "暗号化して復号すると元の値に戻る（v1・AES鍵はKEMの共有鍵と認証鍵から導く）",
+      "source": "code",
+      "source_ref": "Cipher#encrypt と #decrypt（decrypt_v1 → try_keypairs）",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "ラウンドトリップできる"
+        }
+      ],
+      "guarantee": "暗号化した値を、同じ鍵で復号すると同じ文字列が返る",
+      "mutants": [
+        {
+          "id": "no-associated-data-on-encrypt",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "envelope = EnvelopeCipher.new(data_key).encrypt(clear_text, associated_data: associated_data)",
+          "replace": "envelope = EnvelopeCipher.new(data_key).encrypt(clear_text)",
+          "result": "killed"
+        },
+        {
+          "id": "skip-authentication-key-derivation",
+          "kind": "鍵の導出を通さない・入力を1つ外す",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "data_key = CiphertextFormat.data_key(encap.shared_secret, key.authentication_key)",
+          "replace": "data_key = encap.shared_secret",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "headers-written",
+      "pattern": "暗号化の結果に、形式バージョン・アルゴリズムID・鍵IDを書く",
+      "source": "code",
+      "source_ref": "Cipher#encrypt の headers への代入",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "形式バージョン・アルゴリズムID・鍵IDをheadersに書く"
+        }
+      ],
+      "guarantee": "pv は 1、alg はアルゴリズムID、kid は公開鍵から作った鍵IDになる",
+      "mutants": [
+        {
+          "id": "version-plus-one",
+          "kind": "定数を±1する",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "message.headers[:pv] = CiphertextFormat::VERSION",
+          "replace": "message.headers[:pv] = CiphertextFormat::VERSION + 1",
+          "result": "killed"
+        },
+        {
+          "id": "kid-from-algorithm",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "message.headers[:kid] = key_id",
+          "replace": "message.headers[:kid] = algorithm_id",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "unknown-format-version",
+      "pattern": "知らない形式バージョン（pv が 1 でも nil でもない）",
+      "source": "code",
+      "source_ref": "Cipher#decrypt の case 文の else 節",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "知らない形式バージョンの暗号文は、NoMethodErrorではなく形式バージョンを示すPqcRails::Errorにする"
+        }
+      ],
+      "guarantee": "pv が未知の値なら、形式バージョンを示す Decryption を送出し、黙って別の方式で読まない",
+      "mutants": [
+        {
+          "id": "v1-routed-to-legacy",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "when CiphertextFormat::VERSION then decrypt_v1(encrypted_message, keypairs)",
+          "replace": "when nil then decrypt_v1(encrypted_message, keypairs)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "algorithm-id-tampered",
+      "pattern": "暗号文のアルゴリズムIDを書き換える（設定のアルゴリズムと違う）",
+      "source": "code",
+      "source_ref": "Cipher#decrypt_v1 の pq_alg_name_for",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "アルゴリズムIDを書き換えると復号できない"
+        },
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "暗号文に書かれたアルゴリズムで復号する(設定のアルゴリズムを変えても既存データを読める)"
+        }
+      ],
+      "guarantee": "書き換えられたアルゴリズムIDでは復号できない。暗号文に書かれたアルゴリズムで読む",
+      "mutants": [
+        {
+          "id": "use-configured-algorithm",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "pq_alg_name = CiphertextFormat.pq_alg_name_for(algorithm_id, configured: @pq_alg_name)",
+          "replace": "pq_alg_name = @pq_alg_name",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "unregistered-algorithm",
+      "pattern": "レジストリに無く設定とも違うアルゴリズムID",
+      "source": "code",
+      "source_ref": "CiphertextFormat.pq_alg_name_for（cipher.rb は呼ぶだけ）",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "レジストリ未登録で設定とも異なるアルゴリズムIDは拒否する"
+        }
+      ],
+      "guarantee": "未登録で設定とも違うアルゴリズムIDの暗号文は、Decryption で拒否する",
+      "mutants": [
+        {
+          "id": "allow-unlisted-algorithm",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "unless curve == CLASSICAL_CURVE && allowed_pq_name?(pq_name, configured)",
+          "replace": "unless curve == CLASSICAL_CURVE",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "key-id-tampered",
+      "pattern": "暗号文の鍵IDを書き換える（どの鍵とも一致しない）",
+      "source": "code",
+      "source_ref": "Cipher#decrypt_v1 の鍵IDの絞り込み",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "鍵IDを書き換えると復号できない"
+        }
+      ],
+      "guarantee": "鍵IDが一致する鍵が無ければ、Decryption を送出する",
+      "mutants": [
+        {
+          "id": "key-id-filter-inverted",
+          "kind": "演算子・論理を入れ替える",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "candidates = keypairs.select { |keypair| CiphertextFormat.key_id(keypair.public_key) == key_id }",
+          "replace": "candidates = keypairs.select { |keypair| CiphertextFormat.key_id(keypair.public_key) != key_id }",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "other-key-not-tried",
+      "pattern": "鍵IDが一致しない鍵では、KEMの復号を試みない",
+      "source": "code",
+      "source_ref": "Cipher#decrypt_v1 の絞り込みと try_keypairs",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "鍵IDが一致しない鍵では復号を試みない"
+        }
+      ],
+      "guarantee": "鍵IDの違う鍵では HybridKem を開かない（不要な復号をしない）",
+      "mutants": [
+        {
+          "id": "try-all-keys",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "candidates = keypairs.select { |keypair| CiphertextFormat.key_id(keypair.public_key) == key_id }",
+          "replace": "candidates = keypairs",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "no-matching-key",
+      "pattern": "鍵の一覧に一致する鍵が無い",
+      "source": "code",
+      "source_ref": "Cipher#try_keypairs の raise",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "異なる鍵では復号できず、ActiveRecord::Encryption::Errors::Decryptionを送出する"
+        }
+      ],
+      "guarantee": "一致する鍵が無ければ Decryption を送出する（NoMethodError にしない）",
+      "mutants": [
+        {
+          "id": "no-raise-on-empty",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "raise PqcRails::Error, \"no decryption key matches the message's key id\" if keypairs.empty?",
+          "replace": "nil if keypairs.empty?",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "kem-ciphertext-missing",
+      "pattern": "kem_ct ヘッダーが無い",
+      "source": "code",
+      "source_ref": "Cipher#try_keypairs の kem_ct の確認",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "kem_ctヘッダーが無いMessageを復号しようとすると、NoMethodErrorではなくActiveRecord::Encryption::Errors::Decryptionを送出する"
+        }
+      ],
+      "guarantee": "kem_ct が無ければ NoMethodError ではなく Decryption を送出する",
+      "mutants": [
+        {
+          "id": "no-kem-ct-guard",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "raise PqcRails::Error, \"message is missing the kem_ct header\" if kem_ciphertext.nil?",
+          "replace": "nil",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "kem-ciphertext-altered",
+      "pattern": "KEM 暗号文・payload の改変（切れた・余分なバイトがある・末尾が違う）",
+      "source": "code",
+      "source_ref": "HybridKem#decapsulate と EnvelopeCipher#decrypt の例外",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "kem_ctの末尾1バイトを改変すると、ActiveRecord::Encryption::Errors::Decryptionを送出する"
+        },
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "途中で切れた・空・末尾に余分なバイトがあるkem_ctと、途中で切れたpayloadは、ActiveRecord::Encryption::Errors::Decryptionを送出する"
+        }
+      ],
+      "guarantee": "改変された暗号文は Decryption を送出する（別の値を返さない）",
+      "mutants": [
+        {
+          "id": "wrap-error-as-raw",
+          "kind": "例外の種類を変える",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "raise ::ActiveRecord::Encryption::Errors::Decryption, e.message",
+          "replace": "raise e",
+          "result": "killed"
+        },
+        {
+          "id": "rescue-narrowed",
+          "kind": "例外を握りつぶす・捕まえる範囲を変える",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "rescue OpenSSL::Cipher::CipherError, PqcRails::Error, ArgumentError, TypeError => e",
+          "replace": "rescue OpenSSL::Cipher::CipherError => e",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "public-key-forgery",
+      "pattern": "公開鍵だけで作った暗号文（秘密鍵を持たない者が作れるもの）",
+      "source": "code",
+      "source_ref": "Cipher#decrypt_v1 → try_keypairs の AES 鍵（CiphertextFormat.data_key）",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "公開鍵だけで作った暗号文は復号できない(作成元の認証)"
+        }
+      ],
+      "guarantee": "KEM の共有鍵だけで作った暗号文は、認証鍵を通す復号では読めない",
+      "mutants": [
+        {
+          "id": "decrypt-without-authentication-key",
+          "kind": "鍵の導出を通さない・入力を1つ外す",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "data_key = authenticated ? CiphertextFormat.data_key(shared_secret, keypair.authentication_key) : shared_secret",
+          "replace": "data_key = authenticated ? shared_secret : CiphertextFormat.data_key(shared_secret, keypair.authentication_key)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "authentication-key-mismatch",
+      "pattern": "公開鍵と秘密鍵が同じでも、認証鍵が違う鍵ペア",
+      "source": "code",
+      "source_ref": "CiphertextFormat.data_key の認証鍵の入力",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "公開鍵と秘密鍵が同じでも、認証鍵が異なる鍵ペアでは復号できない"
+        }
+      ],
+      "guarantee": "認証鍵が違えば、同じ KEM の鍵でも復号できない",
+      "mutants": [
+        {
+          "id": "decrypt-without-authentication-key-v1",
+          "kind": "鍵の導出を通さない・入力を1つ外す",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "data_key = authenticated ? CiphertextFormat.data_key(shared_secret, keypair.authentication_key) : shared_secret",
+          "replace": "data_key = authenticated ? shared_secret : shared_secret",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "multiple-keys",
+      "pattern": "key: に鍵の配列を渡す（鍵ローテーションの複数世代）",
+      "source": "code",
+      "source_ref": "Cipher#decrypt の keypairs の作り方",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "Railsのkey:インターフェースに準拠し、keyが配列でも復号できる(鍵ローテーション互換)"
+        }
+      ],
+      "guarantee": "配列で渡しても、一致する鍵で復号できる",
+      "mutants": [
+        {
+          "id": "single-key-only",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "keypairs = (key.is_a?(::Array) ? key : [key]).select { |candidate| keypair?(candidate) }",
+          "replace": "keypairs = [key].select { |candidate| keypair?(candidate) }",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "non-keypair-ignored",
+      "pattern": "pqc_rails の鍵ペアでない値（previous スキームの導出鍵の文字列など）",
+      "source": "code",
+      "source_ref": "Cipher#keypair? と decrypt の絞り込み",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "pqc_railsの鍵ペアでない鍵(previousスキームの導出鍵の文字列等)が渡されても、Decryptionを送出する"
+        },
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "旧形式の暗号文でも、pqc_railsの鍵ペアでない鍵は無視する"
+        }
+      ],
+      "guarantee": "鍵ペアでない値は使わず、残りの鍵で復号を試す",
+      "mutants": [
+        {
+          "id": "accept-non-keypair",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "candidate.respond_to?(:public_key) && candidate.respond_to?(:secret_key)",
+          "replace": "candidate.respond_to?(:public_key)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "message-serializer-headers",
+      "pattern": "MessageSerializer で読み戻した headers（キーが文字列）",
+      "source": "code",
+      "source_ref": "Cipher#header の文字列キーの読み",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "ActiveRecordのMessageSerializerを通しても復号できる(DBに保存して読み戻す経路)"
+        }
+      ],
+      "guarantee": "保存して読み戻した暗号文も復号できる",
+      "mutants": [
+        {
+          "id": "no-string-key-fallback",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "encrypted_message.headers[name] || encrypted_message.headers[name.to_s]",
+          "replace": "encrypted_message.headers[name]",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "legacy-written",
+      "pattern": "ciphertext_format = :v0 のとき、旧形式で書く",
+      "source": "code",
+      "source_ref": "Cipher#encrypt の write_legacy? の分岐",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "旧形式(kem_ctヘッダーのみ)で書く"
+        }
+      ],
+      "guarantee": "v0 の設定では pv・alg・kid を書かない",
+      "mutants": [
+        {
+          "id": "legacy-branch-inverted",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "return encrypt_legacy(clear_text, key) if CiphertextFormat.write_legacy?",
+          "replace": "return encrypt_legacy(clear_text, key) unless CiphertextFormat.write_legacy?",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "legacy-rejected-when-not-accepted",
+      "pattern": "accept_legacy_records = false のとき、旧形式の暗号文",
+      "source": "code",
+      "source_ref": "CiphertextFormat.ensure_legacy_record_accepted!（decrypt_legacy から呼ぶ）",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "accept_legacy_records = false のとき、旧形式のデータを拒否する"
+        }
+      ],
+      "guarantee": "accept_legacy_records が false なら、旧形式は Decryption で拒否する",
+      "mutants": [
+        {
+          "id": "legacy-check-removed",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "CiphertextFormat.ensure_legacy_record_accepted!",
+          "replace": "nil",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "legacy-read-with-v1-configured",
+      "pattern": "v1 の設定のまま旧形式の暗号文を読む",
+      "source": "code",
+      "source_ref": "Cipher#decrypt の pv が nil の分岐",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "旧形式で書かれたデータを、新形式で書く設定のまま復号できる"
+        }
+      ],
+      "guarantee": "pv の無い暗号文は旧形式として読む",
+      "mutants": [
+        {
+          "id": "legacy-read-as-v1",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "when nil then decrypt_legacy(encrypted_message, keypairs)",
+          "replace": "when nil then decrypt_v1(encrypted_message, keypairs)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "utf8-result",
+      "pattern": "復号結果の文字コード",
+      "source": "code",
+      "source_ref": "Cipher#try_keypairs の force_encoding",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "日本語の値を、UTF-8の文字列として復号する(新旧どちらの形式でも)"
+        }
+      ],
+      "guarantee": "復号結果は UTF-8 の文字列になる",
+      "mutants": [
+        {
+          "id": "keep-binary-encoding",
+          "kind": "戻り値の文字コード・型を変える",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "return clear_text.force_encoding(Encoding::UTF_8)",
+          "replace": "return clear_text",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "deterministic-refused",
+      "pattern": "deterministic: true",
+      "source": "code",
+      "source_ref": "Cipher#encrypt の先頭の raise",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "deterministic: trueを渡すとArgumentErrorを送出する(KEMはランダム化されるためサポートしない)"
+        }
+      ],
+      "guarantee": "deterministic: true は ArgumentError にする（KEM はランダムなため）",
+      "mutants": [
+        {
+          "id": "deterministic-inverted",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "raise ArgumentError, \"PqcRails::Cipher does not support deterministic encryption\" if deterministic",
+          "replace": "raise ArgumentError, \"PqcRails::Cipher does not support deterministic encryption\" unless deterministic",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "envelope-lengths",
+      "pattern": "AES-GCM の鍵長・IV 長（ActiveRecord の鍵生成が要求する）",
+      "source": "code",
+      "source_ref": "Cipher#key_length / #iv_length",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "EnvelopeCipherが使うAES-256-GCMの鍵長・IV長を返す(ActiveRecord::Encryption::KeyGeneratorが要求するインターフェース)"
+        }
+      ],
+      "guarantee": "key_length は 32、iv_length は 12 を返す",
+      "mutants": [
+        {
+          "id": "key-length-from-iv",
+          "kind": "定数・長さ・回数を±1する",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "EnvelopeCipher::KEY_LENGTH",
+          "replace": "EnvelopeCipher::IV_LENGTH",
+          "result": "killed"
+        }
+      ]
+    }
+  ]
+}

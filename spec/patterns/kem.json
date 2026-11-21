@@ -1,5 +1,5 @@
 {
-  "test_command": "bundle exec rspec spec/pqc_rails/kem_spec.rb spec/pqc_rails/redacted_keypair_spec.rb",
+  "test_command": "bundle exec rspec spec/pqc_rails/kem_spec.rb spec/pqc_rails/redacted_keypair_spec.rb spec/pqc_rails/secret_buffer_spec.rb",
   "rows": [
     {
       "id": "round-trip",
@@ -452,6 +452,33 @@
           "file": "lib/pqc_rails/redacted_keypair.rb",
           "find": "      return \"[FILTERED]\" unless value.respond_to?(:bytesize)\n",
           "replace": "",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "buffer-zeroed-after-use",
+      "pattern": "使い終えた秘密のバッファをゼロで埋める（例外の時も）",
+      "source": "code",
+      "source_ref": "SecretBuffer.with の ensure（liboqs に渡す・受け取る秘密の領域）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/secret_buffer_spec.rb",
+          "name": "ブロックを抜けたらバッファをゼロで埋める"
+        },
+        {
+          "file": "spec/pqc_rails/secret_buffer_spec.rb",
+          "name": "ブロックで例外が出ても、バッファをゼロで埋める"
+        }
+      ],
+      "guarantee": "ブロックを抜けた後（例外の時も）、秘密のバッファの中身はゼロになる",
+      "mutants": [
+        {
+          "id": "no-clear-on-exit",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/secret_buffer.rb",
+          "find": "pointer&.clear",
+          "replace": "nil",
           "result": "killed"
         }
       ]
