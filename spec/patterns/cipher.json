@@ -1,5 +1,5 @@
 {
-  "test_command": "bundle exec rspec spec/cipher_spec.rb",
+  "test_command": "bundle exec rspec spec/cipher_spec.rb spec/pqc_rails/decryption_failure_events_spec.rb",
   "rows": [
     {
       "id": "round-trip",
@@ -516,6 +516,79 @@
           "file": "lib/pqc_rails/cipher.rb",
           "find": "EnvelopeCipher::KEY_LENGTH",
           "replace": "EnvelopeCipher::IV_LENGTH",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "spec-no-auth-key-no-new-format",
+      "pattern": "認証鍵を持たない鍵では、新しい形式の暗号文を書けない（0.3.0以前の鍵）",
+      "source": "spec",
+      "source_ref": "README「暗号文の形式」（0.3.0 以前に生成した鍵は新しい形式の暗号文を書けない）",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "認証鍵を持たない鍵(0.3.0以前の形式)では新しい形式で暗号化できない"
+        }
+      ],
+      "guarantee": "認証鍵の無い鍵では、暗号化は MissingAuthenticationKeyError を送出する（黙って認証の無い形式で書かない）",
+      "mutants": [
+        {
+          "id": "auth-key-check-inverted",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "if authentication_key.nil?",
+          "replace": "if !authentication_key.nil?",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "spec-failure-notice-real-only",
+      "pattern": "復号の失敗の通知は、本当の失敗だけ（previous の試行の失敗は通知しない）",
+      "source": "spec",
+      "source_ref": "README「復号の失敗の通知」（previous: の試行の過程の失敗では発行しない）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/decryption_failure_events_spec.rb",
+          "name": "pqc_railsの暗号文でない値(Rails標準の暗号文)や、pqc_railsの鍵が渡されない呼び出しでは通知しない"
+        },
+        {
+          "file": "spec/pqc_rails/decryption_failure_events_spec.rb",
+          "name": "DBカラムの復号に失敗すると、target: :recordとエラーのクラス名を通知する"
+        }
+      ],
+      "guarantee": "DBカラムの本当の復号の失敗だけ通知し、previous の試行の失敗や pqc_rails の鍵が無い呼び出しでは通知しない",
+      "mutants": [
+        {
+          "id": "notify-every-failure",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "if keypairs.any? && header(encrypted_message, :kem_ct)",
+          "replace": "if header(encrypted_message, :kem_ct)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "spec-legacy-needs-configured-algorithm",
+      "pattern": "旧形式の暗号文を、設定のアルゴリズムと違う設定で読む",
+      "source": "spec",
+      "source_ref": "docs/MIGRATION.md「PqcRails::Cipher.new の pq_alg_name」（旧形式は設定のアルゴリズムで復号し、違うと失敗する）",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "旧形式のデータは、設定のアルゴリズムと違うと読めない（旧形式はアルゴリズムIDを持たないため）"
+        }
+      ],
+      "guarantee": "旧形式の暗号文を別のアルゴリズムの設定で読むと、Decryption になる",
+      "mutants": [
+        {
+          "id": "legacy-ignores-configured-algorithm",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "try_keypairs(encrypted_message, keypairs, pq_alg_name: @pq_alg_name, associated_data: nil, authenticated: false)",
+          "replace": "try_keypairs(encrypted_message, keypairs, pq_alg_name: :ml_kem_512, associated_data: nil, authenticated: false)",
           "result": "killed"
         }
       ]

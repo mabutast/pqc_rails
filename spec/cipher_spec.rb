@@ -295,6 +295,16 @@ RSpec.describe PqcRails::Cipher do
       expect(cipher.decrypt(legacy_message, key: keypair)).to eq("hello pqc")
     end
 
+    it "旧形式のデータは、設定のアルゴリズムと違うと読めない（旧形式はアルゴリズムIDを持たないため）" do
+      PqcRails.configuration.ciphertext_format = :v0
+      legacy_message = cipher.encrypt("hello pqc", key: keypair)
+      PqcRails.configuration.ciphertext_format = :v1
+
+      expect do
+        described_class.new(pq_alg_name: :ml_kem_1024).decrypt(legacy_message, key: keypair)
+      end.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
+    end
+
     it "accept_legacy_records = false のとき、旧形式のデータを拒否する" do
       PqcRails.configuration.ciphertext_format = :v0
       legacy_message = cipher.encrypt("hello pqc", key: keypair)
