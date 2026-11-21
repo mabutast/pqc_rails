@@ -106,6 +106,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- When a key value cannot be read, the raised `PqcRails::Error` no longer carries the internal
+  unpacking error as its `cause`. That error's message held the first four bytes of the key value,
+  so error reports that include the cause could show part of a secret key or seed.
 - Key pairs (`PqcRails::Sig::Keypair`, `Kem::Keypair`, `DhKem::Keypair` and
   `HybridKem::Keypair`) no longer show secret key bytes in `inspect`, `to_s`, `pp` (used by IRB
   and the Rails console) or string interpolation. Secret keys and the authentication key appear as
