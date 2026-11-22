@@ -677,7 +677,7 @@
         },
         {
           "file": "spec/pqc_rails/redacted_struct_spec.rb",
-          "name": "値の取り出し・to_a・==は変わらない"
+          "name": "値の取り出し・to_h・to_a・==は変わらない"
         }
       ],
       "guarantee": "どの表示にも秘密鍵・公開鍵の値が出ず（生のバイト列・エスケープ・16進・Base64のどの形でも）、秘密のメンバーごとに「名前=[FILTERED]」、公開鍵は「public_key=[バイト数 bytes]」と出る。読み出しメソッド・to_a・== は元のバイト列のまま（違う鍵ペアは等しくならない）。共通のモジュール（redacted_struct.rb）を壊す壊し方は kem.json の同じ行に置く",

@@ -357,7 +357,7 @@
         },
         {
           "file": "spec/pqc_rails/redacted_struct_spec.rb",
-          "name": "値の取り出し・to_a・==は変わらない"
+          "name": "値の取り出し・to_h・to_a・==は変わらない"
         },
         {
           "file": "spec/pqc_rails/redacted_struct_spec.rb",
@@ -452,6 +452,14 @@
           "file": "lib/pqc_rails/redacted_struct.rb",
           "find": "      return \"[FILTERED]\" unless value.respond_to?(:bytesize)\n",
           "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "keypair-to-h-empty",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "Keypair = Struct.new(:public_key, :secret_key) do\n      include RedactedStruct\n",
+          "replace": "Keypair = Struct.new(:public_key, :secret_key) do\n      include RedactedStruct\n\n      def to_h = {}\n",
           "result": "killed"
         }
       ]
@@ -563,6 +571,10 @@
         {
           "file": "spec/pqc_rails/redacted_struct_spec.rb",
           "name": "公開鍵が文字列でなくても、as_jsonで値を出さず[FILTERED]にする"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "長さは文字数ではなくバイト数で出す"
         }
       ],
       "guarantee": "JSON の主な経路に秘密の値が出ず、公開鍵・暗号文は「[バイト数 bytes]」、秘密は「[FILTERED]」、nil は nil になる",
@@ -590,6 +602,14 @@
           "find": "      return nil if value.nil?\n",
           "replace": "",
           "result": "killed"
+        },
+        {
+          "id": "length-not-bytes",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/redacted_struct.rb",
+          "find": "\"[#{value.bytesize} bytes]\"",
+          "replace": "\"[#{value.length} bytes]\"",
+          "result": "killed"
         }
       ]
     },
@@ -606,13 +626,9 @@
         {
           "file": "spec/pqc_rails/redacted_struct_spec.rb",
           "name": "as_json・to_json・JSON.generateに鍵のバイト列が出ない"
-        },
-        {
-          "file": "spec/pqc_rails/redacted_struct_spec.rb",
-          "name": "表示の後も暗号化と復号の往復ができる"
         }
       ],
-      "guarantee": "AES 鍵のバイト列が表示にも JSON にも出ず、表示の後も暗号化と復号が動く",
+      "guarantee": "AES 鍵のバイト列が表示にも JSON にも出ない",
       "mutants": [
         {
           "id": "envelope-inspect-removed",
