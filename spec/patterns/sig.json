@@ -1,5 +1,5 @@
 {
-  "test_command": "bundle exec rspec spec/pqc_rails/sig_spec.rb spec/pqc_rails/secret_buffer_spec.rb spec/pqc_rails/redacted_keypair_spec.rb",
+  "test_command": "bundle exec rspec spec/pqc_rails/sig_spec.rb spec/pqc_rails/secret_buffer_spec.rb spec/pqc_rails/redacted_struct_spec.rb",
   "rows": [
     {
       "id": "round-trip",
@@ -672,21 +672,21 @@
       "source_ref": "判断キュー nightly-pqc_rails-2026-11-20-keypair-inspect の回答（秘密鍵を [FILTERED] で伏せ、公開鍵は長さだけ。値の取り出しは変えない）と .claude/CLAUDE.md「コードレビューの追加観点」（鍵を inspect に出さない）",
       "tests": [
         {
-          "file": "spec/pqc_rails/redacted_keypair_spec.rb",
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
           "name": "inspect・to_s・pretty_inspectに秘密の値が含まれず、[FILTERED]と公開鍵の長さが出る"
         },
         {
-          "file": "spec/pqc_rails/redacted_keypair_spec.rb",
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
           "name": "値の取り出し・to_a・==は変わらない"
         }
       ],
-      "guarantee": "どの表示にも秘密鍵・公開鍵の値が出ず（生のバイト列・エスケープ・16進・Base64のどの形でも）、秘密のメンバーごとに「名前=[FILTERED]」、公開鍵は「public_key=[バイト数 bytes]」と出る。読み出しメソッド・to_a・== は元のバイト列のまま（違う鍵ペアは等しくならない）。共通のモジュール（redacted_keypair.rb）を壊す壊し方は kem.json の同じ行に置く",
+      "guarantee": "どの表示にも秘密鍵・公開鍵の値が出ず（生のバイト列・エスケープ・16進・Base64のどの形でも）、秘密のメンバーごとに「名前=[FILTERED]」、公開鍵は「public_key=[バイト数 bytes]」と出る。読み出しメソッド・to_a・== は元のバイト列のまま（違う鍵ペアは等しくならない）。共通のモジュール（redacted_struct.rb）を壊す壊し方は kem.json の同じ行に置く",
       "mutants": [
         {
           "id": "keypair-include-removed",
           "kind": "確かめる処理を消す",
           "file": "lib/pqc_rails/sig.rb",
-          "find": "      include RedactedKeypair\n",
+          "find": "      include RedactedStruct\n",
           "replace": "",
           "result": "killed"
         },
@@ -694,8 +694,8 @@
           "id": "secret-key-reader-filtered",
           "kind": "戻り値を空・nil・固定値にする",
           "file": "lib/pqc_rails/sig.rb",
-          "find": "      include RedactedKeypair\n",
-          "replace": "      include RedactedKeypair\n\n      def secret_key = \"[FILTERED]\"\n",
+          "find": "      include RedactedStruct\n",
+          "replace": "      include RedactedStruct\n\n      def secret_key = \"[FILTERED]\"\n",
           "result": "killed"
         }
       ]

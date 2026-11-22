@@ -63,5 +63,10 @@ module PqcRails
 
       cipher.update(ciphertext) + cipher.final
     end
+
+    # 既定のinspect(ppも使う)とActiveSupportのas_jsonはインスタンス変数を出すため、鍵を伏せる。
+    def inspect = "#<#{self.class.name} key=[FILTERED]>"
+
+    def as_json(_options = nil) = { "key" => "[FILTERED]" }
   end
 end

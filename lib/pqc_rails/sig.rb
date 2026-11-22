@@ -4,7 +4,7 @@ require_relative "algorithms"
 require_relative "length_validation"
 require_relative "secret_buffer"
 require_relative "ffi/sig"
-require_relative "redacted_keypair"
+require_relative "redacted_struct"
 
 module PqcRails
   # liboqsのGeneric SIG(署名)APIをRubyらしく包んだクラス。
@@ -20,7 +20,7 @@ module PqcRails
     include LengthValidation
 
     Keypair = Struct.new(:public_key, :secret_key) do
-      include RedactedKeypair
+      include RedactedStruct
     end
 
     attr_reader :alg_name
