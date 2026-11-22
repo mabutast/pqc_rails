@@ -25,9 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   servers are updated one by one, then remove the setting. Defaults to `:v1`.
 - `PqcRails.configuration.accept_legacy_records`: set to `false` to reject ActiveRecord ciphertexts
   in the 0.3.0 format once all records have been re-encrypted. Defaults to `true`.
-- `PqcRails.configuration.accept_legacy_cookies_until`: a `Time` after which session cookies in the
-  0.3.0 format are rejected. Set it to the upgrade time plus the longest session lifetime. Defaults
-  to `nil` (no deadline).
+- `PqcRails.configuration.accept_legacy_cookies_until`: a `Time` until which session cookies in the
+  0.3.0 format are read. Set it to the upgrade time plus the longest session lifetime to keep
+  existing sessions when upgrading. Defaults to `nil`: these cookies are rejected, except while
+  `ciphertext_format` is `:v0`.
 - A `decryption_failed.pqc_rails` ActiveSupport::Notifications event is published when an
   encrypted column or a session cookie cannot be decrypted, with the target (`:record` or
   `:session`) and the exception class. Failures that are part of ActiveRecord trying `previous:`
@@ -93,8 +94,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and rotate to them when upgrading; see "0.3.0 以前からの更新" in docs/MIGRATION.md. Keys in the new
   encoding can still be read by 0.3.0, which uses only the public and secret key.
 - Ciphertexts grow by about 60 bytes per ActiveRecord column and about 30 bytes per session cookie
-  with ML-KEM-768. Ciphertexts written in the 0.3.0 format are still decrypted, using the
-  configured algorithm. Ciphertexts written in the new format cannot be decrypted by 0.3.0 or
+  with ML-KEM-768. ActiveRecord ciphertexts written in the 0.3.0 format are still decrypted, using
+  the configured algorithm. Ciphertexts written in the new format cannot be decrypted by 0.3.0 or
   earlier, so roll back only data written with `ciphertext_format = :v0`.
 - `PqcRails::HybridKem` public keys and ciphertexts, the KEM ciphertext of encrypted ActiveRecord
   attributes and session cookies with extra bytes after their last component now raise
@@ -122,8 +123,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   other values as `[FILTERED]`. Values read explicitly (`shared_secret`, `to_h`, `to_a`) and `==`
   are unchanged, so passing those values to a log or to JSON still reveals them.
 - `PqcRails::EnvelopeCipher` no longer shows its AES key in `inspect`, `pp`, `as_json` or `to_json`.
-  YAML (`to_yaml` and the Rails `debug` view helper) and `Marshal.dump` still contain the secret
-  values of key pairs, KEM results and `EnvelopeCipher`. Do not pass these objects to them.
+- Key pairs, KEM results and `EnvelopeCipher` no longer expose secret values in YAML (`to_yaml` and
+  the Rails `debug` view helper). They are written as a plain map with the same content as
+  `as_json`, and loading that YAML does not restore a key object. `Marshal.dump` still contains the
+  secret values, so do not store these objects in a cache or a log with it.
 - Ciphertexts in the new format authenticate their creator. In 0.3.0 and earlier, the KEM shared
   secret was used directly as the AES-256-GCM key, so anyone who knew the public key could create
   ciphertexts that decrypt successfully: forged session cookies (for example with an arbitrary
@@ -133,8 +136,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the default key storage (`PQC_SESSION_KEY` / `PQC_RECORD_KEY` or Rails credentials), the public
   key is stored together with the secret key and is not exposed, so this was not exploitable unless
   the public key was disclosed separately. Ciphertexts in the 0.3.0 format remain forgeable with the public
-  key; reject them with `accept_legacy_records` and `accept_legacy_cookies_until` once they are no
-  longer needed.
+  key; reject ActiveRecord ciphertexts with `accept_legacy_records` once they are no longer needed.
+- Session cookies in the 0.3.0 format are no longer read by default, because their content is
+  restored with `Marshal.load` and a cookie forged with the public key could lead to code execution.
+  **Existing sessions end when upgrading** unless `accept_legacy_cookies_until` is set. They are
+  also read while `ciphertext_format` is `:v0`.
 - Secret keys and shared secrets passed to and from liboqs are now zeroed in the native buffers
   after each key generation, encapsulation, decapsulation and signature. Previously these buffers
   were freed by the garbage collector without being cleared. Secret keys held as Ruby Strings cannot

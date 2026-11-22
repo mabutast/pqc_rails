@@ -655,6 +655,77 @@
           "result": "killed"
         }
       ]
+    },
+    {
+      "id": "yaml-redacted",
+      "pattern": "鍵ペア・Encapsulation・EnvelopeCipher と、それらを持つオブジェクトの YAML",
+      "source": "spec",
+      "source_ref": "README・CHANGELOG の Security：YAML は as_json と同じタグ無しのマップにする。Marshal は変えない",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "YAMLは秘密の値を出さず、クラスのタグの無いas_jsonと同じマップになる"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "EnvelopeCipherのYAMLは鍵を出さず、クラスのタグの無いマップになる"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "認証鍵の無い0.3.0の鍵ペアは、YAMLで認証鍵をnilにする"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "鍵ペアを内部に持つKeyProvider::KeyとSession::EncryptorのYAMLにも秘密の値が出ない"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "Marshalの往復は元の値を保つ"
+        }
+      ],
+      "guarantee": "YAML に秘密の値が出ず、クラスのタグが無く、safe_load すると as_json と同じ Hash になる。Marshal の往復は元の値を保つ",
+      "mutants": [
+        {
+          "id": "struct-encode-with-removed",
+          "kind": "フレームワークが呼ぶメソッドを消す",
+          "file": "lib/pqc_rails/redacted_struct.rb",
+          "find": "    def encode_with(coder)\n      coder.represent_map(nil, as_json)\n      coder.implicit = true\n    end\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "envelope-encode-with-removed",
+          "kind": "フレームワークが呼ぶメソッドを消す",
+          "file": "lib/pqc_rails/envelope_cipher.rb",
+          "find": "    def encode_with(coder)\n      coder.represent_map(nil, as_json)\n      coder.implicit = true\n    end\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "struct-yaml-class-tag",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/redacted_struct.rb",
+          "find": "coder.represent_map(nil, as_json)\n      coder.implicit = true",
+          "replace": "coder.represent_map(\"!ruby/object:Keypair\", as_json)",
+          "result": "killed"
+        },
+        {
+          "id": "struct-yaml-raw",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/redacted_struct.rb",
+          "find": "coder.represent_map(nil, as_json)",
+          "replace": "coder.represent_map(nil, to_h.transform_keys(&:to_s))",
+          "result": "killed"
+        },
+        {
+          "id": "struct-marshal-redacted",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/redacted_struct.rb",
+          "find": "    def encode_with(coder)\n",
+          "replace": "    def marshal_dump = as_json\n\n    def marshal_load(data) = data\n\n    def encode_with(coder)\n",
+          "result": "killed"
+        }
+      ]
     }
   ]
 }

@@ -2,6 +2,7 @@
 
 require "pp"
 require "json"
+require "yaml"
 require "active_support"
 require "active_support/json"
 
@@ -198,6 +199,62 @@ RSpec.describe "秘密の値を持つオブジェクトの表示" do
     it "as_json・to_json・JSON.generateに鍵のバイト列が出ない" do
       expect(cipher.as_json).to eq("key" => "[FILTERED]")
       json_outputs_of(cipher).each { |output| expect_not_to_reveal(output, key) }
+    end
+  end
+
+  describe "YAML" do
+    def expect_yaml_redacted(object, secrets)
+      yaml = YAML.dump(object)
+
+      secrets.each { |secret| expect_not_to_reveal(yaml.delete("\n "), secret) }
+      expect(yaml).not_to include("!ruby", "!binary")
+      expect(YAML.safe_load(yaml)).to eq(object.as_json)
+    end
+
+    {
+      "Sig::Keypair" => -> { PqcRails::Sig.open(:ml_dsa_44, &:generate_keypair) },
+      "Kem::Keypair" => -> { PqcRails::Kem.open(:ml_kem_768, &:generate_keypair) },
+      "DhKem::Keypair" => -> { PqcRails::DhKem.new.generate_keypair },
+      "HybridKem::Keypair" => -> { PqcRails::HybridKem.open(:ml_kem_768, &:generate_keypair) },
+      "Kem::Encapsulation" => -> { PqcRails::Kem.open(:ml_kem_768) { |kem| kem.encapsulate(kem.generate_keypair.public_key) } },
+      "DhKem::Encapsulation" => -> { PqcRails::DhKem.new.then { |kem| kem.encapsulate(kem.generate_keypair.public_key) } },
+      "HybridKem::Encapsulation" => -> { PqcRails::HybridKem.open(:ml_kem_768) { |kem| kem.encapsulate(kem.generate_keypair.public_key) } }
+    }.each do |name, build|
+      context name do
+        it "YAMLは秘密の値を出さず、クラスのタグの無いas_jsonと同じマップになる" do
+          object = build.call
+
+          expect_yaml_redacted(object, object.to_a)
+        end
+      end
+    end
+
+    it "EnvelopeCipherのYAMLは鍵を出さず、クラスのタグの無いマップになる" do
+      key = OpenSSL::Random.random_bytes(32)
+
+      expect_yaml_redacted(PqcRails::EnvelopeCipher.new(key), [key])
+    end
+
+    it "認証鍵の無い0.3.0の鍵ペアは、YAMLで認証鍵をnilにする" do
+      keypair = PqcRails::HybridKem.open(:ml_kem_768, &:generate_keypair)
+      legacy = keypair.class.new(keypair.public_key, keypair.secret_key, nil)
+
+      expect(YAML.safe_load(YAML.dump(legacy)).fetch("authentication_key")).to be_nil
+    end
+
+    it "鍵ペアを内部に持つKeyProvider::KeyとSession::EncryptorのYAMLにも秘密の値が出ない" do
+      keypair = PqcRails::HybridKem.open(:ml_kem_768, &:generate_keypair)
+
+      [PqcRails::ActiveRecord::KeyProvider::Key.new(keypair), PqcRails::Session::Encryptor.new(keypair)].each do |owner|
+        yaml = YAML.dump(owner).delete("\n ")
+        [keypair.secret_key, keypair.authentication_key].each { |secret| expect_not_to_reveal(yaml, secret) }
+      end
+    end
+
+    it "Marshalの往復は元の値を保つ" do
+      keypair = PqcRails::HybridKem.open(:ml_kem_768, &:generate_keypair)
+
+      expect(Marshal.load(Marshal.dump(keypair))).to eq(keypair)
     end
   end
 end
