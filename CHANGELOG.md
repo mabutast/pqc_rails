@@ -122,6 +122,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   other values as `[FILTERED]`. Values read explicitly (`shared_secret`, `to_h`, `to_a`) and `==`
   are unchanged, so passing those values to a log or to JSON still reveals them.
 - `PqcRails::EnvelopeCipher` no longer shows its AES key in `inspect`, `pp`, `as_json` or `to_json`.
+  YAML (`to_yaml` and the Rails `debug` view helper) and `Marshal.dump` still contain the secret
+  values of key pairs, KEM results and `EnvelopeCipher`. Do not pass these objects to them.
 - Ciphertexts in the new format authenticate their creator. In 0.3.0 and earlier, the KEM shared
   secret was used directly as the AES-256-GCM key, so anyone who knew the public key could create
   ciphertexts that decrypt successfully: forged session cookies (for example with an arbitrary

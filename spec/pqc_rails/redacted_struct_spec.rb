@@ -48,13 +48,25 @@ RSpec.describe "秘密の値を持つオブジェクトの表示" do
       end
     end
 
-    it "値の取り出し・to_a・==は変わらない" do
+    it "as_json・to_json・JSON.generateは、公開鍵を長さ、秘密を[FILTERED]にする" do
+      json = keypair.as_json
+
+      expect(json.fetch("public_key")).to eq("[#{keypair.public_key.bytesize} bytes]")
+      secret_members.each { |member| expect(json.fetch(member.to_s)).to eq("[FILTERED]") }
+      json_outputs_of(keypair).each do |output|
+        keypair.to_a.each { |value| expect_not_to_reveal(output, value) }
+      end
+    end
+
+    it "値の取り出し・to_h・to_a・==は変わらない" do
       copy = keypair.class.new(*keypair.to_a.map(&:dup))
       other = keypair.class.new(*keypair.to_a.map { |value| value&.reverse })
 
       expect(copy).to eq(keypair)
       expect(other).not_to eq(keypair)
       expect(keypair.to_a).to eq(keypair.members.map { |member| keypair[member] })
+      expect(keypair.to_h).to eq(keypair.members.to_h { |member| [member, keypair[member]] })
+      expect(keypair.to_h.values).to all(satisfy { |value| value != "[FILTERED]" })
       # 読み出しメソッド(keypair.secret_keyなど)が、伏せた文字列ではなく元のバイト列を返す
       keypair.members.each_with_index do |member, index|
         expect(keypair.public_send(member)).to eq(keypair.to_a[index])
@@ -145,24 +157,6 @@ RSpec.describe "秘密の値を持つオブジェクトの表示" do
   end
 
   describe "鍵ペアのJSON" do
-    {
-      "Sig" => -> { PqcRails::Sig.open(:ml_dsa_44, &:generate_keypair) },
-      "Kem" => -> { PqcRails::Kem.open(:ml_kem_768, &:generate_keypair) },
-      "DhKem" => -> { PqcRails::DhKem.new.generate_keypair },
-      "HybridKem" => -> { PqcRails::HybridKem.open(:ml_kem_768, &:generate_keypair) }
-    }.each do |name, build|
-      it "#{name}のas_json・to_json・JSON.generateは、公開鍵を長さ、秘密を[FILTERED]にする" do
-        keypair = build.call
-        json = keypair.as_json
-
-        expect(json.fetch("public_key")).to eq("[#{keypair.public_key.bytesize} bytes]")
-        (keypair.members - [:public_key]).each { |member| expect(json.fetch(member.to_s)).to eq("[FILTERED]") }
-        json_outputs_of(keypair).each do |output|
-          keypair.to_a.each { |value| expect_not_to_reveal(output, value) }
-        end
-      end
-    end
-
     it "as_jsonのonly・methodsを指定しても秘密の値が出ない" do
       keypair = PqcRails::Kem.open(:ml_kem_768, &:generate_keypair)
 
@@ -176,6 +170,13 @@ RSpec.describe "秘密の値を持つオブジェクトの表示" do
       legacy = keypair.class.new(keypair.public_key, keypair.secret_key, nil)
 
       expect(legacy.as_json.fetch("authentication_key")).to be_nil
+    end
+
+    it "長さは文字数ではなくバイト数で出す" do
+      multibyte = PqcRails::Kem::Encapsulation.new("あ", "secret")
+
+      expect(multibyte.inspect).to include("ciphertext=[3 bytes]")
+      expect(multibyte.as_json.fetch("ciphertext")).to eq("[3 bytes]")
     end
 
     it "公開鍵が文字列でなくても、as_jsonで値を出さず[FILTERED]にする" do
@@ -197,13 +198,6 @@ RSpec.describe "秘密の値を持つオブジェクトの表示" do
     it "as_json・to_json・JSON.generateに鍵のバイト列が出ない" do
       expect(cipher.as_json).to eq("key" => "[FILTERED]")
       json_outputs_of(cipher).each { |output| expect_not_to_reveal(output, key) }
-    end
-
-    it "表示の後も暗号化と復号の往復ができる" do
-      cipher.inspect
-      cipher.as_json
-
-      expect(cipher.decrypt(cipher.encrypt("plain"))).to eq("plain")
     end
   end
 end

@@ -14,6 +14,7 @@ module PqcRails
   # 表示で例外を出すと、例外の画面やログで元のエラーが見えなくなるため。
   # 値の取り出し(keypair.secret_key・to_h・to_a)と==はStructのまま変えない。
   # to_h・to_aで取り出した値をログやJSONに渡せば、秘密の値はそのまま出る。
+  # YAML(to_yaml、Railsのdebugヘルパー)とMarshalは保存・復元の形式で、この処理を通らず秘密の値をそのまま出す。
   module RedactedStruct
     PUBLIC_MEMBERS = %i[public_key ciphertext].freeze
 
