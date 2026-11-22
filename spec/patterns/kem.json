@@ -1,5 +1,5 @@
 {
-  "test_command": "bundle exec rspec spec/pqc_rails/kem_spec.rb spec/pqc_rails/redacted_keypair_spec.rb spec/pqc_rails/secret_buffer_spec.rb",
+  "test_command": "bundle exec rspec spec/pqc_rails/kem_spec.rb spec/pqc_rails/redacted_struct_spec.rb spec/pqc_rails/secret_buffer_spec.rb",
   "rows": [
     {
       "id": "round-trip",
@@ -352,15 +352,15 @@
       "source_ref": "判断キュー nightly-pqc_rails-2026-11-20-keypair-inspect の回答（秘密鍵を [FILTERED] で伏せ、公開鍵は長さだけ。値の取り出しは変えない）と .claude/CLAUDE.md「コードレビューの追加観点」（鍵を inspect に出さない）",
       "tests": [
         {
-          "file": "spec/pqc_rails/redacted_keypair_spec.rb",
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
           "name": "inspect・to_s・pretty_inspectに秘密の値が含まれず、[FILTERED]と公開鍵の長さが出る"
         },
         {
-          "file": "spec/pqc_rails/redacted_keypair_spec.rb",
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
           "name": "値の取り出し・to_a・==は変わらない"
         },
         {
-          "file": "spec/pqc_rails/redacted_keypair_spec.rb",
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
           "name": "公開鍵が文字列でなくても、表示で例外を出さず[FILTERED]にする"
         }
       ],
@@ -370,14 +370,14 @@
           "id": "keypair-include-removed",
           "kind": "確かめる処理を消す",
           "file": "lib/pqc_rails/kem.rb",
-          "find": "      include RedactedKeypair\n",
-          "replace": "",
+          "find": "Keypair = Struct.new(:public_key, :secret_key) do\n      include RedactedStruct\n",
+          "replace": "Keypair = Struct.new(:public_key, :secret_key) do\n",
           "result": "killed"
         },
         {
           "id": "redact-secret-check-removed",
           "kind": "確かめる処理を消す",
-          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "file": "lib/pqc_rails/redacted_struct.rb",
           "find": "      return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)\n",
           "replace": "",
           "result": "killed"
@@ -385,7 +385,7 @@
         {
           "id": "redact-secret-check-inverted",
           "kind": "条件を反転する・常に真／偽にする",
-          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "file": "lib/pqc_rails/redacted_struct.rb",
           "find": "return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
           "replace": "return \"[FILTERED]\" if PUBLIC_MEMBERS.include?(name)",
           "result": "killed"
@@ -393,7 +393,7 @@
         {
           "id": "redact-to-s-removed",
           "kind": "フレームワークが呼ぶメソッドを消す",
-          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "file": "lib/pqc_rails/redacted_struct.rb",
           "find": "    def to_s = inspect\n",
           "replace": "",
           "result": "killed"
@@ -401,7 +401,7 @@
         {
           "id": "redact-pretty-print-removed",
           "kind": "フレームワークが呼ぶメソッドを消す",
-          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "file": "lib/pqc_rails/redacted_struct.rb",
           "find": "    def pretty_print(pp)\n      pp.text(inspect)\n    end\n",
           "replace": "",
           "result": "killed"
@@ -409,7 +409,7 @@
         {
           "id": "redact-public-key-raw",
           "kind": "戻り値を空・nil・固定値にする",
-          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "file": "lib/pqc_rails/redacted_struct.rb",
           "find": "      \"[#{value.bytesize} bytes]\"\n",
           "replace": "      value.inspect\n",
           "result": "killed"
@@ -418,14 +418,14 @@
           "id": "secret-key-reader-filtered",
           "kind": "戻り値を空・nil・固定値にする",
           "file": "lib/pqc_rails/kem.rb",
-          "find": "      include RedactedKeypair\n",
-          "replace": "      include RedactedKeypair\n\n      def secret_key = \"[FILTERED]\"\n",
+          "find": "Keypair = Struct.new(:public_key, :secret_key) do\n      include RedactedStruct\n",
+          "replace": "Keypair = Struct.new(:public_key, :secret_key) do\n      include RedactedStruct\n\n      def secret_key = \"[FILTERED]\"\n",
           "result": "killed"
         },
         {
           "id": "secret-shown-as-hex",
           "kind": "戻り値を空・nil・固定値にする",
-          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "file": "lib/pqc_rails/redacted_struct.rb",
           "find": "return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
           "replace": "return \"[FILTERED] #{value.unpack1('H*')}\" unless PUBLIC_MEMBERS.include?(name)",
           "result": "killed"
@@ -433,7 +433,7 @@
         {
           "id": "eq-always-true",
           "kind": "戻り値を空・nil・固定値にする",
-          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "file": "lib/pqc_rails/redacted_struct.rb",
           "find": "    def to_s = inspect\n",
           "replace": "    def to_s = inspect\n\n    def ==(_other) = true\n",
           "result": "killed"
@@ -441,7 +441,7 @@
         {
           "id": "secret-base64-appended",
           "kind": "戻り値を空・nil・固定値にする",
-          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "file": "lib/pqc_rails/redacted_struct.rb",
           "find": "return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
           "replace": "return \"[FILTERED] #{[value].pack('m0')}\" unless PUBLIC_MEMBERS.include?(name)",
           "result": "killed"
@@ -449,7 +449,7 @@
         {
           "id": "public-key-non-string-guard-removed",
           "kind": "確かめる処理を消す",
-          "file": "lib/pqc_rails/redacted_keypair.rb",
+          "file": "lib/pqc_rails/redacted_struct.rb",
           "find": "      return \"[FILTERED]\" unless value.respond_to?(:bytesize)\n",
           "replace": "",
           "result": "killed"
@@ -479,6 +479,163 @@
           "file": "lib/pqc_rails/secret_buffer.rb",
           "find": "pointer&.clear",
           "replace": "nil",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "encapsulation-redacted",
+      "pattern": "Encapsulation（Kem・DhKem・HybridKem）の inspect・to_s・pp",
+      "source": "spec",
+      "source_ref": "PENDING.md「KEM の結果（Encapsulation）ほか、秘密の値が表示・JSON に出る所を伏せる」完了条件1・4",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "inspect・to_s・ppで共有秘密を伏せ、暗号文は長さだけを出す"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "値の取り出し・to_h・to_a・==は変わらない"
+        }
+      ],
+      "guarantee": "3つの Encapsulation の表示に共有秘密・暗号文の値が出ず、shared_secret=[FILTERED]、ciphertext=[バイト数 bytes] と出る。取り出しと == は元の値のまま",
+      "mutants": [
+        {
+          "id": "encap-include-removed-kem",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/kem.rb",
+          "find": "Encapsulation = Struct.new(:ciphertext, :shared_secret) do\n      include RedactedStruct\n",
+          "replace": "Encapsulation = Struct.new(:ciphertext, :shared_secret) do\n",
+          "result": "killed"
+        },
+        {
+          "id": "encap-include-removed-dh",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/dh_kem.rb",
+          "find": "Encapsulation = Struct.new(:ciphertext, :shared_secret) do\n      include RedactedStruct\n",
+          "replace": "Encapsulation = Struct.new(:ciphertext, :shared_secret) do\n",
+          "result": "killed"
+        },
+        {
+          "id": "encap-include-removed-hybrid",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "Encapsulation = Struct.new(:ciphertext, :shared_secret) do\n      include RedactedStruct\n",
+          "replace": "Encapsulation = Struct.new(:ciphertext, :shared_secret) do\n",
+          "result": "killed"
+        },
+        {
+          "id": "ciphertext-not-public",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/redacted_struct.rb",
+          "find": "%i[public_key ciphertext]",
+          "replace": "%i[public_key]",
+          "result": "killed"
+        },
+        {
+          "id": "shared-secret-public",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/redacted_struct.rb",
+          "find": "%i[public_key ciphertext]",
+          "replace": "%i[public_key ciphertext shared_secret]",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "struct-as-json-redacted",
+      "pattern": "鍵ペアと Encapsulation の as_json・to_json・JSON.generate（入れ子を含む）",
+      "source": "spec",
+      "source_ref": "同じ節の完了条件2",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "as_json・to_json・JSON.generateに秘密の値が出ない"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "as_jsonのonly・methodsを指定しても秘密の値が出ない"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "認証鍵の無い0.3.0の鍵ペアは、as_jsonで認証鍵をnilにする"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "公開鍵が文字列でなくても、as_jsonで値を出さず[FILTERED]にする"
+        }
+      ],
+      "guarantee": "JSON の主な経路に秘密の値が出ず、公開鍵・暗号文は「[バイト数 bytes]」、秘密は「[FILTERED]」、nil は nil になる",
+      "mutants": [
+        {
+          "id": "as-json-removed",
+          "kind": "フレームワークが呼ぶメソッドを消す",
+          "file": "lib/pqc_rails/redacted_struct.rb",
+          "find": "    def as_json(_options = nil)\n      each_pair.to_h { |name, value| [name.to_s, redacted_value(name, value)] }\n    end\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "as-json-raw-values",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/redacted_struct.rb",
+          "find": "[name.to_s, redacted_value(name, value)]",
+          "replace": "[name.to_s, value]",
+          "result": "killed"
+        },
+        {
+          "id": "as-json-nil-filtered",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/redacted_struct.rb",
+          "find": "      return nil if value.nil?\n",
+          "replace": "",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "envelope-cipher-redacted",
+      "pattern": "EnvelopeCipher の inspect・pp・as_json・to_json",
+      "source": "spec",
+      "source_ref": "同じ節の完了条件3、判断キューの note「他にもあれば伏せる」",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "inspect・to_s・ppに鍵のバイト列が出ない"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "as_json・to_json・JSON.generateに鍵のバイト列が出ない"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "表示の後も暗号化と復号の往復ができる"
+        }
+      ],
+      "guarantee": "AES 鍵のバイト列が表示にも JSON にも出ず、表示の後も暗号化と復号が動く",
+      "mutants": [
+        {
+          "id": "envelope-inspect-removed",
+          "kind": "フレームワークが呼ぶメソッドを消す",
+          "file": "lib/pqc_rails/envelope_cipher.rb",
+          "find": "    def inspect = \"#<#{self.class.name} key=[FILTERED]>\"\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "envelope-as-json-removed",
+          "kind": "フレームワークが呼ぶメソッドを消す",
+          "file": "lib/pqc_rails/envelope_cipher.rb",
+          "find": "    def as_json(_options = nil) = { \"key\" => \"[FILTERED]\" }\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "envelope-inspect-shows-key",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/envelope_cipher.rb",
+          "find": "key=[FILTERED]>\"",
+          "replace": "key=#{@key.unpack1(\"H*\")}>\"",
           "result": "killed"
         }
       ]

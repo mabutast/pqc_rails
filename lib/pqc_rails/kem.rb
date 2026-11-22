@@ -4,7 +4,7 @@ require_relative "algorithms"
 require_relative "length_validation"
 require_relative "secret_buffer"
 require_relative "ffi/kem"
-require_relative "redacted_keypair"
+require_relative "redacted_struct"
 
 module PqcRails
   # 読み込んだliboqsの版(例: "0.16.0")。
@@ -27,9 +27,11 @@ module PqcRails
     include LengthValidation
 
     Keypair = Struct.new(:public_key, :secret_key) do
-      include RedactedKeypair
+      include RedactedStruct
     end
-    Encapsulation = Struct.new(:ciphertext, :shared_secret)
+    Encapsulation = Struct.new(:ciphertext, :shared_secret) do
+      include RedactedStruct
+    end
 
     attr_reader :alg_name
 
