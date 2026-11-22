@@ -133,5 +133,31 @@ RSpec.describe PqcRails::CiphertextFormat do
         described_class.ensure_legacy_cookie_accepted!(now: deadline + 1)
       end.to raise_error(PqcRails::Error, /legacy/)
     end
+
+    it "期限があれば、旧形式で書く設定でも期限で決める" do
+      PqcRails.configuration.ciphertext_format = :v0
+
+      expect { described_class.ensure_legacy_cookie_accepted!(now: deadline) }.not_to raise_error
+      expect { described_class.ensure_legacy_cookie_accepted!(now: deadline + 1) }
+        .to raise_error(PqcRails::Error, /legacy/)
+    ensure
+      PqcRails.configuration.ciphertext_format = :v1
+    end
+
+    context "期限が未設定のとき" do
+      let(:deadline) { nil }
+
+      it "新形式で書く設定では、旧形式のCookieを拒否する" do
+        expect { described_class.ensure_legacy_cookie_accepted! }.to raise_error(PqcRails::Error, /legacy/)
+      end
+
+      it "旧形式で書く設定(順番デプロイ中)では、旧形式のCookieを受け付ける" do
+        PqcRails.configuration.ciphertext_format = :v0
+
+        expect { described_class.ensure_legacy_cookie_accepted! }.not_to raise_error
+      ensure
+        PqcRails.configuration.ciphertext_format = :v1
+      end
+    end
   end
 end

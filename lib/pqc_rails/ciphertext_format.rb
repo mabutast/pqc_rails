@@ -102,12 +102,15 @@ module PqcRails
       raise PqcRails::Error, "legacy (v0) ciphertexts are not accepted (accept_legacy_records is false)"
     end
 
-    # 旧形式(v0)のセッションCookieの受け付け期限を過ぎていれば、PqcRails::Errorを送出する。
+    # 旧形式(v0)のセッションCookieを受け付けない状態なら、PqcRails::Errorを送出する。
+    # 旧形式は公開鍵だけで作れ、中身はMarshal.loadに渡るため、受け付けるのは期限内の場合と、
+    # 期限が未設定で旧形式を書いている場合(順番デプロイ中)だけにする。
     def ensure_legacy_cookie_accepted!(now: Time.now)
       deadline = PqcRails.configuration.accept_legacy_cookies_until
-      return if deadline.nil? || now <= deadline
+      return if deadline ? now <= deadline : write_legacy?
 
-      raise PqcRails::Error, "legacy (v0) session cookies are not accepted after #{deadline} (accept_legacy_cookies_until)"
+      raise PqcRails::Error,
+            "legacy (v0) session cookies are not accepted (accept_legacy_cookies_until: #{deadline.inspect})"
     end
 
     def hkdf(input_key_material, info)

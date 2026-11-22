@@ -64,9 +64,15 @@ module PqcRails
       cipher.update(ciphertext) + cipher.final
     end
 
-    # 既定のinspect(ppも使う)とActiveSupportのas_jsonはインスタンス変数を出すため、鍵を伏せる。
+    # 既定のinspect(ppも使う)・ActiveSupportのas_json・YAMLはインスタンス変数を出すため、鍵を伏せる。
     def inspect = "#<#{self.class.name} key=[FILTERED]>"
 
     def as_json(_options = nil) = { "key" => "[FILTERED]" }
+
+    # YAMLも同じ内容のタグ無しのマップにする。読み戻してもEnvelopeCipherにはならない。
+    def encode_with(coder)
+      coder.represent_map(nil, as_json)
+      coder.implicit = true
+    end
   end
 end

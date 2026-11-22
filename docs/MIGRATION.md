@@ -111,13 +111,13 @@ end
    PqcRails::KeySource.encode(keypair) # => 新しい鍵の文字列
    ```
 
-2. 1台だけで動かしている場合は、gem の更新と同時に、新しい鍵を `PQC_SESSION_KEY` / `PQC_RECORD_KEY` に、元の鍵を `PQC_SESSION_PREVIOUS_KEYS` / `PQC_RECORD_PREVIOUS_KEYS` に設定して再起動する
+2. 1台だけで動かしている場合は、gem の更新と同時に、新しい鍵を `PQC_SESSION_KEY` / `PQC_RECORD_KEY` に、元の鍵を `PQC_SESSION_PREVIOUS_KEYS` / `PQC_RECORD_PREVIOUS_KEYS` に設定して再起動する。既存のセッションを保つ場合は、再起動の前に手順5の期限も設定する
 3. 複数台を順番に更新する場合は、次の順で進める
    1. `config.ciphertext_format = :v0` を設定して gem を更新する。鍵は元のままでよい（旧形式は認証鍵を使わない）
    2. 全台の更新後、新しい鍵を `PQC_*_PREVIOUS_KEYS` に追加して全台を再起動する。これで、どのサーバーも新しい鍵の暗号文を読める
-   3. 新しい鍵を `PQC_*_KEY` に、元の鍵を `PQC_*_PREVIOUS_KEYS` に入れ替え、`ciphertext_format = :v0` を削除して全台を再起動する
+   3. 新しい鍵を `PQC_*_KEY` に、元の鍵を `PQC_*_PREVIOUS_KEYS` に入れ替え、`ciphertext_format = :v0` を削除して全台を再起動する。`:v0` を削除すると、期限が無い限り旧形式の Cookie は読まれないので、既存のセッションを保つ場合は同時に手順5の期限を設定する
 4. `rails pqc_rails:status` で、鍵が「設定済み」になっていることを確かめる
-5. 旧形式の Cookie を読む期限を設定する。更新日時に最長のセッション有効期限を足した日時を設定すれば、その後は旧形式の Cookie を自動的に読まなくなる
+5. 既存のセッションを保つ場合は、旧形式の Cookie を読む期限を設定する。設定しないと旧形式の Cookie は読まれず、そのセッションは切れる。更新日時に最長のセッション有効期限を足した日時を設定すれば、その後は旧形式の Cookie を自動的に読まなくなる
 
    ```ruby
    PqcRails.configure do |config|

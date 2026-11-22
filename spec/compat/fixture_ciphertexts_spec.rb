@@ -31,7 +31,7 @@ RSpec.describe "以前の版が書いた暗号文の読み込み(固定の検査
     original = [ENV.fetch("PQC_RECORD_KEY", nil), ENV.fetch("PQC_RECORD_PREVIOUS_KEYS", nil),
                 configuration.accept_legacy_records, configuration.accept_legacy_cookies_until]
     configuration.accept_legacy_records = true
-    configuration.accept_legacy_cookies_until = nil
+    configuration.accept_legacy_cookies_until = Time.now + 60
     example.run
   ensure
     ENV["PQC_RECORD_KEY"], ENV["PQC_RECORD_PREVIOUS_KEYS"] = original[0], original[1]
