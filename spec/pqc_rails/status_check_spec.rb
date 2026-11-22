@@ -197,6 +197,46 @@ RSpec.describe PqcRails::StatusCheck do
       ::ActiveRecord::Encryption.configure(primary_key: nil, deterministic_key: nil, key_derivation_salt: nil)
     end
 
+    describe "旧形式のCookie" do
+      around do |example|
+        original = [PqcRails.configuration.ciphertext_format, PqcRails.configuration.accept_legacy_cookies_until]
+        example.run
+      ensure
+        PqcRails.configuration.ciphertext_format, PqcRails.configuration.accept_legacy_cookies_until = original
+      end
+
+      def legacy_cookie_result = result_for(described_class.run, "旧形式のCookie")
+
+      it "ciphertext_formatが:v0の間は、設定の削除を促す警告を出す" do
+        PqcRails.configuration.ciphertext_format = :v0
+
+        expect(legacy_cookie_result.ok).to be(false)
+        expect(legacy_cookie_result.detail).to include(":v0", "削除")
+      end
+
+      it "期限内は読む期限を報告する" do
+        deadline = Time.now.utc + 3600
+        PqcRails.configuration.accept_legacy_cookies_until = deadline
+
+        expect(legacy_cookie_result.ok).to be(true)
+        expect(legacy_cookie_result.detail).to include(deadline.strftime("%Y-%m-%d %H:%M"), "まで")
+      end
+
+      it "期限後は読まないことを報告する" do
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now - 60
+
+        expect(legacy_cookie_result.ok).to be(true)
+        expect(legacy_cookie_result.detail).to include("読みません")
+      end
+
+      it "未設定なら読まないことを報告する" do
+        PqcRails.configuration.accept_legacy_cookies_until = nil
+
+        expect(legacy_cookie_result.ok).to be(true)
+        expect(legacy_cookie_result.detail).to include("読みません")
+      end
+    end
+
     describe "暗号化している属性" do
       let!(:model) do
         Class.new(::ActiveRecord::Base) do

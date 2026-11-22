@@ -35,6 +35,7 @@ module PqcRails
                               env_var: ActiveRecord::KeyProvider::PREVIOUS_ENV_VAR,
                               credentials_key: ActiveRecord::KeyProvider::PREVIOUS_CREDENTIALS_KEY),
         session_store_result,
+        legacy_cookie_result,
         active_record_encryption_result,
         encrypted_attributes_result,
         algorithms_result
@@ -112,6 +113,24 @@ module PqcRails
       end
     rescue StandardError => e
       Result.new(name: "セッションストア", ok: false, detail: "確認できませんでした(#{e.message})")
+    end
+
+    # 旧形式のCookieは公開鍵だけで作れるので、読み続けている状態に気付けるようにする。
+    def legacy_cookie_result
+      name = "旧形式のCookie"
+      config = PqcRails.configuration
+      deadline = config.accept_legacy_cookies_until
+      if config.ciphertext_format == :v0
+        Result.new(name: name, ok: false,
+                   detail: "ciphertext_formatが:v0なので、0.3.0以前の鍵宛の旧形式のCookieを読みます。全台の更新後に設定を削除してください")
+      elsif deadline.nil?
+        Result.new(name: name, ok: true, detail: "読みません")
+      elsif Time.now <= deadline
+        Result.new(name: name, ok: true,
+                   detail: "#{deadline.getutc.strftime('%Y-%m-%d %H:%M')} UTCまで、0.3.0以前の鍵宛のCookieを読みます")
+      else
+        Result.new(name: name, ok: true, detail: "期限を過ぎたので読みません。accept_legacy_cookies_untilは削除できます")
+      end
     end
 
     def active_record_encryption_result

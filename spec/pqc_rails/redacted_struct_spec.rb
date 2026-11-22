@@ -253,8 +253,13 @@ RSpec.describe "秘密の値を持つオブジェクトの表示" do
 
     it "Marshalの往復は元の値を保つ" do
       keypair = PqcRails::HybridKem.open(:ml_kem_768, &:generate_keypair)
+      encap = PqcRails::HybridKem.open(:ml_kem_768) { |kem| kem.encapsulate(keypair.public_key) }
+      key = OpenSSL::Random.random_bytes(32)
+      encrypted = PqcRails::EnvelopeCipher.new(key).encrypt("plain")
 
       expect(Marshal.load(Marshal.dump(keypair))).to eq(keypair)
+      expect(Marshal.load(Marshal.dump(encap))).to eq(encap)
+      expect(Marshal.load(Marshal.dump(PqcRails::EnvelopeCipher.new(key))).decrypt(encrypted)).to eq("plain")
     end
   end
 end

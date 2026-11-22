@@ -26,7 +26,7 @@
           "id": "skip-authentication-key-derivation",
           "kind": "鍵の導出を通さない・入力を1つ外す",
           "file": "lib/pqc_rails/cipher.rb",
-          "find": "data_key = CiphertextFormat.data_key(encap.shared_secret, key.authentication_key)",
+          "find": "data_key = CiphertextFormat.data_key(encap.shared_secret, key.authentication_key, purpose: :record)",
           "replace": "data_key = encap.shared_secret",
           "result": "killed"
         }
@@ -280,8 +280,8 @@
           "id": "decrypt-without-authentication-key",
           "kind": "鍵の導出を通さない・入力を1つ外す",
           "file": "lib/pqc_rails/cipher.rb",
-          "find": "data_key = authenticated ? CiphertextFormat.data_key(shared_secret, keypair.authentication_key) : shared_secret",
-          "replace": "data_key = authenticated ? shared_secret : CiphertextFormat.data_key(shared_secret, keypair.authentication_key)",
+          "find": "data_key = if authenticated\n",
+          "replace": "data_key = unless authenticated\n",
           "result": "killed"
         }
       ]
@@ -303,8 +303,8 @@
           "id": "decrypt-without-authentication-key-v1",
           "kind": "鍵の導出を通さない・入力を1つ外す",
           "file": "lib/pqc_rails/cipher.rb",
-          "find": "data_key = authenticated ? CiphertextFormat.data_key(shared_secret, keypair.authentication_key) : shared_secret",
-          "replace": "data_key = authenticated ? shared_secret : shared_secret",
+          "find": "CiphertextFormat.data_key(shared_secret, keypair.authentication_key, purpose: :record)",
+          "replace": "shared_secret",
           "result": "killed"
         }
       ]

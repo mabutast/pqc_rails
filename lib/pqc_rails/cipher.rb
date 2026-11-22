@@ -35,11 +35,11 @@ module PqcRails
 
       algorithm_id = CiphertextFormat.algorithm_id(@pq_alg_name)
       key_id = CiphertextFormat.key_id(key.public_key)
-      associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id)
+      associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id, purpose: :record)
 
       HybridKem.open(CiphertextFormat.canonical_pq_alg_name(@pq_alg_name)) do |hybrid|
         encap = hybrid.encapsulate(key.public_key)
-        data_key = CiphertextFormat.data_key(encap.shared_secret, key.authentication_key)
+        data_key = CiphertextFormat.data_key(encap.shared_secret, key.authentication_key, purpose: :record)
         envelope = EnvelopeCipher.new(data_key).encrypt(clear_text, associated_data: associated_data)
 
         ::ActiveRecord::Encryption::Message.new(payload: envelope).tap do |message|
@@ -110,7 +110,7 @@ module PqcRails
       key_id = header(encrypted_message, :kid)
       pq_alg_name = CiphertextFormat.pq_alg_name_for(algorithm_id, configured: @pq_alg_name)
       candidates = keypairs.select { |keypair| CiphertextFormat.key_id(keypair.public_key) == key_id }
-      associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id)
+      associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id, purpose: :record)
 
       try_keypairs(encrypted_message, candidates, pq_alg_name: pq_alg_name, associated_data: associated_data,
                                                   authenticated: true)
@@ -131,7 +131,11 @@ module PqcRails
       HybridKem.open(pq_alg_name) do |hybrid|
         keypairs.each do |keypair|
           shared_secret = hybrid.decapsulate(kem_ciphertext, keypair.secret_key)
-          data_key = authenticated ? CiphertextFormat.data_key(shared_secret, keypair.authentication_key) : shared_secret
+          data_key = if authenticated
+                       CiphertextFormat.data_key(shared_secret, keypair.authentication_key, purpose: :record)
+                     else
+                       shared_secret
+                     end
           clear_text = EnvelopeCipher.new(data_key).decrypt(encrypted_message.payload, associated_data: associated_data)
           return clear_text.force_encoding(Encoding::UTF_8)
         rescue OpenSSL::Cipher::CipherError, PqcRails::Error, ArgumentError, TypeError => e

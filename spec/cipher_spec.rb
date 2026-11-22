@@ -131,7 +131,8 @@ RSpec.describe PqcRails::Cipher do
     def forge_with_public_key(public_key, clear_text)
       algorithm_id = PqcRails::CiphertextFormat.algorithm_id(:ml_kem_512)
       key_id = PqcRails::CiphertextFormat.key_id(public_key)
-      associated_data = PqcRails::CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id)
+      associated_data = PqcRails::CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id,
+                                                                  purpose: :record)
 
       PqcRails::HybridKem.open(:ml_kem_512) do |hybrid|
         encap = hybrid.encapsulate(public_key)

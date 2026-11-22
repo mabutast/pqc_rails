@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "active_record"
+
 RSpec.describe PqcRails::Session::Encryptor do
   let(:keypair) { PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair } }
   let(:encryptor) { described_class.new(keypair, pq_alg_name: :ml_kem_512) }
@@ -55,14 +57,27 @@ RSpec.describe PqcRails::Session::Encryptor do
       PqcRails.configuration.accept_legacy_cookies_until = original_until
     end
 
+    let(:legacy_keypair) { PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key) }
+    let(:legacy_encryptor) { described_class.new(legacy_keypair, pq_alg_name: :ml_kem_512) }
+
     def decoded(blob) = Base64.strict_decode64(blob)
+
+    # 公開鍵だけで旧形式(v0)のCookieを作る。
+    def forge_legacy(public_key, session)
+      PqcRails::HybridKem.open(:ml_kem_512) do |hybrid|
+        encap = hybrid.encapsulate(public_key)
+        body = PqcRails::EnvelopeCipher.new(encap.shared_secret).encrypt(Marshal.dump(session))
+        Base64.strict_encode64(PqcRails::BlobPacking.pack(encap.ciphertext, body))
+      end
+    end
 
     # 公開鍵だけを使い、KEMの共有鍵をそのままAES鍵にしてv1形式のCookieを作る。
     # 秘密鍵を持たない者が作れるCookieに当たる。
     def forge_with_public_key(public_key, session)
       algorithm_id = PqcRails::CiphertextFormat.algorithm_id(:ml_kem_512)
       key_id = PqcRails::CiphertextFormat.key_id(public_key)
-      associated_data = PqcRails::CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id)
+      associated_data = PqcRails::CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id,
+                                                                  purpose: :session)
       header = [PqcRails::CiphertextFormat::VERSION, algorithm_id.bytesize].pack("CC") + algorithm_id + [key_id].pack("H4")
 
       PqcRails::HybridKem.open(:ml_kem_512) do |hybrid|
@@ -128,23 +143,23 @@ RSpec.describe PqcRails::Session::Encryptor do
     it "途中で切れた旧形式(v0)のCookieもPqcRails::Errorを送出する" do
       PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
       PqcRails.configuration.ciphertext_format = :v0
-      bytes = decoded(encryptor.encrypt({ "user_id" => 1 }))
+      bytes = decoded(legacy_encryptor.encrypt({ "user_id" => 1 }))
       PqcRails.configuration.ciphertext_format = :v1
 
       [bytes[0, 2], bytes[0, 4], bytes[0, 40], bytes[0..-2]].each do |bad|
-        expect { encryptor.decrypt(Base64.strict_encode64(bad)) }.to raise_error(PqcRails::Error)
+        expect { legacy_encryptor.decrypt(Base64.strict_encode64(bad)) }.to raise_error(PqcRails::Error)
       end
     end
 
     it "末尾に余分なバイトがあるCookie(新形式・旧形式)はPqcRails::Errorを送出する" do
       PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
       PqcRails.configuration.ciphertext_format = :v0
-      legacy = decoded(encryptor.encrypt({ "user_id" => 1 }))
+      legacy = decoded(legacy_encryptor.encrypt({ "user_id" => 1 }))
       PqcRails.configuration.ciphertext_format = :v1
       current = decoded(encryptor.encrypt({ "user_id" => 1 }))
 
-      [legacy, current].each do |bytes|
-        expect { encryptor.decrypt(Base64.strict_encode64(bytes + "\x00".b)) }
+      { legacy_encryptor => legacy, encryptor => current }.each do |reader, bytes|
+        expect { reader.decrypt(Base64.strict_encode64(bytes + "\x00".b)) }
           .to raise_error(PqcRails::Error, /trailing/)
       end
     end
@@ -159,47 +174,96 @@ RSpec.describe PqcRails::Session::Encryptor do
     context "ciphertext_format = :v0 のとき" do
       before { PqcRails.configuration.ciphertext_format = :v0 }
 
-      it "旧形式([4バイト長][KEM暗号文][4バイト長][AES暗号文])で書く" do
-        bytes = decoded(encryptor.encrypt({ "user_id" => 1 }))
+      it "0.3.0の鍵では旧形式([4バイト長][KEM暗号文][4バイト長][AES暗号文])で書く" do
+        bytes = decoded(legacy_encryptor.encrypt({ "user_id" => 1 }))
 
         expect(bytes.getbyte(0)).to eq(0)
+      end
+
+      it "認証鍵を持つ鍵では、読めないCookieを書かないようPqcRails::Errorを送出する" do
+        expect { encryptor.encrypt({ "user_id" => 1 }) }.to raise_error(PqcRails::Error, /authentication key/)
+      end
+
+      it "期限が未設定でも過去でも、0.3.0の鍵で旧形式のCookieを読む" do
+        [nil, Time.now - 60].each do |deadline|
+          PqcRails.configuration.accept_legacy_cookies_until = deadline
+
+          expect(legacy_encryptor.decrypt(legacy_encryptor.encrypt({ "user_id" => 1 }))).to eq({ "user_id" => 1 })
+        end
+      end
+
+      it "新しい形式のCookieは、この設定でも読む" do
+        PqcRails.configuration.ciphertext_format = :v1
+        blob = encryptor.encrypt({ "user_id" => 2 })
+        PqcRails.configuration.ciphertext_format = :v0
+
+        expect(encryptor.decrypt(blob)).to eq({ "user_id" => 2 })
       end
     end
 
     it "期限が未設定なら、公開鍵だけで作った旧形式のCookieをMarshal.loadに渡さず拒否する" do
-      forged = PqcRails::HybridKem.open(:ml_kem_512) do |hybrid|
-        encap = hybrid.encapsulate(keypair.public_key)
-        body = PqcRails::EnvelopeCipher.new(encap.shared_secret).encrypt(Marshal.dump({ "user_id" => 1 }))
-        Base64.strict_encode64(PqcRails::BlobPacking.pack(encap.ciphertext, body))
-      end
+      forged = forge_legacy(keypair.public_key, { "user_id" => 1 })
       allow(Marshal).to receive(:load).and_call_original
 
-      expect { encryptor.decrypt(forged) }.to raise_error(PqcRails::Error, /legacy/)
+      expect { legacy_encryptor.decrypt(forged) }.to raise_error(PqcRails::Error, /legacy/)
       expect(Marshal).not_to have_received(:load)
     end
 
-    it "旧形式で書く設定(順番デプロイ中)では、期限が未設定でも旧形式のCookieを読む" do
-      PqcRails.configuration.ciphertext_format = :v0
+    it "認証鍵を持つ鍵宛の旧形式のCookieは、期限内でも:v0でもMarshal.loadに渡さず拒否する" do
+      forged = forge_legacy(keypair.public_key, { "user_id" => 1 })
+      allow(Marshal).to receive(:load).and_call_original
 
-      expect(encryptor.decrypt(encryptor.encrypt({ "user_id" => 1 }))).to eq({ "user_id" => 1 })
+      [[:v1, Time.now + 60], [:v0, Time.now + 60], [:v0, nil]].each do |format, deadline|
+        PqcRails.configuration.ciphertext_format = format
+        PqcRails.configuration.accept_legacy_cookies_until = deadline
+
+        expect { encryptor.decrypt(forged) }.to raise_error(PqcRails::Error, /authentication key/)
+      end
+      expect(Marshal).not_to have_received(:load)
+    end
+
+    it "同じ鍵でも、DBカラムのv1暗号文をCookieの形に組み替えたものはMarshal.loadに届かない" do
+      message = PqcRails::Cipher.new(pq_alg_name: :ml_kem_512).encrypt(Marshal.dump({ "user_id" => 1 }), key: keypair)
+      algorithm_id = message.headers[:alg]
+      header = [PqcRails::CiphertextFormat::VERSION, algorithm_id.bytesize].pack("CC") + algorithm_id +
+               [message.headers[:kid]].pack("H4")
+      cookie = Base64.strict_encode64(header + PqcRails::BlobPacking.pack(message.headers[:kem_ct], message.payload))
+      allow(Marshal).to receive(:load).and_call_original
+
+      expect { encryptor.decrypt(cookie) }.to raise_error(PqcRails::Error)
+      expect(Marshal).not_to have_received(:load)
+    end
+
+    it "同じ鍵でも、Cookieのv1本体をDBカラムの暗号文に組み替えたものは復号できない" do
+      bytes = decoded(encryptor.encrypt("value"))
+      id_length = bytes.getbyte(1)
+      kem_ciphertext, encrypted = PqcRails::BlobPacking.unpack(bytes[(4 + id_length)..], exact: true)
+      message = ActiveRecord::Encryption::Message.new(payload: encrypted)
+      message.headers[:kem_ct] = kem_ciphertext
+      message.headers[:pv] = PqcRails::CiphertextFormat::VERSION
+      message.headers[:alg] = bytes[2, id_length]
+      message.headers[:kid] = bytes[2 + id_length, 2].unpack1("H4")
+
+      expect { PqcRails::Cipher.new(pq_alg_name: :ml_kem_512).decrypt(message, key: keypair) }
+        .to raise_error(ActiveRecord::Encryption::Errors::Decryption)
     end
 
     context "旧形式のCookieの受け付け期限(accept_legacy_cookies_until)" do
       let(:legacy_blob) do
         PqcRails.configuration.ciphertext_format = :v0
-        encryptor.encrypt({ "user_id" => 1 }).tap { PqcRails.configuration.ciphertext_format = :v1 }
+        legacy_encryptor.encrypt({ "user_id" => 1 }).tap { PqcRails.configuration.ciphertext_format = :v1 }
       end
 
       it "期限を過ぎたら旧形式のCookieを拒否する" do
         PqcRails.configuration.accept_legacy_cookies_until = Time.now - 60
 
-        expect { encryptor.decrypt(legacy_blob) }.to raise_error(PqcRails::Error, /legacy/)
+        expect { legacy_encryptor.decrypt(legacy_blob) }.to raise_error(PqcRails::Error, /legacy/)
       end
 
       it "期限前は旧形式のCookieを読む" do
         PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
 
-        expect(encryptor.decrypt(legacy_blob)).to eq({ "user_id" => 1 })
+        expect(legacy_encryptor.decrypt(legacy_blob)).to eq({ "user_id" => 1 })
       end
 
       it "期限を過ぎても、新しい形式のCookieは読む" do

@@ -72,6 +72,50 @@ RSpec.describe PqcRails::Session::PqcCookieStore do
     end
   end
 
+  describe "旧形式(v0)のCookie" do
+    let(:old_keypair) { PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key) }
+    let(:new_keypair) { PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair } }
+
+    around do |example|
+      original = [PqcRails.configuration.ciphertext_format, PqcRails.configuration.accept_legacy_cookies_until]
+      example.run
+    ensure
+      PqcRails.configuration.ciphertext_format, PqcRails.configuration.accept_legacy_cookies_until = original
+    end
+
+    def legacy_cookie(old_keypair, session_key)
+      PqcRails.configuration.ciphertext_format = :v0
+      response = Rack::MockRequest.new(build_app(old_keypair, session_key)).get("/write")
+      PqcRails.configuration.ciphertext_format = :v1
+      response.headers["Set-Cookie"].split(";").first
+    end
+
+    def read_body(app, cookie)
+      response = Rack::MockRequest.new(app).get("/read", "HTTP_COOKIE" => cookie)
+      expect(response.status).to eq(200)
+      response.body
+    end
+
+    it "鍵ローテーション中、旧鍵宛の旧形式のCookieは期限内なら読め、期限後と未設定では空セッションになる" do
+      cookie = legacy_cookie(old_keypair, session_key)
+      app = build_app(new_keypair, session_key, previous_keypairs: [old_keypair])
+
+      PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+      expect(read_body(app, cookie)).to eq("42")
+      [Time.now - 60, nil].each do |deadline|
+        PqcRails.configuration.accept_legacy_cookies_until = deadline
+        expect(read_body(app, cookie)).to eq("none")
+      end
+    end
+
+    it "認証鍵を持つ鍵宛の旧形式のCookieは、期限内でも例外にならず空セッションになる" do
+      cookie = legacy_cookie(old_keypair, session_key)
+      PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+
+      expect(read_body(build_app(keypair, session_key), cookie)).to eq("none")
+    end
+  end
+
   describe "鍵ローテーション(previous_keypairs)" do
     it "旧鍵で書かれたCookieもprevious_keypairsに旧鍵を渡せば復号できる" do
       old_keypair = keypair

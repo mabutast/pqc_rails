@@ -53,6 +53,11 @@ module PqcRails
 
       # 旧形式(v0): [4バイト長][KEM暗号文][4バイト長][AES暗号文]
       def seal_legacy(serialized)
+        unless @keypair.authentication_key.nil?
+          raise PqcRails::Error, "ciphertext_format :v0 cannot write session cookies with a key that has an " \
+                                 "authentication key, because such a cookie is not read back; see docs/MIGRATION.md"
+        end
+
         HybridKem.open(@pq_alg_name) do |hybrid|
           encap = hybrid.encapsulate(@keypair.public_key)
           BlobPacking.pack(encap.ciphertext, EnvelopeCipher.new(encap.shared_secret).encrypt(serialized))
@@ -60,7 +65,7 @@ module PqcRails
       end
 
       def open_legacy(bytes)
-        CiphertextFormat.ensure_legacy_cookie_accepted!
+        CiphertextFormat.ensure_legacy_cookie_accepted!(@keypair)
         ciphertext, encrypted = BlobPacking.unpack(bytes, exact: true)
 
         HybridKem.open(@pq_alg_name) do |hybrid|
@@ -73,12 +78,12 @@ module PqcRails
       def seal_v1(serialized)
         algorithm_id = CiphertextFormat.algorithm_id(@pq_alg_name)
         key_id = CiphertextFormat.key_id(@keypair.public_key)
-        associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id)
+        associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id, purpose: :session)
         header = [CiphertextFormat::VERSION, algorithm_id.bytesize].pack("CC") + algorithm_id + [key_id].pack("H4")
 
         HybridKem.open(CiphertextFormat.canonical_pq_alg_name(@pq_alg_name)) do |hybrid|
           encap = hybrid.encapsulate(@keypair.public_key)
-          data_key = CiphertextFormat.data_key(encap.shared_secret, @keypair.authentication_key)
+          data_key = CiphertextFormat.data_key(encap.shared_secret, @keypair.authentication_key, purpose: :session)
           encrypted = EnvelopeCipher.new(data_key).encrypt(serialized, associated_data: associated_data)
           header + BlobPacking.pack(encap.ciphertext, encrypted)
         end
@@ -99,12 +104,12 @@ module PqcRails
         end
 
         pq_alg_name = CiphertextFormat.pq_alg_name_for(algorithm_id, configured: @pq_alg_name)
-        associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id)
+        associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id, purpose: :session)
         ciphertext, encrypted = BlobPacking.unpack(body, exact: true)
 
         HybridKem.open(pq_alg_name) do |hybrid|
           shared_secret = hybrid.decapsulate(ciphertext, @keypair.secret_key)
-          data_key = CiphertextFormat.data_key(shared_secret, @keypair.authentication_key)
+          data_key = CiphertextFormat.data_key(shared_secret, @keypair.authentication_key, purpose: :session)
           EnvelopeCipher.new(data_key).decrypt(encrypted, associated_data: associated_data)
         end
       end

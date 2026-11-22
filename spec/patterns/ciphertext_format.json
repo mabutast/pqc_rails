@@ -228,16 +228,16 @@
           "id": "drop-algorithm-id",
           "kind": "確かめる処理を消す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "\"pqc_rails:v#{VERSION}:#{algorithm_id}:#{key_id}\"",
-          "replace": "\"pqc_rails:v#{VERSION}:#{key_id}\"",
+          "find": "\"pqc_rails:v#{VERSION}:#{purpose_label(purpose)}:#{algorithm_id}:#{key_id}\"",
+          "replace": "\"pqc_rails:v#{VERSION}:#{purpose_label(purpose)}:#{key_id}\"",
           "result": "killed"
         },
         {
           "id": "drop-key-id",
           "kind": "確かめる処理を消す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "\"pqc_rails:v#{VERSION}:#{algorithm_id}:#{key_id}\"",
-          "replace": "\"pqc_rails:v#{VERSION}:#{algorithm_id}\"",
+          "find": "\"pqc_rails:v#{VERSION}:#{purpose_label(purpose)}:#{algorithm_id}:#{key_id}\"",
+          "replace": "\"pqc_rails:v#{VERSION}:#{purpose_label(purpose)}:#{algorithm_id}\"",
           "result": "killed"
         }
       ]
@@ -263,15 +263,15 @@
           "id": "drop-auth-key",
           "kind": "鍵の導出を通さない・入力を1つ外す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "hkdf(shared_secret + authentication_key, DATA_KEY_INFO)",
-          "replace": "hkdf(shared_secret, DATA_KEY_INFO)",
+          "find": "hkdf(shared_secret + authentication_key, \"#{DATA_KEY_INFO}:#{purpose_label(purpose)}\")",
+          "replace": "hkdf(shared_secret, \"#{DATA_KEY_INFO}:#{purpose_label(purpose)}\")",
           "result": "killed"
         },
         {
           "id": "shared-secret-as-key",
           "kind": "鍵の導出を通さない・入力を1つ外す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "hkdf(shared_secret + authentication_key, DATA_KEY_INFO)",
+          "find": "hkdf(shared_secret + authentication_key, \"#{DATA_KEY_INFO}:#{purpose_label(purpose)}\")",
           "replace": "shared_secret",
           "result": "killed"
         }
@@ -407,9 +407,9 @@
     },
     {
       "id": "legacy-cookie-deadline",
-      "pattern": "旧形式の Cookie の受け付け（期限の前・後・ちょうど・未設定、:v0 の間）",
+      "pattern": "旧形式の Cookie の受け付け（鍵の世代・期限の前後・未設定・:v0 の間）",
       "source": "spec",
-      "source_ref": "README「暗号文の形式」：旧形式の Cookie は既定で読まず、accept_legacy_cookies_until の期限内と ciphertext_format = :v0 の間だけ読む",
+      "source_ref": "README「暗号文の形式」：旧形式の Cookie は既定で読まず、認証鍵を持たない鍵宛で、期限内か ciphertext_format = :v0 の間だけ読む",
       "tests": [
         {
           "file": "spec/session/encryptor_spec.rb",
@@ -420,6 +420,26 @@
           "name": "期限前は旧形式のCookieを読む"
         },
         {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "期限が未設定なら、公開鍵だけで作った旧形式のCookieをMarshal.loadに渡さず拒否する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "認証鍵を持つ鍵宛の旧形式のCookieは、期限内でも:v0でもMarshal.loadに渡さず拒否する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "期限が未設定でも過去でも、0.3.0の鍵で旧形式のCookieを読む"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "認証鍵を持つ鍵では、読めないCookieを書かないようPqcRails::Errorを送出する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "新しい形式のCookieは、この設定でも読む"
+        },
+        {
           "file": "spec/pqc_rails/ciphertext_format_spec.rb",
           "name": "期限ちょうどの時刻は、まだ旧形式のCookieを受け付ける"
         },
@@ -428,16 +448,12 @@
           "name": "期限を1秒でも過ぎたら、旧形式のCookieを拒否する"
         },
         {
-          "file": "spec/session/encryptor_spec.rb",
-          "name": "期限が未設定なら、公開鍵だけで作った旧形式のCookieをMarshal.loadに渡さず拒否する"
-        },
-        {
-          "file": "spec/session/encryptor_spec.rb",
-          "name": "旧形式で書く設定(順番デプロイ中)では、期限が未設定でも旧形式のCookieを読む"
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "旧形式で書く設定の間は、期限を過ぎても0.3.0の鍵では受け付ける"
         },
         {
           "file": "spec/pqc_rails/ciphertext_format_spec.rb",
-          "name": "期限があれば、旧形式で書く設定でも期限で決める"
+          "name": "認証鍵を持つ鍵は、期限内でも旧形式で書く設定でも拒否する"
         },
         {
           "file": "spec/pqc_rails/ciphertext_format_spec.rb",
@@ -446,9 +462,17 @@
         {
           "file": "spec/pqc_rails/ciphertext_format_spec.rb",
           "name": "旧形式で書く設定(順番デプロイ中)では、旧形式のCookieを受け付ける"
+        },
+        {
+          "file": "spec/session/pqc_cookie_store_spec.rb",
+          "name": "鍵ローテーション中、旧鍵宛の旧形式のCookieは期限内なら読め、期限後と未設定では空セッションになる"
+        },
+        {
+          "file": "spec/session/pqc_cookie_store_spec.rb",
+          "name": "認証鍵を持つ鍵宛の旧形式のCookieは、期限内でも例外にならず空セッションになる"
         }
       ],
-      "guarantee": "期限があれば期限ちょうどまで読み、1秒でも過ぎたら :v0 でも拒否する。期限が未設定なら :v0 の間だけ読み、それ以外は Marshal.load に渡す前に拒否する",
+      "guarantee": "認証鍵を持つ鍵宛の旧形式は常に Marshal.load の前に拒否する。0.3.0 の鍵は :v0 の間と期限ちょうどまで読み、未設定や期限後は拒否して、ストアでは空セッションになる",
       "mutants": [
         {
           "id": "boundary",
@@ -462,7 +486,7 @@
           "id": "drop-nil",
           "kind": "打ち切りを消す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "return if deadline ? now <= deadline : write_legacy?",
+          "find": "return if deadline && now <= deadline",
           "replace": "return if deadline.nil? || now <= deadline",
           "result": "killed"
         },
@@ -478,32 +502,40 @@
           "id": "error-class-runtime",
           "kind": "例外の種類を変える",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "raise PqcRails::Error,\n            \"legacy (v0) session cookies",
-          "replace": "raise RuntimeError,\n            \"legacy (v0) session cookies",
+          "find": "raise PqcRails::Error,\n            \"legacy (v0) session cookies are not accepted",
+          "replace": "raise RuntimeError,\n            \"legacy (v0) session cookies are not accepted",
           "result": "killed"
         },
         {
-          "id": "nil-never-accepts",
-          "kind": "条件を反転する・常に真／偽にする",
+          "id": "key-generation-check-removed",
+          "kind": "確かめる処理を消す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "return if deadline ? now <= deadline : write_legacy?",
-          "replace": "return if deadline && now <= deadline",
+          "find": "unless keypair.authentication_key.nil?",
+          "replace": "unless true",
           "result": "killed"
         },
         {
-          "id": "v0-overrides-deadline",
-          "kind": "条件を反転する・常に真／偽にする",
+          "id": "v0-mode-removed",
+          "kind": "打ち切りを消す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "return if deadline ? now <= deadline : write_legacy?",
-          "replace": "return if write_legacy? || (deadline && now <= deadline)",
+          "find": "      return if write_legacy?\n",
+          "replace": "",
           "result": "killed"
         },
         {
           "id": "check-removed-before-marshal",
           "kind": "確かめる処理を消す",
           "file": "lib/pqc_rails/session/encryptor.rb",
-          "find": "        CiphertextFormat.ensure_legacy_cookie_accepted!\n",
+          "find": "        CiphertextFormat.ensure_legacy_cookie_accepted!(@keypair)\n",
           "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "write-guard-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "unless @keypair.authentication_key.nil?",
+          "replace": "unless true",
           "result": "killed"
         }
       ]
@@ -531,6 +563,120 @@
           "file": "lib/pqc_rails/ciphertext_format.rb",
           "find": "ciphertext_format == :v0",
           "replace": "ciphertext_format != :v0",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "purpose-separation",
+      "pattern": "同じ鍵で DB の暗号文と Cookie を組み替える、未知の用途",
+      "source": "spec",
+      "source_ref": "README「暗号文の形式」：鍵導出と追加認証データに用途を入れる",
+      "tests": [
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "同じ鍵でも、DBカラムのv1暗号文をCookieの形に組み替えたものはMarshal.loadに届かない"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "同じ鍵でも、Cookieのv1本体をDBカラムの暗号文に組み替えたものは復号できない"
+        },
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "用途が違えば異なる値になる"
+        },
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "用途が違えば、同じ共有鍵と認証鍵からでも異なるAES鍵になる"
+        },
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "未知の用途はArgumentErrorを送出する"
+        }
+      ],
+      "guarantee": "鍵導出と追加認証データがそれぞれ用途で変わり、組み替えた暗号文は両方向とも復号できない。未知の用途は例外",
+      "mutants": [
+        {
+          "id": "info-without-purpose",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "hkdf(shared_secret + authentication_key, \"#{DATA_KEY_INFO}:#{purpose_label(purpose)}\")",
+          "replace": "hkdf(shared_secret + authentication_key, DATA_KEY_INFO)",
+          "result": "killed"
+        },
+        {
+          "id": "aad-without-purpose",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "\"pqc_rails:v#{VERSION}:#{purpose_label(purpose)}:#{algorithm_id}:#{key_id}\"",
+          "replace": "\"pqc_rails:v#{VERSION}:#{algorithm_id}:#{key_id}\"",
+          "result": "killed"
+        },
+        {
+          "id": "both-without-purpose",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "      purpose.to_s\n",
+          "replace": "      \"same\"\n",
+          "result": "killed"
+        },
+        {
+          "id": "unknown-purpose-allowed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "      raise ArgumentError, \"unknown ciphertext purpose: #{purpose.inspect}\" unless PURPOSES.include?(purpose)\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "session-uses-record",
+          "kind": "定数を変える",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "CiphertextFormat.data_key(shared_secret, @keypair.authentication_key, purpose: :session)",
+          "replace": "CiphertextFormat.data_key(shared_secret, @keypair.authentication_key, purpose: :record)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "authentication-key-length",
+      "pattern": "認証鍵が空・31・33・64バイト、文字列でない値",
+      "source": "spec",
+      "source_ref": "鍵ペアの認証鍵は32バイトのランダムな値（README「暗号文の形式」）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "32バイトの文字列でない認証鍵はPqcRails::Errorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "認証鍵が無い鍵ペアではPqcRails::MissingAuthenticationKeyErrorを送出する"
+        }
+      ],
+      "guarantee": "32バイトの文字列以外の認証鍵では AES 鍵を導かない。nil は MissingAuthenticationKeyError、それ以外は PqcRails::Error",
+      "mutants": [
+        {
+          "id": "length-check-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "unless authentication_key.is_a?(String) && authentication_key.bytesize == KEY_LENGTH",
+          "replace": "unless true",
+          "result": "killed"
+        },
+        {
+          "id": "length-allows-longer",
+          "kind": "境界をずらす",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "authentication_key.bytesize == KEY_LENGTH",
+          "replace": "authentication_key.bytesize >= KEY_LENGTH",
+          "result": "killed"
+        },
+        {
+          "id": "string-check-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "authentication_key.is_a?(String) && ",
+          "replace": "",
           "result": "killed"
         }
       ]
