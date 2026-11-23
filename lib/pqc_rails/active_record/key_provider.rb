@@ -35,14 +35,24 @@ module PqcRails
         end
       end
 
-      # ActiveRecord::Encryptionの今のコンテキストに設定された、pqc_railsの鍵を返すKeyProvider。無ければnil。
-      def self.configured
-        return unless defined?(::ActiveRecord::Encryption)
+      class << self
+        # Context.install!で設定したKeyProvider。with_encryption_contextの中でも判定から外れないように持つ。
+        attr_accessor :installed
 
-        provider = ::ActiveRecord::Encryption.context.key_provider
-        provider if provider.respond_to?(:public_keys)
-      rescue ::ActiveRecord::Encryption::Errors::Configuration
-        nil
+        # install!で設定したものと、今のコンテキストのもののうち、pqc_railsの鍵を返すKeyProvider。
+        def configured
+          [installed, current_context_provider].compact.uniq.select { |provider| provider.respond_to?(:public_keys) }
+        end
+
+        private
+
+        def current_context_provider
+          return unless defined?(::ActiveRecord::Encryption)
+
+          ::ActiveRecord::Encryption.context.key_provider
+        rescue ::ActiveRecord::Encryption::Errors::Configuration
+          nil
+        end
       end
 
       def initialize(key_source: default_key_source)

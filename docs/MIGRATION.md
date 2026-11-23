@@ -199,6 +199,7 @@ end
 ```
 
 - `PqcRails::Cipher.new` の `pq_alg_name:` は、導入時に `Context.install!(pq_alg_name: ...)` へ渡していた値と一致させてください。省略するとデフォルト（`:ml_kem_768`）が使われ、README の案内に従って `:ml_kem_512` 等へ変更していた場合は KEM 暗号文の長さが合わず復号に失敗します。
+- `Context.install!` を外す前に、Rails 標準の暗号化の `primary_key`・`deterministic_key`・`key_derivation_salt` を設定してください。導入前の値が残っていればそれを戻し、無ければ `bin/rails db:encryption:init` で生成します。設定が無いまま外すと、暗号化属性の保存と `record.encrypt` が `ActiveRecord::Encryption::Errors::Configuration` になります。
 - `Context.install!` の呼び出し自体を削除（または呼ばない状態に戻す）することで、新規の暗号化は Rails 標準（AES-256-GCM + 導出鍵）に戻ります。
 - 完全に pqc_rails 以前の状態へ戻したい場合は、上記「一括再暗号化したい場合」と同じ要領で全レコードに `record.encrypt` を実行し、Rails 標準方式で再暗号化してください（`save!` では再暗号化されません）。
 - 移行が完了し pqc_rails 方式のデータが残っていないことを確認できるまで、`PQC_RECORD_KEY`（または `pqc_record_key` credentials）は削除しないでください。

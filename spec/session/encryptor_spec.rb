@@ -283,6 +283,26 @@ RSpec.describe PqcRails::Session::Encryptor do
         expect(legacy_encryptor.decrypt(forged)).to eq({ "user_id" => 1 })
       end
 
+      it "install!の鍵ソースと同じ鍵は、別のコンテキストの中でも拒否する" do
+        ENV.delete("PQC_RECORD_KEY")
+        ENV.delete("PQC_RECORD_PREVIOUS_KEYS")
+        source = Struct.new(:current_keypair, :previous_keypairs).new(legacy_keypair, [])
+        other = Struct.new(:current_keypair, :previous_keypairs)
+                      .new(PqcRails::HybridKem.open(:ml_kem_512, &:generate_keypair), [])
+        original = PqcRails::ActiveRecord::KeyProvider.installed
+        PqcRails::ActiveRecord::KeyProvider.installed = PqcRails::ActiveRecord::KeyProvider.new(key_source: source)
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+        forged = forge_legacy(keypair.public_key, { "user_id" => 1 })
+
+        ActiveRecord::Encryption.with_encryption_context(
+          key_provider: PqcRails::ActiveRecord::KeyProvider.new(key_source: other)
+        ) do
+          expect { legacy_encryptor.decrypt(forged) }.to raise_error(PqcRails::Error, /records/)
+        end
+      ensure
+        PqcRails::ActiveRecord::KeyProvider.installed = original
+      end
+
       it "公開鍵の文字コードが違っても、同じバイト列なら同じ鍵と判定する" do
         ENV.delete("PQC_RECORD_KEY")
         ENV.delete("PQC_RECORD_PREVIOUS_KEYS")

@@ -151,7 +151,7 @@ module PqcRails
     end
 
     def record_key_blocks_legacy?
-      [ActiveRecord::KeyProvider.new, ActiveRecord::KeyProvider.configured].compact.any? do |provider|
+      [ActiveRecord::KeyProvider.new, *ActiveRecord::KeyProvider.configured].any? do |provider|
         record_key_has_authentication_key?(provider)
       end
     end

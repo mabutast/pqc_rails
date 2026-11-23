@@ -20,6 +20,7 @@ module PqcRails
                    primary_key: existing_config_value(:primary_key),
                    deterministic_key: existing_config_value(:deterministic_key),
                    key_derivation_salt: existing_config_value(:key_derivation_salt))
+        PqcRails::ActiveRecord::KeyProvider.installed = key_provider
         ::ActiveRecord::Encryption.configure(
           key_provider: key_provider,
           cipher: PqcRails::Cipher.new(pq_alg_name: pq_alg_name),

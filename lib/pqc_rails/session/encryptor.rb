@@ -49,7 +49,7 @@ module PqcRails
 
       private
 
-      # 既定の鍵の置き場所と、ActiveRecord::Encryptionの今のコンテキストの鍵ソースの両方を見る。
+      # 既定の鍵の置き場所と、Context.install!の鍵ソース、ActiveRecord::Encryptionの今のコンテキストの鍵ソースを見る。
       # 属性ごとに指定したkey_providerは対象外。
       def shared_with_records?
         public_key = @keypair.public_key.b
@@ -63,8 +63,7 @@ module PqcRails
 
       # コンテキストはスレッドや処理の範囲で変わるので、結果を覚えない。
       def configured_record_public_keys
-        provider = ActiveRecord::KeyProvider.configured
-        provider ? provider.public_keys.map(&:b) : []
+        ActiveRecord::KeyProvider.configured.flat_map(&:public_keys).map(&:b)
       end
 
       def open_cookie(bytes)

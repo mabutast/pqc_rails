@@ -734,6 +734,10 @@
         {
           "file": "spec/session/encryptor_spec.rb",
           "name": "公開鍵の文字コードが違っても、同じバイト列なら同じ鍵と判定する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "install!の鍵ソースと同じ鍵は、別のコンテキストの中でも拒否する"
         }
       ],
       "guarantee": "DB の現行鍵・旧鍵と同じ鍵では、旧形式の Cookie を Marshal.load の前に拒否し、:v0 でも書かない。別の鍵なら期限内は読む",
@@ -782,16 +786,32 @@
           "id": "configured-result-memoized",
           "kind": "状態を覚える",
           "file": "lib/pqc_rails/session/encryptor.rb",
-          "find": "        provider = ActiveRecord::KeyProvider.configured\n        provider ? provider.public_keys.map(&:b) : []\n",
-          "replace": "        @configured_keys ||= begin\n          provider = ActiveRecord::KeyProvider.configured\n          provider ? provider.public_keys.map(&:b) : []\n        end\n",
+          "find": "        ActiveRecord::KeyProvider.configured.flat_map(&:public_keys).map(&:b)\n",
+          "replace": "        @configured_keys ||= ActiveRecord::KeyProvider.configured.flat_map(&:public_keys).map(&:b)\n",
           "result": "killed"
         },
         {
           "id": "public-key-encoding-compared",
           "kind": "比較の条件を変える",
           "file": "lib/pqc_rails/session/encryptor.rb",
-          "find": "provider ? provider.public_keys.map(&:b) : []",
-          "replace": "provider ? provider.public_keys : []",
+          "find": "ActiveRecord::KeyProvider.configured.flat_map(&:public_keys).map(&:b)",
+          "replace": "ActiveRecord::KeyProvider.configured.flat_map(&:public_keys)",
+          "result": "killed"
+        },
+        {
+          "id": "installed-provider-ignored",
+          "kind": "範囲を狭める",
+          "file": "lib/pqc_rails/active_record/key_provider.rb",
+          "find": "[installed, current_context_provider]",
+          "replace": "[current_context_provider]",
+          "result": "killed"
+        },
+        {
+          "id": "context-provider-ignored",
+          "kind": "範囲を狭める",
+          "file": "lib/pqc_rails/active_record/key_provider.rb",
+          "find": "[installed, current_context_provider]",
+          "replace": "[installed]",
           "result": "killed"
         }
       ]
