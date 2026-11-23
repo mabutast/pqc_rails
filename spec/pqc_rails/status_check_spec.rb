@@ -257,6 +257,53 @@ RSpec.describe PqcRails::StatusCheck do
         expect(legacy_cookie_result.detail).to include("同じ鍵", "読みません")
       end
 
+      it "現行のセッション鍵がDBと同じでも、期限内に読まないことを警告する" do
+        legacy = PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key)
+        ENV["PQC_SESSION_KEY"] = PqcRails::KeySource.encode(legacy)
+        ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(legacy)
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now + 3600
+
+        expect(legacy_cookie_result.ok).to be(false)
+      end
+
+      it "認証鍵を持つセッション鍵がDBと同じだけなら、旧形式の警告を出さない" do
+        ENV["PQC_SESSION_KEY"] = PqcRails::KeySource.encode(keypair)
+        ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(keypair)
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now + 3600
+
+        expect(legacy_cookie_result.ok).to be(true)
+      end
+
+      it "期限を過ぎていれば、同じ鍵でも警告しない" do
+        legacy = PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key)
+        ENV["PQC_SESSION_KEY"] = PqcRails::KeySource.encode(legacy)
+        ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(legacy)
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now - 60
+
+        expect(legacy_cookie_result.ok).to be(true)
+      end
+
+      it "鍵の値がBase64として不正でも、statusは例外で終わらない" do
+        ENV["PQC_SESSION_KEY"] = "not base64!"
+        ENV["PQC_SESSION_PREVIOUS_KEYS"] = "not base64!"
+        ENV["PQC_RECORD_KEY"] = "not base64!"
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now + 3600
+        expect { described_class.run }.not_to raise_error
+
+        PqcRails.configuration.ciphertext_format = :v0
+        expect { described_class.run }.not_to raise_error
+      end
+
+      it ":v0で、コンテキストの鍵ソースの鍵が認証鍵を持つなら、保存がエラーになることを報告する" do
+        source = Struct.new(:current_keypair, :previous_keypairs).new(keypair, [])
+        provider = PqcRails::ActiveRecord::KeyProvider.new(key_source: source)
+        PqcRails.configuration.ciphertext_format = :v0
+
+        ActiveRecord::Encryption.with_encryption_context(key_provider: provider) do
+          expect(legacy_cookie_result.detail).to include("DBレコード鍵", "エラー")
+        end
+      end
+
       it "期限内は読む期限を報告する" do
         deadline = Time.now.utc + 3600
         PqcRails.configuration.accept_legacy_cookies_until = deadline

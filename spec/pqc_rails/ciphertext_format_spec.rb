@@ -131,6 +131,21 @@ RSpec.describe PqcRails::CiphertextFormat do
       expect(secret).to eq("\xFF".b * 32)
     end
 
+    it "鍵導出の途中のコピーをゼロで埋める" do
+      wiped = []
+      allow(PqcRails::SecretBuffer).to receive(:wipe).and_wrap_original do |original, *strings|
+        original.call(*strings)
+        wiped.concat(strings)
+      end
+
+      described_class.data_key(shared_secret, authentication_key, purpose: :record)
+
+      expect(wiped.map(&:bytesize)).to contain_exactly(64, 32, 32)
+      expect(wiped.join.bytes).to all(eq(0))
+      expect(shared_secret).to eq("\x01" * 32)
+      expect(authentication_key).to eq("\x02" * 32)
+    end
+
     it "32バイトの文字列でない認証鍵はPqcRails::Errorを送出する" do
       ["", "\x02" * 31, "\x02" * 33, "\x02" * 64, 123, :key, Array.new(32, 2)].each do |bad|
         expect { described_class.data_key(shared_secret, bad, purpose: :record) }.to raise_error(PqcRails::Error) do |error|

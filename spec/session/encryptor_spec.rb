@@ -268,6 +268,35 @@ RSpec.describe PqcRails::Session::Encryptor do
         end
       end
 
+      it "コンテキストの鍵ソースの判定を覚えず、範囲の外と中でそれぞれ判定する" do
+        ENV.delete("PQC_RECORD_KEY")
+        ENV.delete("PQC_RECORD_PREVIOUS_KEYS")
+        source = Struct.new(:current_keypair, :previous_keypairs).new(legacy_keypair, [])
+        provider = PqcRails::ActiveRecord::KeyProvider.new(key_source: source)
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+        forged = forge_legacy(keypair.public_key, { "user_id" => 1 })
+
+        expect(legacy_encryptor.decrypt(forged)).to eq({ "user_id" => 1 })
+        ActiveRecord::Encryption.with_encryption_context(key_provider: provider) do
+          expect { legacy_encryptor.decrypt(forged) }.to raise_error(PqcRails::Error, /records/)
+        end
+        expect(legacy_encryptor.decrypt(forged)).to eq({ "user_id" => 1 })
+      end
+
+      it "公開鍵の文字コードが違っても、同じバイト列なら同じ鍵と判定する" do
+        ENV.delete("PQC_RECORD_KEY")
+        ENV.delete("PQC_RECORD_PREVIOUS_KEYS")
+        utf8 = PqcRails::HybridKem::Keypair.new(keypair.public_key.dup.force_encoding(Encoding::UTF_8), keypair.secret_key)
+        source = Struct.new(:current_keypair, :previous_keypairs).new(utf8, [])
+        provider = PqcRails::ActiveRecord::KeyProvider.new(key_source: source)
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+
+        ActiveRecord::Encryption.with_encryption_context(key_provider: provider) do
+          expect { legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 })) }
+            .to raise_error(PqcRails::Error, /records/)
+        end
+      end
+
       it "DBと同じ鍵では、:v0でCookieを書くとPqcRails::Errorを送出する" do
         ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(legacy_keypair)
         PqcRails.configuration.ciphertext_format = :v0

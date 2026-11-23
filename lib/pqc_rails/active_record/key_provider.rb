@@ -35,6 +35,16 @@ module PqcRails
         end
       end
 
+      # ActiveRecord::Encryptionの今のコンテキストに設定された、pqc_railsの鍵を返すKeyProvider。無ければnil。
+      def self.configured
+        return unless defined?(::ActiveRecord::Encryption)
+
+        provider = ::ActiveRecord::Encryption.context.key_provider
+        provider if provider.respond_to?(:public_keys)
+      rescue ::ActiveRecord::Encryption::Errors::Configuration
+        nil
+      end
+
       def initialize(key_source: default_key_source)
         @key_source = key_source
       end

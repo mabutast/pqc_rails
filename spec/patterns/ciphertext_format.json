@@ -640,7 +640,7 @@
     },
     {
       "id": "authentication-key-length",
-      "pattern": "認証鍵が空・31・33・64バイト、文字列でない値",
+      "pattern": "認証鍵が空・31・33・64バイト、文字列でない値、鍵導出の途中のコピー",
       "source": "spec",
       "source_ref": "鍵ペアの認証鍵は32バイトのランダムな値（README「暗号文の形式」）",
       "tests": [
@@ -651,9 +651,13 @@
         {
           "file": "spec/pqc_rails/ciphertext_format_spec.rb",
           "name": "認証鍵が無い鍵ペアではPqcRails::MissingAuthenticationKeyErrorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "鍵導出の途中のコピーをゼロで埋める"
         }
       ],
-      "guarantee": "32バイトの文字列以外の認証鍵では AES 鍵を導かない。nil は MissingAuthenticationKeyError、それ以外は PqcRails::Error",
+      "guarantee": "32バイトの文字列以外の認証鍵では AES 鍵を導かない。nil は MissingAuthenticationKeyError、それ以外は PqcRails::Error。途中のコピーをゼロで埋め、引数は書き換えない",
       "mutants": [
         {
           "id": "length-check-removed",
@@ -677,6 +681,22 @@
           "file": "lib/pqc_rails/ciphertext_format.rb",
           "find": "authentication_key.is_a?(String) && ",
           "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "wipe-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "      SecretBuffer.wipe(material, secret_part, authentication_part)\n",
+          "replace": "      nil\n",
+          "result": "killed"
+        },
+        {
+          "id": "wipe-material-only",
+          "kind": "範囲を狭める",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "SecretBuffer.wipe(material, secret_part, authentication_part)",
+          "replace": "SecretBuffer.wipe(material)",
           "result": "killed"
         }
       ]
@@ -706,6 +726,14 @@
         {
           "file": "spec/session/encryptor_spec.rb",
           "name": "ActiveRecord::Encryptionに設定した鍵ソースの鍵と同じでも拒否する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "コンテキストの鍵ソースの判定を覚えず、範囲の外と中でそれぞれ判定する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "公開鍵の文字コードが違っても、同じバイト列なら同じ鍵と判定する"
         }
       ],
       "guarantee": "DB の現行鍵・旧鍵と同じ鍵では、旧形式の Cookie を Marshal.load の前に拒否し、:v0 でも書かない。別の鍵なら期限内は読む",
@@ -746,8 +774,24 @@
           "id": "configured-provider-ignored",
           "kind": "範囲を狭める",
           "file": "lib/pqc_rails/session/encryptor.rb",
-          "find": "        providers << configured if configured.respond_to?(:public_keys)\n",
+          "find": " || configured_record_public_keys.include?(public_key)",
           "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "configured-result-memoized",
+          "kind": "状態を覚える",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "        provider = ActiveRecord::KeyProvider.configured\n        provider ? provider.public_keys.map(&:b) : []\n",
+          "replace": "        @configured_keys ||= begin\n          provider = ActiveRecord::KeyProvider.configured\n          provider ? provider.public_keys.map(&:b) : []\n        end\n",
+          "result": "killed"
+        },
+        {
+          "id": "public-key-encoding-compared",
+          "kind": "比較の条件を変える",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "provider ? provider.public_keys.map(&:b) : []",
+          "replace": "provider ? provider.public_keys : []",
           "result": "killed"
         }
       ]

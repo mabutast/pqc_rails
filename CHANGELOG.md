@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in docs/MIGRATION.md.
 - `PqcRails.configuration.ciphertext_format`: set to `:v0` to keep writing the 0.3.0 format while
   servers are updated one by one, then remove the setting. Defaults to `:v1`.
+- `PqcRails::ActiveRecord::Context.install!` accepts `key_provider:`, so a custom key source can be
+  passed as described in docs/MIGRATION.md.
 - `PqcRails.configuration.accept_legacy_records`: set to `false` to reject ActiveRecord ciphertexts
   in the 0.3.0 format once all records have been re-encrypted. Defaults to `true`.
 - `PqcRails.configuration.accept_legacy_cookies_until`: a `Time` until which session cookies in the
