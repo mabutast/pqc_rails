@@ -75,5 +75,101 @@ RSpec.describe PqcRails::Generators::InstallGenerator do
       expect(credentials.config[:existing_secret]).to eq("keep-me")
       expect(credentials.config[:pqc_session_key]).to be_a(String)
     end
+
+    it "pqc_record_keyに認証鍵を持つ有効なキーペアを書き込む" do
+      credentials = build_credentials(@destination_root)
+
+      run_generator(credentials)
+
+      keypair = PqcRails::KeySource.decode(credentials.config[:pqc_record_key])
+      expect(keypair.public_key).to be_a(String)
+      expect(keypair.authentication_key).to be_a(String)
+    end
+
+    it "セッションとDBに別の鍵を書き込む" do
+      credentials = build_credentials(@destination_root)
+
+      run_generator(credentials)
+
+      expect(credentials.config[:pqc_record_key]).not_to eq(credentials.config[:pqc_session_key])
+    end
+
+    it "再実行しても両方の鍵を上書きしない" do
+      credentials = build_credentials(@destination_root)
+      run_generator(credentials)
+      session_key = credentials.config[:pqc_session_key]
+      record_key = credentials.config[:pqc_record_key]
+
+      run_generator(reloaded(credentials))
+
+      expect(reloaded(credentials).config[:pqc_session_key]).to eq(session_key)
+      expect(reloaded(credentials).config[:pqc_record_key]).to eq(record_key)
+    end
+
+    it "セッションの鍵だけがある時は、それを保ってDBの鍵を足す" do
+      credentials = build_credentials(@destination_root)
+      credentials.change { |tmp_path| tmp_path.write({ "pqc_session_key" => "existing-session-key" }.to_yaml) }
+
+      run_generator(reloaded(credentials))
+
+      expect(reloaded(credentials).config[:pqc_session_key]).to eq("existing-session-key")
+      expect(reloaded(credentials).config[:pqc_record_key]).to be_a(String)
+    end
+
+    it "DBの鍵だけがある時は、それを保ってセッションの鍵を足す" do
+      credentials = build_credentials(@destination_root)
+      credentials.change { |tmp_path| tmp_path.write({ "pqc_record_key" => "existing-record-key" }.to_yaml) }
+
+      run_generator(reloaded(credentials))
+
+      expect(reloaded(credentials).config[:pqc_record_key]).to eq("existing-record-key")
+      expect(reloaded(credentials).config[:pqc_session_key]).to be_a(String)
+    end
+
+    it "環境変数で設定済みの鍵はcredentialsに書き込まない" do
+      credentials = build_credentials(@destination_root)
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("PQC_RECORD_KEY", nil).and_return("key-from-env")
+
+      run_generator(credentials)
+
+      expect(credentials.config).not_to have_key(:pqc_record_key)
+      expect(credentials.config[:pqc_session_key]).to be_a(String)
+    end
+
+    it "全ての鍵が設定済みならcredentialsを書き換えない" do
+      credentials = build_credentials(@destination_root)
+      credentials.change do |tmp_path|
+        tmp_path.write({ "pqc_session_key" => "session", "pqc_record_key" => "record" }.to_yaml)
+      end
+      path = File.join(@destination_root, "credentials.yml.enc")
+      before = File.binread(path)
+
+      run_generator(reloaded(credentials))
+
+      expect(File.binread(path)).to eq(before)
+    end
+  end
+
+  describe "再実行時のinitializer" do
+    it "編集済みのinitializerを上書きしない" do
+      credentials = build_credentials(@destination_root)
+      run_generator(credentials)
+      path = File.join(@destination_root, "config/initializers/pqc_rails.rb")
+      File.write(path, "# edited\n")
+
+      run_generator(reloaded(credentials))
+
+      expect(File.read(path)).to eq("# edited\n")
+    end
+  end
+
+  def reloaded(credentials)
+    ActiveSupport::EncryptedConfiguration.new(
+      config_path: credentials.content_path.to_s,
+      key_path: credentials.key_path.to_s,
+      env_key: "RAILS_MASTER_KEY",
+      raise_if_missing_key: true
+    )
   end
 end

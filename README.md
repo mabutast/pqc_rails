@@ -123,7 +123,7 @@ bundle install
 rails generate pqc_rails:install
 ```
 
-ジェネレータが `config/initializers/pqc_rails.rb` を生成し、セッション用・DB 用の鍵を Rails credentials に書き込みます。
+ジェネレータが `config/initializers/pqc_rails.rb` を生成し、セッション用・DB 用の別々の鍵を Rails credentials に書き込みます。credentials または環境変数に設定済みの鍵と、既存の `config/initializers/pqc_rails.rb` は上書きしないので、片方の鍵だけが無い場合も再実行で足せます。
 
 ## 設定
 

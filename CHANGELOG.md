@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `rails generate pqc_rails:install` now also generates the database key (`pqc_record_key`).
+  Previously it wrote only the session key, so the first write to an encrypted column raised
+  `PqcRails::MissingKeyError` in a new installation.
+- `rails generate pqc_rails:install` no longer replaces keys that are already set in Rails
+  credentials or in `PQC_SESSION_KEY` / `PQC_RECORD_KEY`, and no longer overwrites an existing
+  `config/initializers/pqc_rails.rb`. Previously, running it again replaced `pqc_session_key`,
+  which ended existing sessions. If this happened and the earlier key is still available, add it
+  to `PQC_SESSION_PREVIOUS_KEYS`.
+
 ## [0.4.0] - 2026-11-23
 
 ### Added
