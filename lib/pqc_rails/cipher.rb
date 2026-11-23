@@ -35,11 +35,11 @@ module PqcRails
 
       algorithm_id = CiphertextFormat.algorithm_id(@pq_alg_name)
       key_id = CiphertextFormat.key_id(key.public_key)
-      associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id)
+      associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id, purpose: :record)
 
       HybridKem.open(CiphertextFormat.canonical_pq_alg_name(@pq_alg_name)) do |hybrid|
         encap = hybrid.encapsulate(key.public_key)
-        data_key = CiphertextFormat.data_key(encap.shared_secret, key.authentication_key)
+        data_key = CiphertextFormat.data_key(encap.shared_secret, key.authentication_key, purpose: :record)
         envelope = EnvelopeCipher.new(data_key).encrypt(clear_text, associated_data: associated_data)
 
         ::ActiveRecord::Encryption::Message.new(payload: envelope).tap do |message|
@@ -89,6 +89,11 @@ module PqcRails
     private
 
     def encrypt_legacy(clear_text, keypair)
+      unless keypair.authentication_key.nil?
+        raise PqcRails::Error, "ciphertext_format :v0 cannot write with a key that has an authentication key, " \
+                               "because such a ciphertext is not read back; see docs/MIGRATION.md"
+      end
+
       HybridKem.open(@pq_alg_name) do |hybrid|
         encap = hybrid.encapsulate(keypair.public_key)
         envelope = EnvelopeCipher.new(encap.shared_secret).encrypt(clear_text)
@@ -102,7 +107,12 @@ module PqcRails
     def decrypt_legacy(encrypted_message, keypairs)
       CiphertextFormat.ensure_legacy_record_accepted!
 
-      try_keypairs(encrypted_message, keypairs, pq_alg_name: @pq_alg_name, associated_data: nil, authenticated: false)
+      legacy = CiphertextFormat.legacy_keypairs(keypairs)
+      if legacy.empty? && keypairs.any? && header(encrypted_message, :kem_ct)
+        raise PqcRails::Error, "legacy (v0) ciphertexts are not read with a key that has an authentication key"
+      end
+
+      try_keypairs(encrypted_message, legacy, pq_alg_name: @pq_alg_name, associated_data: nil, authenticated: false)
     end
 
     def decrypt_v1(encrypted_message, keypairs)
@@ -110,7 +120,7 @@ module PqcRails
       key_id = header(encrypted_message, :kid)
       pq_alg_name = CiphertextFormat.pq_alg_name_for(algorithm_id, configured: @pq_alg_name)
       candidates = keypairs.select { |keypair| CiphertextFormat.key_id(keypair.public_key) == key_id }
-      associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id)
+      associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id, purpose: :record)
 
       try_keypairs(encrypted_message, candidates, pq_alg_name: pq_alg_name, associated_data: associated_data,
                                                   authenticated: true)
@@ -122,16 +132,19 @@ module PqcRails
     # 暗号文に使う既定と同じ)。暗号文に文字コードを記録しないため、UTF-8以外の文字列は元の文字コードに
     # 戻らない。binary型の属性は、ActiveModelの型がBINARYに付け直す。
     def try_keypairs(encrypted_message, keypairs, pq_alg_name:, associated_data:, authenticated:)
-      raise PqcRails::Error, "no decryption key matches the message's key id" if keypairs.empty?
-
       kem_ciphertext = header(encrypted_message, :kem_ct)
       raise PqcRails::Error, "message is missing the kem_ct header" if kem_ciphertext.nil?
+      raise PqcRails::Error, "no decryption key matches the message's key id" if keypairs.empty?
 
       last_error = nil
       HybridKem.open(pq_alg_name) do |hybrid|
         keypairs.each do |keypair|
           shared_secret = hybrid.decapsulate(kem_ciphertext, keypair.secret_key)
-          data_key = authenticated ? CiphertextFormat.data_key(shared_secret, keypair.authentication_key) : shared_secret
+          data_key = if authenticated
+                       CiphertextFormat.data_key(shared_secret, keypair.authentication_key, purpose: :record)
+                     else
+                       shared_secret
+                     end
           clear_text = EnvelopeCipher.new(data_key).decrypt(encrypted_message.payload, associated_data: associated_data)
           return clear_text.force_encoding(Encoding::UTF_8)
         rescue OpenSSL::Cipher::CipherError, PqcRails::Error, ArgumentError, TypeError => e

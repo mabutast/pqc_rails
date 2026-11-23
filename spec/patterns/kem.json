@@ -683,7 +683,7 @@
           "name": "Marshalの往復は元の値を保つ"
         }
       ],
-      "guarantee": "YAML に秘密の値が出ず、クラスのタグが無く、safe_load すると as_json と同じ Hash になる。Marshal の往復は元の値を保つ",
+      "guarantee": "YAML に秘密の値が出ず、クラスのタグが無く、同じオブジェクトが1回だけなら safe_load すると as_json と同じ Hash になる。鍵ペア・Encapsulation・EnvelopeCipher の Marshal の往復は元の値を保つ",
       "mutants": [
         {
           "id": "struct-encode-with-removed",

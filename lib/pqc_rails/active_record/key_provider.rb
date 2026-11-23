@@ -47,6 +47,16 @@ module PqcRails
         [encryption_key] + @key_source.previous_keypairs.map { |keypair| build_key(keypair) }
       end
 
+      # 現行鍵と旧鍵の公開鍵。鍵が未設定なら含めない。
+      def public_keys
+        current = begin
+          [@key_source.current_keypair]
+        rescue PqcRails::MissingKeyError
+          []
+        end
+        (current + @key_source.previous_keypairs).map(&:public_key)
+      end
+
       private
 
       def default_key_source

@@ -5,6 +5,7 @@ require_relative "../blob_packing"
 require_relative "../hybrid_kem"
 require_relative "../envelope_cipher"
 require_relative "../ciphertext_format"
+require_relative "../active_record/key_provider"
 
 module PqcRails
   module Session
@@ -39,7 +40,38 @@ module PqcRails
         Marshal.load(open_cookie(bytes))
       end
 
+      # この鍵で旧形式のCookieを書けない理由(読み戻せないため)。書ける場合はnil。
+      def legacy_write_blocker
+        return "the key has an authentication key" unless @keypair.authentication_key.nil?
+
+        "the key is also configured for records" if shared_with_records?
+      end
+
       private
+
+      # 鍵はプロセスの間変わらないので、DBの鍵の読み込みは1回だけにする。
+      def shared_with_records?
+        return @shared_with_records if defined?(@shared_with_records)
+
+        @shared_with_records = record_public_keys.include?(@keypair.public_key)
+      end
+
+      # 既定の鍵の置き場所と、ActiveRecord::Encryptionに設定された鍵ソースの両方を見る。
+      # 属性ごとに指定したkey_providerは対象外。
+      def record_public_keys
+        providers = [ActiveRecord::KeyProvider.new]
+        configured = configured_record_provider
+        providers << configured if configured.respond_to?(:public_keys)
+        providers.flat_map(&:public_keys)
+      end
+
+      def configured_record_provider
+        return unless defined?(::ActiveRecord::Encryption)
+
+        ::ActiveRecord::Encryption.context.key_provider
+      rescue ::ActiveRecord::Encryption::Errors::Configuration
+        nil
+      end
 
       def open_cookie(bytes)
         case bytes.getbyte(0)
@@ -53,6 +85,9 @@ module PqcRails
 
       # 旧形式(v0): [4バイト長][KEM暗号文][4バイト長][AES暗号文]
       def seal_legacy(serialized)
+        blocker = legacy_write_blocker
+        raise PqcRails::Error, "ciphertext_format :v0 cannot write session cookies: #{blocker}; see docs/MIGRATION.md" if blocker
+
         HybridKem.open(@pq_alg_name) do |hybrid|
           encap = hybrid.encapsulate(@keypair.public_key)
           BlobPacking.pack(encap.ciphertext, EnvelopeCipher.new(encap.shared_secret).encrypt(serialized))
@@ -60,7 +95,7 @@ module PqcRails
       end
 
       def open_legacy(bytes)
-        CiphertextFormat.ensure_legacy_cookie_accepted!
+        CiphertextFormat.ensure_legacy_cookie_accepted!(@keypair, shared_with_records: shared_with_records?)
         ciphertext, encrypted = BlobPacking.unpack(bytes, exact: true)
 
         HybridKem.open(@pq_alg_name) do |hybrid|
@@ -73,12 +108,12 @@ module PqcRails
       def seal_v1(serialized)
         algorithm_id = CiphertextFormat.algorithm_id(@pq_alg_name)
         key_id = CiphertextFormat.key_id(@keypair.public_key)
-        associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id)
+        associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id, purpose: :session)
         header = [CiphertextFormat::VERSION, algorithm_id.bytesize].pack("CC") + algorithm_id + [key_id].pack("H4")
 
         HybridKem.open(CiphertextFormat.canonical_pq_alg_name(@pq_alg_name)) do |hybrid|
           encap = hybrid.encapsulate(@keypair.public_key)
-          data_key = CiphertextFormat.data_key(encap.shared_secret, @keypair.authentication_key)
+          data_key = CiphertextFormat.data_key(encap.shared_secret, @keypair.authentication_key, purpose: :session)
           encrypted = EnvelopeCipher.new(data_key).encrypt(serialized, associated_data: associated_data)
           header + BlobPacking.pack(encap.ciphertext, encrypted)
         end
@@ -99,12 +134,12 @@ module PqcRails
         end
 
         pq_alg_name = CiphertextFormat.pq_alg_name_for(algorithm_id, configured: @pq_alg_name)
-        associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id)
+        associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id, purpose: :session)
         ciphertext, encrypted = BlobPacking.unpack(body, exact: true)
 
         HybridKem.open(pq_alg_name) do |hybrid|
           shared_secret = hybrid.decapsulate(ciphertext, @keypair.secret_key)
-          data_key = CiphertextFormat.data_key(shared_secret, @keypair.authentication_key)
+          data_key = CiphertextFormat.data_key(shared_secret, @keypair.authentication_key, purpose: :session)
           EnvelopeCipher.new(data_key).decrypt(encrypted, associated_data: associated_data)
         end
       end
