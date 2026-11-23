@@ -263,8 +263,8 @@
           "id": "drop-auth-key",
           "kind": "鍵の導出を通さない・入力を1つ外す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "material = shared_secret.b + authentication_key.b",
-          "replace": "material = shared_secret.b",
+          "find": "material = secret_part + authentication_part",
+          "replace": "material = secret_part",
           "result": "killed"
         },
         {
@@ -702,6 +702,10 @@
         {
           "file": "spec/session/encryptor_spec.rb",
           "name": "DBと別の鍵なら、期限内は旧形式のCookieを読む"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "ActiveRecord::Encryptionに設定した鍵ソースの鍵と同じでも拒否する"
         }
       ],
       "guarantee": "DB の現行鍵・旧鍵と同じ鍵では、旧形式の Cookie を Marshal.load の前に拒否し、:v0 でも書かない。別の鍵なら期限内は読む",
@@ -736,6 +740,14 @@
           "file": "lib/pqc_rails/session/encryptor.rb",
           "find": "        \"the key is also configured for records\" if shared_with_records?\n",
           "replace": "        nil\n",
+          "result": "killed"
+        },
+        {
+          "id": "configured-provider-ignored",
+          "kind": "範囲を狭める",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "        providers << configured if configured.respond_to?(:public_keys)\n",
+          "replace": "",
           "result": "killed"
         }
       ]

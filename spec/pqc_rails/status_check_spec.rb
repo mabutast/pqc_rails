@@ -238,6 +238,25 @@ RSpec.describe PqcRails::StatusCheck do
         expect(legacy_cookie_result.detail).not_to include("エラー")
       end
 
+      it ":v0で今のDBレコード鍵が認証鍵を持つなら、保存がエラーになることを報告する" do
+        ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(keypair)
+        PqcRails.configuration.ciphertext_format = :v0
+
+        expect(legacy_cookie_result.ok).to be(false)
+        expect(legacy_cookie_result.detail).to include("DBレコード鍵", "エラー")
+      end
+
+      it "期限内でも、旧鍵のセッション鍵がDBと同じなら、読まないことを警告する" do
+        legacy = PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key)
+        ENV["PQC_SESSION_KEY"] = PqcRails::KeySource.encode(PqcRails::HybridKem.open(:ml_kem_512, &:generate_keypair))
+        ENV["PQC_SESSION_PREVIOUS_KEYS"] = PqcRails::KeySource.encode(legacy)
+        ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(legacy)
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now + 3600
+
+        expect(legacy_cookie_result.ok).to be(false)
+        expect(legacy_cookie_result.detail).to include("同じ鍵", "読みません")
+      end
+
       it "期限内は読む期限を報告する" do
         deadline = Time.now.utc + 3600
         PqcRails.configuration.accept_legacy_cookies_until = deadline

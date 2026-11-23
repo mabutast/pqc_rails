@@ -96,10 +96,12 @@ module PqcRails
         raise PqcRails::Error, "the authentication key must be a #{KEY_LENGTH}-byte string"
       end
 
-      material = shared_secret.b + authentication_key.b
+      secret_part = shared_secret.b
+      authentication_part = authentication_key.b
+      material = secret_part + authentication_part
       hkdf(material, "#{DATA_KEY_INFO}:#{purpose_label(purpose)}")
     ensure
-      SecretBuffer.wipe(material)
+      SecretBuffer.wipe(material, secret_part, authentication_part)
     end
 
     def write_legacy?

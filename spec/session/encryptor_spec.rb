@@ -255,6 +255,19 @@ RSpec.describe PqcRails::Session::Encryptor do
           .to raise_error(PqcRails::Error, /records/)
       end
 
+      it "ActiveRecord::Encryptionに設定した鍵ソースの鍵と同じでも拒否する" do
+        ENV.delete("PQC_RECORD_KEY")
+        ENV.delete("PQC_RECORD_PREVIOUS_KEYS")
+        source = Struct.new(:current_keypair, :previous_keypairs).new(legacy_keypair, [])
+        provider = PqcRails::ActiveRecord::KeyProvider.new(key_source: source)
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+        forged = forge_legacy(keypair.public_key, { "user_id" => 1 })
+
+        ActiveRecord::Encryption.with_encryption_context(key_provider: provider) do
+          expect { legacy_encryptor.decrypt(forged) }.to raise_error(PqcRails::Error, /records/)
+        end
+      end
+
       it "DBと同じ鍵では、:v0でCookieを書くとPqcRails::Errorを送出する" do
         ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(legacy_keypair)
         PqcRails.configuration.ciphertext_format = :v0

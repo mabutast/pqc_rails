@@ -53,7 +53,24 @@ module PqcRails
       def shared_with_records?
         return @shared_with_records if defined?(@shared_with_records)
 
-        @shared_with_records = ActiveRecord::KeyProvider.new.public_keys.include?(@keypair.public_key)
+        @shared_with_records = record_public_keys.include?(@keypair.public_key)
+      end
+
+      # 既定の鍵の置き場所と、ActiveRecord::Encryptionに設定された鍵ソースの両方を見る。
+      # 属性ごとに指定したkey_providerは対象外。
+      def record_public_keys
+        providers = [ActiveRecord::KeyProvider.new]
+        configured = configured_record_provider
+        providers << configured if configured.respond_to?(:public_keys)
+        providers.flat_map(&:public_keys)
+      end
+
+      def configured_record_provider
+        return unless defined?(::ActiveRecord::Encryption)
+
+        ::ActiveRecord::Encryption.context.key_provider
+      rescue ::ActiveRecord::Encryption::Errors::Configuration
+        nil
       end
 
       def open_cookie(bytes)

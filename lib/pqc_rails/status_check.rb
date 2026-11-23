@@ -124,6 +124,9 @@ module PqcRails
         Result.new(name: name, ok: false, detail: legacy_format_detail)
       elsif deadline.nil?
         Result.new(name: name, ok: true, detail: "読みません")
+      elsif Time.now <= deadline && legacy_session_key_shared?
+        Result.new(name: name, ok: false,
+                   detail: "セッションとDBに同じ鍵を設定しているので、期限内でも旧形式のCookieは読みません。既存のセッションは切れます")
       elsif Time.now <= deadline
         Result.new(name: name, ok: true,
                    detail: "#{deadline.getutc.strftime('%Y-%m-%d %H:%M')} UTCまで、0.3.0以前の鍵宛のCookieを読みます")
@@ -133,15 +136,37 @@ module PqcRails
     end
 
     def legacy_format_detail
-      keypair = Session::KeyManager.keypair
-      if Session::Encryptor.new(keypair).legacy_write_blocker
-        "ciphertext_formatが:v0ですが、今のセッション鍵では旧形式のCookieを書けず、セッションの保存がエラーになります。" \
-          "docs/MIGRATION.mdの手順で鍵か設定を直してください"
-      else
-        "ciphertext_formatが:v0なので、0.3.0以前の鍵宛の旧形式のCookieを読みます。全台の更新後に設定を削除してください"
-      end
+      problems = []
+      problems << "今のセッション鍵では旧形式のCookieを書けず、セッションの保存がエラーになります" if session_key_blocks_legacy?
+      problems << "今のDBレコード鍵では旧形式の値を書けず、暗号化属性の保存がエラーになります" if record_key_blocks_legacy?
+      return "ciphertext_formatが:v0ですが、#{problems.join('。')}。docs/MIGRATION.mdの手順で鍵か設定を直してください" if problems.any?
+
+      "ciphertext_formatが:v0なので、0.3.0以前の鍵宛の旧形式のCookieを読みます。全台の更新後に設定を削除してください"
+    end
+
+    def session_key_blocks_legacy?
+      !Session::Encryptor.new(Session::KeyManager.keypair).legacy_write_blocker.nil?
     rescue PqcRails::Error
-      "ciphertext_formatが:v0です。セッション鍵を読めないので確認してください。全台の更新後に設定を削除してください"
+      false
+    end
+
+    def record_key_blocks_legacy?
+      !ActiveRecord::KeyProvider.new.encryption_key.secret.authentication_key.nil?
+    rescue PqcRails::Error, NameError
+      false
+    end
+
+    # 旧形式のCookieを読むはずの鍵(認証鍵を持たないセッション鍵)が、DBの鍵と同じかどうか。
+    def legacy_session_key_shared?
+      keypairs = Session::KeyManager.previous_keypairs
+      begin
+        keypairs += [Session::KeyManager.keypair]
+      rescue MissingKeyError
+        nil
+      end
+      keypairs.any? { |keypair| keypair.authentication_key.nil? && Session::Encryptor.new(keypair).legacy_write_blocker }
+    rescue PqcRails::Error
+      false
     end
 
     def active_record_encryption_result
