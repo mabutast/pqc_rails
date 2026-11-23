@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-23
+
 ### Added
 
 - Platform gems for x86_64-linux-gnu, aarch64-linux-gnu, x86_64-linux-musl, aarch64-linux-musl
@@ -367,7 +369,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   documentation for decision-makers and developers.
 - CI workflow building liboqs from source and running the test suite on push/PR.
 
-[Unreleased]: https://github.com/mabutast/pqc_rails/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/mabutast/pqc_rails/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/mabutast/pqc_rails/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/mabutast/pqc_rails/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/mabutast/pqc_rails/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/mabutast/pqc_rails/compare/v0.1.0...v0.2.0
