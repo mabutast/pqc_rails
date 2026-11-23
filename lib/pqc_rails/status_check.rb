@@ -121,8 +121,7 @@ module PqcRails
       config = PqcRails.configuration
       deadline = config.accept_legacy_cookies_until
       if config.ciphertext_format == :v0
-        Result.new(name: name, ok: false,
-                   detail: "ciphertext_formatが:v0なので、0.3.0以前の鍵宛の旧形式のCookieを読みます。全台の更新後に設定を削除してください")
+        Result.new(name: name, ok: false, detail: legacy_format_detail)
       elsif deadline.nil?
         Result.new(name: name, ok: true, detail: "読みません")
       elsif Time.now <= deadline
@@ -131,6 +130,18 @@ module PqcRails
       else
         Result.new(name: name, ok: true, detail: "期限を過ぎたので読みません。accept_legacy_cookies_untilは削除できます")
       end
+    end
+
+    def legacy_format_detail
+      keypair = Session::KeyManager.keypair
+      if Session::Encryptor.new(keypair).legacy_write_blocker
+        "ciphertext_formatが:v0ですが、今のセッション鍵では旧形式のCookieを書けず、セッションの保存がエラーになります。" \
+          "docs/MIGRATION.mdの手順で鍵か設定を直してください"
+      else
+        "ciphertext_formatが:v0なので、0.3.0以前の鍵宛の旧形式のCookieを読みます。全台の更新後に設定を削除してください"
+      end
+    rescue PqcRails::Error
+      "ciphertext_formatが:v0です。セッション鍵を読めないので確認してください。全台の更新後に設定を削除してください"
     end
 
     def active_record_encryption_result

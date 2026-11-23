@@ -214,6 +214,30 @@ RSpec.describe PqcRails::StatusCheck do
         expect(legacy_cookie_result.detail).to include(":v0", "削除")
       end
 
+      it ":v0のまま期限も設定していても、警告を出す" do
+        PqcRails.configuration.ciphertext_format = :v0
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now + 3600
+
+        expect(legacy_cookie_result.ok).to be(false)
+      end
+
+      it ":v0で今のセッション鍵が認証鍵を持つなら、保存がエラーになることを報告する" do
+        ENV["PQC_SESSION_KEY"] = PqcRails::KeySource.encode(keypair)
+        PqcRails.configuration.ciphertext_format = :v0
+
+        expect(legacy_cookie_result.ok).to be(false)
+        expect(legacy_cookie_result.detail).to include("エラー")
+      end
+
+      it ":v0で今のセッション鍵が0.3.0の鍵でDBと別なら、削除を促す" do
+        legacy = PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key)
+        ENV["PQC_SESSION_KEY"] = PqcRails::KeySource.encode(legacy)
+        PqcRails.configuration.ciphertext_format = :v0
+
+        expect(legacy_cookie_result.detail).to include("削除")
+        expect(legacy_cookie_result.detail).not_to include("エラー")
+      end
+
       it "期限内は読む期限を報告する" do
         deadline = Time.now.utc + 3600
         PqcRails.configuration.accept_legacy_cookies_until = deadline

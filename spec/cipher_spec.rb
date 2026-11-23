@@ -4,6 +4,7 @@ require "active_record"
 
 RSpec.describe PqcRails::Cipher do
   let(:keypair) { PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair } }
+  let(:legacy_keypair) { PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key) }
   let(:cipher)  { described_class.new(pq_alg_name: :ml_kem_512) }
 
   describe "#encrypt" do
@@ -35,7 +36,8 @@ RSpec.describe PqcRails::Cipher do
     it "日本語の値を、UTF-8の文字列として復号する(新旧どちらの形式でも)" do
       %i[v1 v0].each do |format|
         PqcRails.configuration.ciphertext_format = format
-        decrypted = cipher.decrypt(cipher.encrypt("日本語の値", key: keypair), key: keypair)
+        key = format == :v0 ? legacy_keypair : keypair
+        decrypted = cipher.decrypt(cipher.encrypt("日本語の値", key: key), key: key)
 
         expect(decrypted.encoding).to eq(Encoding::UTF_8)
         expect(decrypted).to eq("日本語の値")
@@ -72,9 +74,9 @@ RSpec.describe PqcRails::Cipher do
 
     it "旧形式の暗号文でも、pqc_railsの鍵ペアでない鍵は無視する" do
       PqcRails.configuration.ciphertext_format = :v0
-      message = cipher.encrypt("hello pqc", key: keypair)
+      message = cipher.encrypt("hello pqc", key: legacy_keypair)
 
-      expect(cipher.decrypt(message, key: ["derived-secret-string", keypair])).to eq("hello pqc")
+      expect(cipher.decrypt(message, key: ["derived-secret-string", legacy_keypair])).to eq("hello pqc")
     ensure
       PqcRails.configuration.ciphertext_format = :v1
     end
@@ -280,40 +282,62 @@ RSpec.describe PqcRails::Cipher do
       before { PqcRails.configuration.ciphertext_format = :v0 }
 
       it "旧形式(kem_ctヘッダーのみ)で書く" do
-        message = cipher.encrypt("hello", key: keypair)
+        message = cipher.encrypt("hello", key: legacy_keypair)
 
         expect(message.headers[:pv]).to be_nil
         expect(message.headers[:alg]).to be_nil
         expect(message.headers[:kid]).to be_nil
       end
+
+      it "認証鍵を持つ鍵では、読めない値を書かないようPqcRails::Errorを送出する" do
+        expect { cipher.encrypt("hello", key: keypair) }.to raise_error(PqcRails::Error, /authentication key/)
+      end
+    end
+
+    it "認証鍵を持つ鍵では、公開鍵だけで作った旧形式の値を復号しない" do
+      PqcRails.configuration.ciphertext_format = :v0
+      forged = cipher.encrypt("FORGED", key: PqcRails::HybridKem::Keypair.new(keypair.public_key, nil))
+      PqcRails.configuration.ciphertext_format = :v1
+
+      expect { cipher.decrypt(forged, key: keypair) }
+        .to raise_error(ActiveRecord::Encryption::Errors::Decryption, /authentication key/)
+    end
+
+    it "鍵ローテーション中は、旧鍵(0.3.0の鍵)で旧形式の値を復号する" do
+      new_keypair = PqcRails::HybridKem.open(:ml_kem_512, &:generate_keypair)
+      PqcRails.configuration.ciphertext_format = :v0
+      legacy_message = cipher.encrypt("hello pqc", key: legacy_keypair)
+      PqcRails.configuration.ciphertext_format = :v1
+
+      expect(cipher.decrypt(legacy_message, key: [new_keypair, legacy_keypair])).to eq("hello pqc")
     end
 
     it "旧形式で書かれたデータを、新形式で書く設定のまま復号できる" do
       PqcRails.configuration.ciphertext_format = :v0
-      legacy_message = cipher.encrypt("hello pqc", key: keypair)
+      legacy_message = cipher.encrypt("hello pqc", key: legacy_keypair)
       PqcRails.configuration.ciphertext_format = :v1
 
-      expect(cipher.decrypt(legacy_message, key: keypair)).to eq("hello pqc")
+      expect(cipher.decrypt(legacy_message, key: legacy_keypair)).to eq("hello pqc")
     end
 
     it "旧形式のデータは、設定のアルゴリズムと違うと読めない（旧形式はアルゴリズムIDを持たないため）" do
       PqcRails.configuration.ciphertext_format = :v0
-      legacy_message = cipher.encrypt("hello pqc", key: keypair)
+      legacy_message = cipher.encrypt("hello pqc", key: legacy_keypair)
       PqcRails.configuration.ciphertext_format = :v1
 
       expect do
-        described_class.new(pq_alg_name: :ml_kem_1024).decrypt(legacy_message, key: keypair)
+        described_class.new(pq_alg_name: :ml_kem_1024).decrypt(legacy_message, key: legacy_keypair)
       end.to raise_error(ActiveRecord::Encryption::Errors::Decryption)
     end
 
     it "accept_legacy_records = false のとき、旧形式のデータを拒否する" do
       PqcRails.configuration.ciphertext_format = :v0
-      legacy_message = cipher.encrypt("hello pqc", key: keypair)
+      legacy_message = cipher.encrypt("hello pqc", key: legacy_keypair)
       PqcRails.configuration.ciphertext_format = :v1
       PqcRails.configuration.accept_legacy_records = false
 
       expect do
-        cipher.decrypt(legacy_message, key: keypair)
+        cipher.decrypt(legacy_message, key: legacy_keypair)
       end.to raise_error(ActiveRecord::Encryption::Errors::Decryption, /legacy/)
     end
   end

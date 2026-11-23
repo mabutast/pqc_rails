@@ -222,6 +222,55 @@ RSpec.describe PqcRails::Session::Encryptor do
       expect(Marshal).not_to have_received(:load)
     end
 
+    context "セッションとDBに同じ0.3.0の鍵を設定しているとき" do
+      around do |example|
+        original = ENV.fetch("PQC_RECORD_KEY", nil), ENV.fetch("PQC_RECORD_PREVIOUS_KEYS", nil)
+        example.run
+      ensure
+        ENV["PQC_RECORD_KEY"], ENV["PQC_RECORD_PREVIOUS_KEYS"] = original
+      end
+
+      it "DBの現行鍵と同じなら、期限内でも:v0でも旧形式のCookieをMarshal.loadに渡さず拒否する" do
+        ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(legacy_keypair)
+        ENV.delete("PQC_RECORD_PREVIOUS_KEYS")
+        forged = forge_legacy(keypair.public_key, { "user_id" => 1 })
+        allow(Marshal).to receive(:load).and_call_original
+
+        [[:v1, Time.now + 60], [:v0, nil]].each do |format, deadline|
+          PqcRails.configuration.ciphertext_format = format
+          PqcRails.configuration.accept_legacy_cookies_until = deadline
+
+          expect { legacy_encryptor.decrypt(forged) }.to raise_error(PqcRails::Error, /records/)
+        end
+        expect(Marshal).not_to have_received(:load)
+      end
+
+      it "DBの旧鍵と同じでも拒否する" do
+        other = PqcRails::HybridKem.open(:ml_kem_512, &:generate_keypair)
+        ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(other)
+        ENV["PQC_RECORD_PREVIOUS_KEYS"] = PqcRails::KeySource.encode(legacy_keypair)
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+
+        expect { legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 })) }
+          .to raise_error(PqcRails::Error, /records/)
+      end
+
+      it "DBと同じ鍵では、:v0でCookieを書くとPqcRails::Errorを送出する" do
+        ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(legacy_keypair)
+        PqcRails.configuration.ciphertext_format = :v0
+
+        expect { legacy_encryptor.encrypt({ "user_id" => 1 }) }.to raise_error(PqcRails::Error, /records/)
+      end
+
+      it "DBと別の鍵なら、期限内は旧形式のCookieを読む" do
+        ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(PqcRails::HybridKem.open(:ml_kem_512, &:generate_keypair))
+        ENV.delete("PQC_RECORD_PREVIOUS_KEYS")
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+
+        expect(legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 }))).to eq({ "user_id" => 1 })
+      end
+    end
+
     it "同じ鍵でも、DBカラムのv1暗号文をCookieの形に組み替えたものはMarshal.loadに届かない" do
       message = PqcRails::Cipher.new(pq_alg_name: :ml_kem_512).encrypt(Marshal.dump({ "user_id" => 1 }), key: keypair)
       algorithm_id = message.headers[:alg]

@@ -3,6 +3,7 @@
 require "digest"
 require "openssl"
 require_relative "algorithms"
+require_relative "secret_buffer"
 
 module PqcRails
   # 認証鍵を持たない鍵(0.3.0以前に生成した鍵)で、新しい形式の暗号文を作ろうとした。
@@ -95,7 +96,10 @@ module PqcRails
         raise PqcRails::Error, "the authentication key must be a #{KEY_LENGTH}-byte string"
       end
 
-      hkdf(shared_secret + authentication_key, "#{DATA_KEY_INFO}:#{purpose_label(purpose)}")
+      material = shared_secret.b + authentication_key.b
+      hkdf(material, "#{DATA_KEY_INFO}:#{purpose_label(purpose)}")
+    ensure
+      SecretBuffer.wipe(material)
     end
 
     def write_legacy?
@@ -109,12 +113,21 @@ module PqcRails
       raise PqcRails::Error, "legacy (v0) ciphertexts are not accepted (accept_legacy_records is false)"
     end
 
+    # 旧形式は公開鍵だけで作れるので、復号に使う鍵を、認証鍵を持たない鍵(0.3.0以前に生成した鍵)に限る。
+    def legacy_keypairs(keypairs)
+      keypairs.select { |keypair| keypair.authentication_key.nil? }
+    end
+
     # 旧形式(v0)のセッションCookieを受け付けない状態なら、PqcRails::Errorを送出する。
     # 旧形式は公開鍵だけで作れ、中身はMarshal.loadに渡るため、受け付けるのは認証鍵を持たない鍵
     # (0.3.0以前に生成した鍵)だけにする。その鍵でも、旧形式を書いている間(順番デプロイ中)か、期限内に限る。
-    def ensure_legacy_cookie_accepted!(keypair, now: Time.now)
+    # 旧形式には用途の区別が無いため、DBと同じ鍵では、DBの旧形式の値をCookieに組み替えられる。その鍵でも読まない。
+    def ensure_legacy_cookie_accepted!(keypair, shared_with_records: false, now: Time.now)
       unless keypair.authentication_key.nil?
         raise PqcRails::Error, "legacy (v0) session cookies are not read with a key that has an authentication key"
+      end
+      if shared_with_records
+        raise PqcRails::Error, "legacy (v0) session cookies are not read with a key also configured for records"
       end
       return if write_legacy?
 

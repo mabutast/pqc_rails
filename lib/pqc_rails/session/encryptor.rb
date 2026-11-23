@@ -5,6 +5,7 @@ require_relative "../blob_packing"
 require_relative "../hybrid_kem"
 require_relative "../envelope_cipher"
 require_relative "../ciphertext_format"
+require_relative "../active_record/key_provider"
 
 module PqcRails
   module Session
@@ -39,7 +40,21 @@ module PqcRails
         Marshal.load(open_cookie(bytes))
       end
 
+      # この鍵で旧形式のCookieを書けない理由(読み戻せないため)。書ける場合はnil。
+      def legacy_write_blocker
+        return "the key has an authentication key" unless @keypair.authentication_key.nil?
+
+        "the key is also configured for records" if shared_with_records?
+      end
+
       private
+
+      # 鍵はプロセスの間変わらないので、DBの鍵の読み込みは1回だけにする。
+      def shared_with_records?
+        return @shared_with_records if defined?(@shared_with_records)
+
+        @shared_with_records = ActiveRecord::KeyProvider.new.public_keys.include?(@keypair.public_key)
+      end
 
       def open_cookie(bytes)
         case bytes.getbyte(0)
@@ -53,10 +68,8 @@ module PqcRails
 
       # 旧形式(v0): [4バイト長][KEM暗号文][4バイト長][AES暗号文]
       def seal_legacy(serialized)
-        unless @keypair.authentication_key.nil?
-          raise PqcRails::Error, "ciphertext_format :v0 cannot write session cookies with a key that has an " \
-                                 "authentication key, because such a cookie is not read back; see docs/MIGRATION.md"
-        end
+        blocker = legacy_write_blocker
+        raise PqcRails::Error, "ciphertext_format :v0 cannot write session cookies: #{blocker}; see docs/MIGRATION.md" if blocker
 
         HybridKem.open(@pq_alg_name) do |hybrid|
           encap = hybrid.encapsulate(@keypair.public_key)
@@ -65,7 +78,7 @@ module PqcRails
       end
 
       def open_legacy(bytes)
-        CiphertextFormat.ensure_legacy_cookie_accepted!(@keypair)
+        CiphertextFormat.ensure_legacy_cookie_accepted!(@keypair, shared_with_records: shared_with_records?)
         ciphertext, encrypted = BlobPacking.unpack(bytes, exact: true)
 
         HybridKem.open(@pq_alg_name) do |hybrid|

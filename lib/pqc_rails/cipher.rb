@@ -89,6 +89,11 @@ module PqcRails
     private
 
     def encrypt_legacy(clear_text, keypair)
+      unless keypair.authentication_key.nil?
+        raise PqcRails::Error, "ciphertext_format :v0 cannot write with a key that has an authentication key, " \
+                               "because such a ciphertext is not read back; see docs/MIGRATION.md"
+      end
+
       HybridKem.open(@pq_alg_name) do |hybrid|
         encap = hybrid.encapsulate(keypair.public_key)
         envelope = EnvelopeCipher.new(encap.shared_secret).encrypt(clear_text)
@@ -102,7 +107,12 @@ module PqcRails
     def decrypt_legacy(encrypted_message, keypairs)
       CiphertextFormat.ensure_legacy_record_accepted!
 
-      try_keypairs(encrypted_message, keypairs, pq_alg_name: @pq_alg_name, associated_data: nil, authenticated: false)
+      legacy = CiphertextFormat.legacy_keypairs(keypairs)
+      if legacy.empty? && keypairs.any? && header(encrypted_message, :kem_ct)
+        raise PqcRails::Error, "legacy (v0) ciphertexts are not read with a key that has an authentication key"
+      end
+
+      try_keypairs(encrypted_message, legacy, pq_alg_name: @pq_alg_name, associated_data: nil, authenticated: false)
     end
 
     def decrypt_v1(encrypted_message, keypairs)
@@ -122,10 +132,9 @@ module PqcRails
     # 暗号文に使う既定と同じ)。暗号文に文字コードを記録しないため、UTF-8以外の文字列は元の文字コードに
     # 戻らない。binary型の属性は、ActiveModelの型がBINARYに付け直す。
     def try_keypairs(encrypted_message, keypairs, pq_alg_name:, associated_data:, authenticated:)
-      raise PqcRails::Error, "no decryption key matches the message's key id" if keypairs.empty?
-
       kem_ciphertext = header(encrypted_message, :kem_ct)
       raise PqcRails::Error, "message is missing the kem_ct header" if kem_ciphertext.nil?
+      raise PqcRails::Error, "no decryption key matches the message's key id" if keypairs.empty?
 
       last_error = nil
       HybridKem.open(pq_alg_name) do |hybrid|

@@ -47,6 +47,10 @@ RSpec.describe PqcRails::ActiveRecord::CiphertextInfo do
     end
 
     it "0.3.0以前の形式の暗号文は、形式バージョン0(legacy)として読む" do
+      ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(
+        PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key)
+      )
+      PqcRails::ActiveRecord::Context.install!(pq_alg_name: :ml_kem_512)
       PqcRails.configuration.ciphertext_format = :v0
       widget = widget_class.create!(secret: "hello") # pragma: allowlist secret
 

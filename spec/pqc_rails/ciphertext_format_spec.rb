@@ -120,6 +120,17 @@ RSpec.describe PqcRails::CiphertextFormat do
       end
     end
 
+    it "UTF-8と判定された32バイトの認証鍵でも、BINARYと同じAES鍵を導き、引数を書き換えない" do
+      bytes = "\xE3\x81\x82".b * 10 + "ab".b
+      utf8 = bytes.dup.force_encoding(Encoding::UTF_8)
+      secret = "\xFF".b * 32
+
+      expect(described_class.data_key(secret, utf8, purpose: :record))
+        .to eq(described_class.data_key(secret, bytes, purpose: :record))
+      expect(utf8.b).to eq(bytes)
+      expect(secret).to eq("\xFF".b * 32)
+    end
+
     it "32バイトの文字列でない認証鍵はPqcRails::Errorを送出する" do
       ["", "\x02" * 31, "\x02" * 33, "\x02" * 64, 123, :key, Array.new(32, 2)].each do |bad|
         expect { described_class.data_key(shared_secret, bad, purpose: :record) }.to raise_error(PqcRails::Error) do |error|
@@ -191,6 +202,15 @@ RSpec.describe PqcRails::CiphertextFormat do
 
     context "期限が未設定のとき" do
       let(:deadline) { nil }
+
+      it "DBと同じ鍵は、旧形式で書く設定でも拒否する" do
+        PqcRails.configuration.ciphertext_format = :v0
+
+        expect { described_class.ensure_legacy_cookie_accepted!(legacy_key, shared_with_records: true) }
+          .to raise_error(PqcRails::Error, /records/)
+      ensure
+        PqcRails.configuration.ciphertext_format = :v1
+      end
 
       it "新形式で書く設定では、旧形式のCookieを拒否する" do
         expect { described_class.ensure_legacy_cookie_accepted!(legacy_key) }.to raise_error(PqcRails::Error, /legacy/)
