@@ -263,15 +263,15 @@
           "id": "drop-auth-key",
           "kind": "鍵の導出を通さない・入力を1つ外す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "hkdf(shared_secret + authentication_key, \"#{DATA_KEY_INFO}:#{purpose_label(purpose)}\")",
-          "replace": "hkdf(shared_secret, \"#{DATA_KEY_INFO}:#{purpose_label(purpose)}\")",
+          "find": "material = shared_secret.b + authentication_key.b",
+          "replace": "material = shared_secret.b",
           "result": "killed"
         },
         {
           "id": "shared-secret-as-key",
           "kind": "鍵の導出を通さない・入力を1つ外す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "hkdf(shared_secret + authentication_key, \"#{DATA_KEY_INFO}:#{purpose_label(purpose)}\")",
+          "find": "hkdf(material, \"#{DATA_KEY_INFO}:#{purpose_label(purpose)}\")",
           "replace": "shared_secret",
           "result": "killed"
         }
@@ -526,7 +526,7 @@
           "id": "check-removed-before-marshal",
           "kind": "確かめる処理を消す",
           "file": "lib/pqc_rails/session/encryptor.rb",
-          "find": "        CiphertextFormat.ensure_legacy_cookie_accepted!(@keypair)\n",
+          "find": "        CiphertextFormat.ensure_legacy_cookie_accepted!(@keypair, shared_with_records: shared_with_records?)\n",
           "replace": "",
           "result": "killed"
         },
@@ -534,8 +534,8 @@
           "id": "write-guard-removed",
           "kind": "確かめる処理を消す",
           "file": "lib/pqc_rails/session/encryptor.rb",
-          "find": "unless @keypair.authentication_key.nil?",
-          "replace": "unless true",
+          "find": "        return \"the key has an authentication key\" unless @keypair.authentication_key.nil?\n",
+          "replace": "",
           "result": "killed"
         }
       ]
@@ -569,7 +569,7 @@
     },
     {
       "id": "purpose-separation",
-      "pattern": "同じ鍵で DB の暗号文と Cookie を組み替える、未知の用途",
+      "pattern": "同じ鍵で新しい形式（v1）の DB の暗号文と Cookie を組み替える、未知の用途",
       "source": "spec",
       "source_ref": "README「暗号文の形式」：鍵導出と追加認証データに用途を入れる",
       "tests": [
@@ -594,14 +594,14 @@
           "name": "未知の用途はArgumentErrorを送出する"
         }
       ],
-      "guarantee": "鍵導出と追加認証データがそれぞれ用途で変わり、組み替えた暗号文は両方向とも復号できない。未知の用途は例外",
+      "guarantee": "v1 の鍵導出と追加認証データがそれぞれ用途で変わり、組み替えた v1 の暗号文は両方向とも復号できない。未知の用途は例外。旧形式は legacy-cookie-shared-key の行で守る",
       "mutants": [
         {
           "id": "info-without-purpose",
           "kind": "戻り値を空・nil・固定値にする",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "hkdf(shared_secret + authentication_key, \"#{DATA_KEY_INFO}:#{purpose_label(purpose)}\")",
-          "replace": "hkdf(shared_secret + authentication_key, DATA_KEY_INFO)",
+          "find": "hkdf(material, \"#{DATA_KEY_INFO}:#{purpose_label(purpose)}\")",
+          "replace": "hkdf(material, DATA_KEY_INFO)",
           "result": "killed"
         },
         {
@@ -677,6 +677,65 @@
           "file": "lib/pqc_rails/ciphertext_format.rb",
           "find": "authentication_key.is_a?(String) && ",
           "replace": "",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "legacy-cookie-shared-key",
+      "pattern": "セッションの鍵が DB の現行鍵・旧鍵と同じ時の旧形式の Cookie",
+      "source": "spec",
+      "source_ref": "README「暗号文の形式」：旧形式には用途の区別が無いので、DB と同じ鍵では旧形式の Cookie を読まない",
+      "tests": [
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "DBの現行鍵と同じなら、期限内でも:v0でも旧形式のCookieをMarshal.loadに渡さず拒否する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "DBの旧鍵と同じでも拒否する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "DBと同じ鍵では、:v0でCookieを書くとPqcRails::Errorを送出する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "DBと別の鍵なら、期限内は旧形式のCookieを読む"
+        }
+      ],
+      "guarantee": "DB の現行鍵・旧鍵と同じ鍵では、旧形式の Cookie を Marshal.load の前に拒否し、:v0 でも書かない。別の鍵なら期限内は読む",
+      "mutants": [
+        {
+          "id": "shared-check-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "      if shared_with_records\n",
+          "replace": "      if false\n",
+          "result": "killed"
+        },
+        {
+          "id": "shared-not-passed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "shared_with_records: shared_with_records?)",
+          "replace": "shared_with_records: false)",
+          "result": "killed"
+        },
+        {
+          "id": "previous-keys-ignored",
+          "kind": "範囲を狭める",
+          "file": "lib/pqc_rails/active_record/key_provider.rb",
+          "find": "(current + @key_source.previous_keypairs).map",
+          "replace": "current.map",
+          "result": "killed"
+        },
+        {
+          "id": "shared-write-allowed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "        \"the key is also configured for records\" if shared_with_records?\n",
+          "replace": "        nil\n",
           "result": "killed"
         }
       ]

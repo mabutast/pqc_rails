@@ -587,8 +587,8 @@
           "id": "legacy-ignores-configured-algorithm",
           "kind": "引数・順番を入れ替える",
           "file": "lib/pqc_rails/cipher.rb",
-          "find": "try_keypairs(encrypted_message, keypairs, pq_alg_name: @pq_alg_name, associated_data: nil, authenticated: false)",
-          "replace": "try_keypairs(encrypted_message, keypairs, pq_alg_name: :ml_kem_512, associated_data: nil, authenticated: false)",
+          "find": "try_keypairs(encrypted_message, legacy, pq_alg_name: @pq_alg_name, associated_data: nil, authenticated: false)",
+          "replace": "try_keypairs(encrypted_message, legacy, pq_alg_name: :ml_kem_512, associated_data: nil, authenticated: false)",
           "result": "killed"
         }
       ]
@@ -612,6 +612,53 @@
           "file": "lib/pqc_rails/session/encryptor.rb",
           "find": "DEFAULT_PQ_ALG_NAME = :ml_kem_768",
           "replace": "DEFAULT_PQ_ALG_NAME = :ml_kem_512",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "legacy-record-key-generation",
+      "pattern": "DB の旧形式を、認証鍵を持つ鍵・0.3.0 の鍵で読み書きする",
+      "source": "spec",
+      "source_ref": "README「暗号文の形式」：DB の旧形式は認証鍵を持たない鍵でだけ復号する",
+      "tests": [
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "認証鍵を持つ鍵では、公開鍵だけで作った旧形式の値を復号しない"
+        },
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "鍵ローテーション中は、旧鍵(0.3.0の鍵)で旧形式の値を復号する"
+        },
+        {
+          "file": "spec/cipher_spec.rb",
+          "name": "認証鍵を持つ鍵では、読めない値を書かないようPqcRails::Errorを送出する"
+        }
+      ],
+      "guarantee": "認証鍵を持つ鍵は旧形式の値を復号も書き込みもしない。0.3.0 の鍵が旧鍵にあれば、新しい鍵と並んでいても旧形式を復号する",
+      "mutants": [
+        {
+          "id": "legacy-filter-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "legacy = CiphertextFormat.legacy_keypairs(keypairs)",
+          "replace": "legacy = keypairs",
+          "result": "killed"
+        },
+        {
+          "id": "legacy-filter-inverted",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "keypairs.select { |keypair| keypair.authentication_key.nil? }",
+          "replace": "keypairs.reject { |keypair| keypair.authentication_key.nil? }",
+          "result": "killed"
+        },
+        {
+          "id": "legacy-write-guard-removed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/cipher.rb",
+          "find": "unless keypair.authentication_key.nil?",
+          "replace": "unless true",
           "result": "killed"
         }
       ]

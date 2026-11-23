@@ -30,7 +30,7 @@ module PqcRails
 
     # 認証鍵を持たない鍵(0.3.0以前に生成した鍵)宛の旧形式のセッションCookieを、この日時まで復号する。
     # 既定のnilでは復号しない。ciphertext_formatが:v0の間は、順番デプロイ中のCookieを読むため期限によらず復号する。
-    # 旧形式のCookieは発行日時を持たないため、更新日時に最長のセッション有効期限を足した日時を設定する。
+    # 旧形式のCookieは発行日時を持たないため、旧形式の発行が止まる日時に最長のセッション有効期限を足した日時を設定する。
     attr_reader :accept_legacy_cookies_until
 
     def initialize
