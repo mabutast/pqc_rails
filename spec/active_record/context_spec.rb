@@ -41,6 +41,14 @@ RSpec.describe PqcRails::ActiveRecord::Context do
     expect(raw).not_to include("hello pqc")
   end
 
+  it "install!に渡したkey_providerを使う" do
+    provider = PqcRails::ActiveRecord::KeyProvider.new
+    described_class.install!(pq_alg_name: :ml_kem_512, key_provider: provider)
+
+    expect(::ActiveRecord::Encryption.key_provider).to equal(provider)
+    expect(PqcRails::ActiveRecord::KeyProvider.installed).to equal(provider)
+  end
+
   it "読み出すと平文に戻る" do
     widget = widget_class.create!(secret: "hello pqc")
 

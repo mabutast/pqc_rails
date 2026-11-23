@@ -106,7 +106,7 @@ end
 
 セッションと DB に同じ鍵を設定している場合、更新後は旧形式の Cookie を読みません。`ciphertext_format = :v0` でも Cookie を書けないので、順番に更新する場合は、更新の前にセッションの鍵を DB と別の鍵に変えてください（この時点で既存のセッションは切れます）。この鍵は更新前の版で生成します。認証鍵を持つ鍵は `ciphertext_format = :v0` で使えません。同じ鍵のまま更新すると、期限を設定しても既存のセッションは保てません。
 
-gem を 0.3.0 以前に戻す時は、鍵の設定も元の鍵に戻してください。新しい鍵のまま 0.3.0 以前の版で書いた値は、再度更新すると読めません。その場合は、同じ鍵から認証鍵を除いた鍵（`PqcRails::KeySource.encode(PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key))`）を旧鍵に足すと読めます。
+gem を 0.3.0 以前に戻す時は、鍵の設定も元の鍵に戻してください。**新しい鍵は消さずに保管してください。** 更新後に書かれた新しい形式の暗号文は、新しい鍵が無いと復号できません。新しい鍵のまま 0.3.0 以前の版で書いた値は、再度更新すると読めません。その場合は、同じ鍵から認証鍵を除いた鍵（`PqcRails::KeySource.encode(PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key))`）を旧鍵に足すと読めます。Cookie を読むには、あわせて `accept_legacy_cookies_until` の期限内である必要があります。
 
 1. 更新後の版の gem で、新しい鍵を生成する（セッション用・DB 用それぞれ）。0.3.0 以前の版で生成した鍵は認証鍵を持たない。`:ml_kem_768` は、今の設定のアルゴリズムに合わせる
 
@@ -159,10 +159,10 @@ ML-KEM-768 から ML-KEM-1024 に変える場合のように、アルゴリズ�
 
 鍵の取得元は、デフォルトでは `PqcRails::KeySource::EnvCredentials`（ENV → Rails credentials）です。`#current_keypair` / `#previous_keypairs` の2メソッドを実装したオブジェクトであれば差し替えられます。
 
-- **DB側**: `PqcRails::ActiveRecord::KeyProvider.new(key_source: your_source)` のように、`Context.install!` に渡す `KeyProvider` へ直接注入できます。
+- **DB側**: `PqcRails::ActiveRecord::Context.install!(key_provider: PqcRails::ActiveRecord::KeyProvider.new(key_source: your_source))` のように注入できます。
 - **セッション側**: `PqcRails::Session::KeyManager` はモジュール実装のため同様の注入口はありませんが、`PqcCookieStore` は `keypair:` / `previous_keypairs:` オプションで実際の鍵ペアを直接受け取れます（`KeyManager` を経由しない）。外部鍵ソースから取得した鍵ペアをこのオプションに渡すことで、同様に差し替え可能です。
 
-DB とセッションには別の鍵を設定してください。`Context` に設定した鍵ソースは旧形式の Cookie の「同じ鍵」の判定の対象ですが、属性ごとに指定した `key_provider` は対象外です。
+DB とセッションには別の鍵を設定してください。`Context` に設定した鍵ソースは旧形式の Cookie の「同じ鍵」の判定の対象ですが、属性ごとに指定した `key_provider` と、`PqcRails::ActiveRecord::KeyProvider` 以外の `key_provider` は対象外です。
 
 将来 HSM/PKCS#11 経由の鍵管理と連携する場合の拡張ポイントとして用意していますが、pqc_rails 自体は具体的な HSM 連携実装を提供しません。
 
@@ -199,8 +199,9 @@ end
 ```
 
 - `PqcRails::Cipher.new` の `pq_alg_name:` は、導入時に `Context.install!(pq_alg_name: ...)` へ渡していた値と一致させてください。省略するとデフォルト（`:ml_kem_768`）が使われ、README の案内に従って `:ml_kem_512` 等へ変更していた場合は KEM 暗号文の長さが合わず復号に失敗します。
+- `Context.install!` を外す前に、Rails 標準の暗号化の `primary_key`・`deterministic_key`・`key_derivation_salt` を設定してください。導入前の値が残っていればそれを戻し、無ければ `bin/rails db:encryption:init` で生成します。設定が無いまま外すと、暗号化属性の保存と `record.encrypt` が `ActiveRecord::Encryption::Errors::Configuration` になります。
 - `Context.install!` の呼び出し自体を削除（または呼ばない状態に戻す）することで、新規の暗号化は Rails 標準（AES-256-GCM + 導出鍵）に戻ります。
-- 完全に pqc_rails 以前の状態へ戻したい場合は、上記「一括再暗号化したい場合」と同じ要領で全レコードを読み出して `save!` し、Rails 標準方式で再暗号化してください。
+- 完全に pqc_rails 以前の状態へ戻したい場合は、上記「一括再暗号化したい場合」と同じ要領で全レコードに `record.encrypt` を実行し、Rails 標準方式で再暗号化してください（`save!` では再暗号化されません）。
 - 移行が完了し pqc_rails 方式のデータが残っていないことを確認できるまで、`PQC_RECORD_KEY`（または `pqc_record_key` credentials）は削除しないでください。
 
 ### セッション（PqcCookieStore）

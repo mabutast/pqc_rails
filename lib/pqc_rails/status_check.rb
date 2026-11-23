@@ -124,14 +124,14 @@ module PqcRails
         Result.new(name: name, ok: false, detail: legacy_format_detail)
       elsif deadline.nil?
         Result.new(name: name, ok: true, detail: "読みません")
-      elsif Time.now <= deadline && legacy_session_key_shared?
+      elsif Time.now > deadline
+        Result.new(name: name, ok: true, detail: "期限を過ぎたので読みません。accept_legacy_cookies_untilは削除できます")
+      elsif legacy_session_key_shared?
         Result.new(name: name, ok: false,
                    detail: "セッションとDBに同じ鍵を設定しているので、期限内でも旧形式のCookieは読みません。既存のセッションは切れます")
-      elsif Time.now <= deadline
+      else
         Result.new(name: name, ok: true,
                    detail: "#{deadline.getutc.strftime('%Y-%m-%d %H:%M')} UTCまで、0.3.0以前の鍵宛のCookieを読みます")
-      else
-        Result.new(name: name, ok: true, detail: "期限を過ぎたので読みません。accept_legacy_cookies_untilは削除できます")
       end
     end
 
@@ -146,26 +146,27 @@ module PqcRails
 
     def session_key_blocks_legacy?
       !Session::Encryptor.new(Session::KeyManager.keypair).legacy_write_blocker.nil?
-    rescue PqcRails::Error
+    rescue PqcRails::Error, ArgumentError, TypeError
       false
     end
 
     def record_key_blocks_legacy?
-      !ActiveRecord::KeyProvider.new.encryption_key.secret.authentication_key.nil?
-    rescue PqcRails::Error, NameError
+      [ActiveRecord::KeyProvider.new, *ActiveRecord::KeyProvider.configured].any? do |provider|
+        record_key_has_authentication_key?(provider)
+      end
+    end
+
+    def record_key_has_authentication_key?(provider)
+      !provider.encryption_key.secret.authentication_key.nil?
+    rescue PqcRails::Error, ArgumentError, TypeError
       false
     end
 
     # 旧形式のCookieを読むはずの鍵(認証鍵を持たないセッション鍵)が、DBの鍵と同じかどうか。
     def legacy_session_key_shared?
-      keypairs = Session::KeyManager.previous_keypairs
-      begin
-        keypairs += [Session::KeyManager.keypair]
-      rescue MissingKeyError
-        nil
-      end
+      keypairs = [Session::KeyManager.keypair] + Session::KeyManager.previous_keypairs
       keypairs.any? { |keypair| keypair.authentication_key.nil? && Session::Encryptor.new(keypair).legacy_write_blocker }
-    rescue PqcRails::Error
+    rescue PqcRails::Error, ArgumentError, TypeError
       false
     end
 

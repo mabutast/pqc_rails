@@ -49,28 +49,21 @@ module PqcRails
 
       private
 
-      # 鍵はプロセスの間変わらないので、DBの鍵の読み込みは1回だけにする。
-      def shared_with_records?
-        return @shared_with_records if defined?(@shared_with_records)
-
-        @shared_with_records = record_public_keys.include?(@keypair.public_key)
-      end
-
-      # 既定の鍵の置き場所と、ActiveRecord::Encryptionに設定された鍵ソースの両方を見る。
+      # 既定の鍵の置き場所と、Context.install!の鍵ソース、ActiveRecord::Encryptionの今のコンテキストの鍵ソースを見る。
       # 属性ごとに指定したkey_providerは対象外。
-      def record_public_keys
-        providers = [ActiveRecord::KeyProvider.new]
-        configured = configured_record_provider
-        providers << configured if configured.respond_to?(:public_keys)
-        providers.flat_map(&:public_keys)
+      def shared_with_records?
+        public_key = @keypair.public_key.b
+        default_record_public_keys.include?(public_key) || configured_record_public_keys.include?(public_key)
       end
 
-      def configured_record_provider
-        return unless defined?(::ActiveRecord::Encryption)
+      # 既定の鍵の置き場所はプロセスの間変わらないので、読み込みは1回だけにする。
+      def default_record_public_keys
+        @default_record_public_keys ||= ActiveRecord::KeyProvider.new.public_keys.map(&:b)
+      end
 
-        ::ActiveRecord::Encryption.context.key_provider
-      rescue ::ActiveRecord::Encryption::Errors::Configuration
-        nil
+      # コンテキストはスレッドや処理の範囲で変わるので、結果を覚えない。
+      def configured_record_public_keys
+        ActiveRecord::KeyProvider.configured.flat_map(&:public_keys).map(&:b)
       end
 
       def open_cookie(bytes)
