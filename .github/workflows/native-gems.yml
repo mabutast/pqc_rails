@@ -44,7 +44,7 @@ jobs:
           - { platform: aarch64-linux-gnu, runner: ubuntu-24.04-arm, image: "almalinux:8" }
           - { platform: x86_64-linux-musl, runner: ubuntu-24.04, image: "alpine:3.20" }
           - { platform: aarch64-linux-musl, runner: ubuntu-24.04-arm, image: "alpine:3.20" }
-          - { platform: arm64-darwin, runner: macos-14, image: "" }
+          - { platform: arm64-darwin, runner: macos-15, image: "" }
     steps:
       - uses: actions/checkout@v4
         with:
@@ -128,7 +128,7 @@ jobs:
           - { platform: aarch64-linux-gnu, runner: ubuntu-24.04-arm, image: slim }
           - { platform: x86_64-linux-musl, runner: ubuntu-24.04, image: alpine }
           - { platform: aarch64-linux-musl, runner: ubuntu-24.04-arm, image: alpine }
-          - { platform: arm64-darwin, runner: macos-14, image: "" }
+          - { platform: arm64-darwin, runner: macos-15, image: "" }
     steps:
       - uses: actions/checkout@v4
         with:
