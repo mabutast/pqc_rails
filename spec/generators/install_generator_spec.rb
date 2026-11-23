@@ -234,6 +234,37 @@ RSpec.describe PqcRails::Generators::InstallGenerator do
       expect(output).to include("ML-KEM-768")
     end
 
+    [
+      ["末尾改行の無いブロックスカラー", "pem: |\n  line1\n  line2"],
+      ["末尾改行の無い|+のブロックスカラー", "pem: |+\n  line1"],
+      ["文書の終わりの印がある内容", "a: 1\n...\n"],
+      ["フロー形式の内容", "{a: 1}\n"]
+    ].each do |name, content|
+      it "#{name}は書き換えず、失敗で終了する" do
+        credentials = write_credentials(build_credentials(@destination_root), content)
+        allow(Rails).to receive(:application).and_return(double("Rails.application", credentials: credentials))
+        original_stderr = $stderr
+        $stderr = StringIO.new
+
+        expect do
+          capture_stdout { described_class.start([], destination_root: @destination_root) }
+        end.to raise_error(SystemExit) { |error| expect(error.status).to eq(1) }
+
+        expect(reloaded(credentials).read).to eq(content)
+      ensure
+        $stderr = original_stderr
+      end
+    end
+
+    it "末尾改行の無い通常の値は保って鍵を足す" do
+      credentials = write_credentials(build_credentials(@destination_root), "a: 1")
+
+      run_generator(credentials)
+
+      expect(reloaded(credentials).config[:a]).to eq(1)
+      expect(reloaded(credentials).config[:pqc_record_key]).to be_a(String)
+    end
+
     it "認証鍵の無い0.3.0形式の鍵は残し、入れ替えを案内する" do
       legacy = PqcRails::HybridKem.open(:ml_kem_768, &:generate_keypair)
       encoded = PqcRails::KeySource.encode(PqcRails::HybridKem::Keypair.new(legacy.public_key, legacy.secret_key))
@@ -253,8 +284,22 @@ RSpec.describe PqcRails::Generators::InstallGenerator do
       output = capture_stdout { described_class.start([], destination_root: @destination_root) }
 
       expect(output).to include("pqc_record_key is not a valid pqc_rails key")
+      expect(output).to include("do not move it to the previous keys")
       expect(output).not_to include("not-a-valid-secret")
       expect(reloaded(credentials).config[:pqc_record_key]).to eq("not-a-valid-secret")
+    end
+
+    it "シードだけの鍵は残し、旧鍵へ移さないよう案内する" do
+      seed = Base64.strict_encode64("\x01".b * 32)
+      credentials = write_credentials(build_credentials(@destination_root), "pqc_record_key: #{seed}\n")
+      allow(Rails).to receive(:application).and_return(double("Rails.application", credentials: credentials))
+
+      output = capture_stdout { described_class.start([], destination_root: @destination_root) }
+
+      expect(output).to include("pqc_record_key looks like a seed-only key")
+      expect(output).to include("do not move it to the previous keys")
+      expect(output).not_to include(seed)
+      expect(reloaded(credentials).config[:pqc_record_key]).to eq(seed)
     end
 
     def capture_stdout
