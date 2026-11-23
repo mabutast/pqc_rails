@@ -53,7 +53,10 @@ module PqcRails
     # 0.3.0以前の版は先頭の2要素だけを読むため、3要素の鍵も読める。
     def encode(keypair)
       parts = [keypair.public_key, keypair.secret_key, keypair.authentication_key].compact
-      Base64.strict_encode64(BlobPacking.pack_all(*parts))
+      packed = BlobPacking.pack_all(*parts)
+      Base64.strict_encode64(packed)
+    ensure
+      SecretBuffer.wipe(packed)
     end
 
     # Base64から戻したバイト列は、鍵を取り出した後にゼロで埋める(鍵ペアが持つのは取り出したコピーだけ)。
