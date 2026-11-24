@@ -234,6 +234,8 @@ module PqcRails
 
       Result.new(name: name, ok: false,
                  detail: "#{short.join(', ')}。text列に変更してください(docs/MIGRATION.md)")
+    rescue ::ActiveRecord::ConnectionNotEstablished, ::ActiveRecord::NoDatabaseError
+      Result.new(name: name, ok: true, detail: "DBに接続できないので確かめていません")
     rescue StandardError => e
       Result.new(name: name, ok: false, detail: "確認できませんでした(#{e.class})")
     end

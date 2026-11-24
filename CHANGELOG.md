@@ -7,11 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-24
+
 ### Added
 
 - `rails pqc_rails:status` reports encrypted columns that are too short for the
   ciphertext and `string` columns that longer values can overflow. `PqcRails::ActiveRecord::ColumnCapacity`
-  provides `too_short`, `may_overflow`, and `too_long`.
+  provides `too_short`, `may_overflow`, and `too_long`. The task now exits with status 1 when a
+  column is too short for the ciphertext. The check is skipped when the database is unavailable.
 
 ### Fixed
 
@@ -404,7 +407,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   documentation for decision-makers and developers.
 - CI workflow building liboqs from source and running the test suite on push/PR.
 
-[Unreleased]: https://github.com/mabutast/pqc_rails/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/mabutast/pqc_rails/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/mabutast/pqc_rails/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/mabutast/pqc_rails/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/mabutast/pqc_rails/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/mabutast/pqc_rails/compare/v0.2.1...v0.3.0
