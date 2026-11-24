@@ -40,14 +40,14 @@
       "id": "combiner",
       "pattern": "共有鍵の導出（入力の順序・ラベル・曲線・アルゴリズム・両方の暗号文）",
       "source": "spec",
-      "source_ref": "docs/THREAT_MODEL.md「技術的な対応範囲」、NIST SP 800-227 §4.6.2・§4.6.3、hybrid_kem.rb の combine",
+      "source_ref": "docs/THREAT_MODEL.md「技術的な対応範囲」、hybrid_kem.rb の combine（NIST SP 800-227 は設計の参考。適合の照合は未実施）",
       "tests": [
         {
           "file": "spec/pqc_rails/hybrid_kem_spec.rb",
           "name": "X25519・ML-KEMの順に連結した共有鍵を、ラベル・曲線・アルゴリズム・両方の暗号文を束ねたinfoでHKDF-SHA256にかける"
         }
       ],
-      "guarantee": "共有鍵は、X25519・ML-KEM の順の連結を、ラベル・曲線・アルゴリズム名・両方の暗号文を NUL で束ねた info で HKDF-SHA256 にかけた値と一致する",
+      "guarantee": "共有鍵は、X25519・ML-KEM の順の連結を、ラベル・曲線・アルゴリズム名・両方の暗号文を NUL で束ねた info で HKDF-SHA256 にかけた値と一致する（テストは lib と同じ組み立てで期待値を作る。既知の答えとの照合は無いため、SP 800-227 への適合は確かめていない）",
       "mutants": [
         {
           "id": "swap-ikm",
@@ -136,6 +136,22 @@
           "find": "salt: \"\"",
           "replace": "salt: \"x\"",
           "result": "killed"
+        },
+        {
+          "id": "swap-info-ciphertext",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "        classical_ciphertext,\n        pq_ciphertext\n",
+          "replace": "        pq_ciphertext,\n        classical_ciphertext\n",
+          "result": "killed"
+        },
+        {
+          "id": "swap-combine-args",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "                classical_encap.ciphertext, pq_encap.ciphertext)\n",
+          "replace": "                pq_encap.ciphertext, classical_encap.ciphertext)\n",
+          "result": "killed"
         }
       ]
     },
@@ -147,7 +163,7 @@
       "tests": [
         {
           "file": "spec/pqc_rails/hybrid_kem_spec.rb",
-          "name": "公開鍵・秘密鍵・暗号文は、X25519・ML-KEMの順に正しい長さで詰める"
+          "name": "公開鍵・秘密鍵・暗号文は、X25519・ML-KEMの順に、ML-KEM-512・768・1024のそれぞれで正しい長さに詰める"
         }
       ],
       "guarantee": "3つの値はどれも X25519・ML-KEM の順で、それぞれ正しい長さ",
