@@ -2,6 +2,7 @@
 
 require "rack"
 require "action_dispatch"
+require "action_dispatch/middleware/flash"
 
 RSpec.describe PqcRails::Session::PqcCookieStore do
   let(:keypair) { PqcRails::HybridKem.open(:ml_kem_512) { |hybrid| hybrid.generate_keypair } }
@@ -58,6 +59,35 @@ RSpec.describe PqcRails::Session::PqcCookieStore do
       second_response = Rack::MockRequest.new(app).get("/read", "HTTP_COOKIE" => cookie_header)
 
       expect(second_response.body).to eq("42")
+    end
+
+    it "session_serializerが:jsonでも、セッションIDとフラッシュを含めて次のリクエストで復元される" do
+      inner = lambda do |env|
+        request = ActionDispatch::Request.new(env)
+        if request.path == "/write"
+          request.session[:user_id] = 42
+          request.flash[:notice] = "saved"
+        end
+        body = "#{request.session[:user_id]}:#{request.flash[:notice]}"
+        request.commit_flash
+        [200, {}, [body]]
+      end
+      store_keypair = keypair
+      app = Rack::Builder.new do
+        use ActionDispatch::Cookies
+        use PqcRails::Session::PqcCookieStore, key: "_json_session", keypair: store_keypair, pq_alg_name: :ml_kem_512
+        run inner
+      end.to_app
+      PqcRails.configuration.session_serializer = :json
+
+      first = Rack::MockRequest.new(app).get("/write")
+      cookie = first.headers["Set-Cookie"].split(";").first
+      second = Rack::MockRequest.new(app).get("/read", "HTTP_COOKIE" => cookie)
+
+      expect(Base64.strict_decode64(Rack::Utils.unescape(cookie.split("=", 2).last)).getbyte(0)).to eq(2)
+      expect(second.body).to eq("42:saved")
+    ensure
+      PqcRails.configuration.session_serializer = :marshal
     end
   end
 

@@ -33,11 +33,42 @@ module PqcRails
     # 旧形式のCookieは発行日時を持たないため、旧形式の発行が止まる日時に最長のセッション有効期限を足した日時を設定する。
     attr_reader :accept_legacy_cookies_until
 
+    SESSION_SERIALIZERS = %i[marshal json].freeze
+
+    # セッションCookieの中身の書き方。
+    # :marshal Marshalで書く(既定)。JSONで同じ形に戻らない値があれば、
+    #          session_not_json_safe.pqc_railsのイベントでキーの名前を知らせる
+    # :json    JSONで書く(形式v2)。Marshal.loadを通らないため、認証鍵が漏れてもコードの実行には広がらない
+    attr_reader :session_serializer
+
+    # session_serializerが:jsonの時に、Marshalで書かれたCookie(形式v0・v1)をこの日時まで読む。
+    # 既定のnilでは読まない。:jsonへ切り替えた日時に最長のセッション有効期限を足した日時を設定する。
+    attr_reader :accept_marshal_cookies_until
+
     def initialize
       @liboqs_path = ENV["LIBOQS_PATH"] || default_liboqs_path
       @ciphertext_format = :v1
       @accept_legacy_records = true
       @accept_legacy_cookies_until = nil
+      @session_serializer = :marshal
+      @accept_marshal_cookies_until = nil
+    end
+
+    def session_serializer=(serializer)
+      unless SESSION_SERIALIZERS.include?(serializer)
+        raise ArgumentError,
+              "session_serializer must be one of #{SESSION_SERIALIZERS.inspect}, got #{serializer.inspect}"
+      end
+
+      @session_serializer = serializer
+    end
+
+    def accept_marshal_cookies_until=(time)
+      unless time.nil? || time.is_a?(Time)
+        raise ArgumentError, "accept_marshal_cookies_until must be a Time or nil, got #{time.inspect}"
+      end
+
+      @accept_marshal_cookies_until = time
     end
 
     def ciphertext_format=(format)

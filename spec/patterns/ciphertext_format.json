@@ -271,7 +271,7 @@
           "id": "shared-secret-as-key",
           "kind": "鍵の導出を通さない・入力を1つ外す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "hkdf(material, \"#{DATA_KEY_INFO}:#{purpose_label(purpose)}\")",
+          "find": "hkdf(material, \"pqc_rails:v#{version_label(version)}:data-key:#{purpose_label(purpose)}\")",
           "replace": "shared_secret",
           "result": "killed"
         }
@@ -312,7 +312,7 @@
       "id": "data-key-derivation",
       "pattern": "AES 鍵の導き方（長さ・salt・info）",
       "source": "code",
-      "source_ref": "hkdf と DATA_KEY_INFO・KEY_LENGTH",
+      "source_ref": "hkdf と、info の「pqc_rails:v<版>:data-key:<用途>」・KEY_LENGTH",
       "tests": [
         {
           "file": "spec/pqc_rails/ciphertext_format_spec.rb",
@@ -345,8 +345,8 @@
           "id": "info",
           "kind": "定数を変える",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "DATA_KEY_INFO = \"pqc_rails:v#{VERSION}:data-key\".freeze",
-          "replace": "DATA_KEY_INFO = \"pqc_rails:v#{VERSION}:data\".freeze",
+          "find": "hkdf(material, \"pqc_rails:v#{version_label(version)}:data-key:#{purpose_label(purpose)}\")",
+          "replace": "hkdf(material, \"pqc_rails:v#{version_label(version)}:data:#{purpose_label(purpose)}\")",
           "result": "killed"
         }
       ]
@@ -600,8 +600,8 @@
           "id": "info-without-purpose",
           "kind": "戻り値を空・nil・固定値にする",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "hkdf(material, \"#{DATA_KEY_INFO}:#{purpose_label(purpose)}\")",
-          "replace": "hkdf(material, DATA_KEY_INFO)",
+          "find": "hkdf(material, \"pqc_rails:v#{version_label(version)}:data-key:#{purpose_label(purpose)}\")",
+          "replace": "hkdf(material, \"pqc_rails:v#{version_label(version)}:data-key\")",
           "result": "killed"
         },
         {
@@ -610,7 +610,7 @@
           "file": "lib/pqc_rails/ciphertext_format.rb",
           "find": "\"pqc_rails:v#{VERSION}:#{purpose_label(purpose)}:#{algorithm_id}:#{key_id}\"",
           "replace": "\"pqc_rails:v#{VERSION}:#{algorithm_id}:#{key_id}\"",
-          "result": "killed"
+          "result": "stale"
         },
         {
           "id": "both-without-purpose",
@@ -634,7 +634,7 @@
           "file": "lib/pqc_rails/session/encryptor.rb",
           "find": "CiphertextFormat.data_key(shared_secret, @keypair.authentication_key, purpose: :session)",
           "replace": "CiphertextFormat.data_key(shared_secret, @keypair.authentication_key, purpose: :record)",
-          "result": "killed"
+          "result": "stale"
         }
       ]
     },

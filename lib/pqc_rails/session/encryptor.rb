@@ -6,6 +6,7 @@ require_relative "../hybrid_kem"
 require_relative "../envelope_cipher"
 require_relative "../ciphertext_format"
 require_relative "../active_record/key_provider"
+require_relative "json_payload"
 
 module PqcRails
   module Session
@@ -25,7 +26,11 @@ module PqcRails
         @pq_alg_name = pq_alg_name
       end
 
+      # session_serializerが:jsonなら形式v2(中身はJSON)、:marshalならv1(ciphertext_formatが:v0ならv0)で書く。
       def encrypt(data)
+        return Base64.strict_encode64(seal_json(data)) if PqcRails.configuration.session_serializer == :json
+
+        notify_not_json_safe(data)
         serialized = Marshal.dump(data)
         return Base64.strict_encode64(seal_legacy(serialized)) if CiphertextFormat.write_legacy?
 
@@ -35,9 +40,13 @@ module PqcRails
       # 先頭バイトで形式を判別する。旧形式(v0)は先頭がKEM暗号文の4バイト長(ビッグエンディアン)で、
       # KEM暗号文は16MB未満のため先頭バイトは必ず0になる。1以上なら形式バージョンとして読む。
       # 途中で切れた・壊れたCookieは、どの段で見つかってもPqcRails::Errorにする。
+      # v2はJSONとして読み、Marshal.loadに渡さない。v0・v1(Marshal)は、session_serializerが:jsonの間は期限内だけ読む。
       def decrypt(blob)
         bytes = Base64.strict_decode64(blob)
-        Marshal.load(open_cookie(bytes))
+        payload = open_cookie(bytes)
+        return JsonPayload.load(payload) if bytes.getbyte(0) == CiphertextFormat::SESSION_JSON_VERSION
+
+        Marshal.load(payload)
       end
 
       # この鍵で旧形式のCookieを書けない理由(読み戻せないため)。書ける場合はnil。
@@ -66,10 +75,23 @@ module PqcRails
         ActiveRecord::KeyProvider.configured.flat_map(&:public_keys).map(&:b)
       end
 
+      # :marshalで書く間に、:jsonへ切り替えると書けなくなる値があれば、最上位のキーの名前だけを知らせる。
+      def notify_not_json_safe(data)
+        keys = JsonPayload.unsafe_keys(data)
+        return if keys.empty?
+
+        ActiveSupport::Notifications.instrument("session_not_json_safe.pqc_rails", keys: keys)
+      end
+
       def open_cookie(bytes)
         case bytes.getbyte(0)
-        when 0 then open_legacy(bytes)
-        when CiphertextFormat::VERSION then open_v1(bytes)
+        when 0
+          CiphertextFormat.ensure_marshal_cookie_accepted!
+          open_legacy(bytes)
+        when CiphertextFormat::VERSION
+          CiphertextFormat.ensure_marshal_cookie_accepted!
+          open_versioned(bytes, CiphertextFormat::VERSION)
+        when CiphertextFormat::SESSION_JSON_VERSION then open_versioned(bytes, CiphertextFormat::SESSION_JSON_VERSION)
         else raise PqcRails::Error, "unsupported ciphertext format version: #{bytes.getbyte(0).inspect}"
         end
       rescue OpenSSL::Cipher::CipherError, ArgumentError => e
@@ -97,22 +119,37 @@ module PqcRails
         end
       end
 
-      # v1: [形式バージョン 1B][アルゴリズムIDの長さ 1B][アルゴリズムID][鍵ID 2B][v0と同じ本体]
-      def seal_v1(serialized)
+      def seal_json(data)
+        if CiphertextFormat.write_legacy?
+          raise PqcRails::Error,
+                "session_serializer :json cannot be used while ciphertext_format is :v0 " \
+                "(servers on pqc_rails 0.3.0 or earlier cannot read it); see docs/MIGRATION.md"
+        end
+
+        seal_versioned(JsonPayload.dump(data), CiphertextFormat::SESSION_JSON_VERSION)
+      end
+
+      def seal_v1(serialized) = seal_versioned(serialized, CiphertextFormat::VERSION)
+
+      # v1・v2: [形式バージョン 1B][アルゴリズムIDの長さ 1B][アルゴリズムID][鍵ID 2B][v0と同じ本体]
+      # v1の中身はMarshal、v2の中身はJSON。形式バージョンはAES鍵の導出と追加認証データに入る。
+      def seal_versioned(serialized, version)
         algorithm_id = CiphertextFormat.algorithm_id(@pq_alg_name)
         key_id = CiphertextFormat.key_id(@keypair.public_key)
-        associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id, purpose: :session)
-        header = [CiphertextFormat::VERSION, algorithm_id.bytesize].pack("CC") + algorithm_id + [key_id].pack("H4")
+        associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id,
+                                                           purpose: :session, version: version)
+        header = [version, algorithm_id.bytesize].pack("CC") + algorithm_id + [key_id].pack("H4")
 
         HybridKem.open(CiphertextFormat.canonical_pq_alg_name(@pq_alg_name)) do |hybrid|
           encap = hybrid.encapsulate(@keypair.public_key)
-          data_key = CiphertextFormat.data_key(encap.shared_secret, @keypair.authentication_key, purpose: :session)
+          data_key = CiphertextFormat.data_key(encap.shared_secret, @keypair.authentication_key,
+                                               purpose: :session, version: version)
           encrypted = EnvelopeCipher.new(data_key).encrypt(serialized, associated_data: associated_data)
           header + BlobPacking.pack(encap.ciphertext, encrypted)
         end
       end
 
-      def open_v1(bytes)
+      def open_versioned(bytes, version)
         algorithm_id_length = bytes.getbyte(1)
         if algorithm_id_length.nil? || bytes.bytesize < 4 + algorithm_id_length
           raise PqcRails::Error, "the cookie is truncated: missing the format header"
@@ -127,12 +164,14 @@ module PqcRails
         end
 
         pq_alg_name = CiphertextFormat.pq_alg_name_for(algorithm_id, configured: @pq_alg_name)
-        associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id, purpose: :session)
+        associated_data = CiphertextFormat.associated_data(algorithm_id: algorithm_id, key_id: key_id,
+                                                           purpose: :session, version: version)
         ciphertext, encrypted = BlobPacking.unpack(body, exact: true)
 
         HybridKem.open(pq_alg_name) do |hybrid|
           shared_secret = hybrid.decapsulate(ciphertext, @keypair.secret_key)
-          data_key = CiphertextFormat.data_key(shared_secret, @keypair.authentication_key, purpose: :session)
+          data_key = CiphertextFormat.data_key(shared_secret, @keypair.authentication_key,
+                                               purpose: :session, version: version)
           EnvelopeCipher.new(data_key).decrypt(encrypted, associated_data: associated_data)
         end
       end

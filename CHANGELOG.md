@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `PqcRails.configuration.session_serializer = :json` writes session cookies in a new format (v2)
+  whose content is JSON instead of `Marshal`. Reading a v2 cookie never calls `Marshal.load`.
+  The format version is part of the AES key derivation and the associated data, so v1 and v2
+  cookies cannot be swapped. Strings, integers, finite floats, `true`, `false`, `nil`, arrays and
+  hashes with string keys are accepted; symbol values are stored as strings. Other values (such
+  as `Time`, symbol keys, or custom objects) raise `PqcRails::Error` when the session is saved.
+  The default stays `:marshal`. All versions from 0.6.0 read both v1 and v2 cookies.
+- `accept_marshal_cookies_until`: while `session_serializer` is `:json`, `Marshal` cookies
+  (formats v0 and v1) are read only until this time. With the default `nil` they are not read.
+- With `:marshal`, a `session_not_json_safe.pqc_rails` event reports the top-level session keys
+  whose values would not survive JSON (key names only, no values). See `docs/MIGRATION.md`,
+  "セッションの中身を JSON に切り替える".
+
 ## [0.5.0] - 2026-11-24
 
 ### Added

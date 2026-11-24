@@ -166,7 +166,7 @@ RSpec.describe PqcRails::Session::Encryptor do
 
     it "未知の形式バージョンはPqcRails::Errorを送出する" do
       bytes = decoded(encryptor.encrypt({ "user_id" => 1 }))
-      bytes.setbyte(0, 2)
+      bytes.setbyte(0, 3)
 
       expect { encryptor.decrypt(Base64.strict_encode64(bytes)) }.to raise_error(PqcRails::Error, /version/)
     end
