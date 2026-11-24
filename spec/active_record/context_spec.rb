@@ -81,6 +81,74 @@ RSpec.describe PqcRails::ActiveRecord::Context do
     expect { widget_class.find(widget.id).secret }.to raise_error(ActiveRecord::Encryption::Errors::Base)
   end
 
+  describe "レコードのMarshal(Rails.cache)" do
+    # 6.1の形式は属性の型(暗号化のスキームとkey_provider)までたどり、7.1の形式は属性の値だけを書く。
+    around do |example|
+      original = ::ActiveRecord::Marshalling.format_version
+      example.run
+    ensure
+      ::ActiveRecord::Marshalling.format_version = original
+    end
+
+    def expect_marshal_without_keys(klass)
+      stub_const("MarshalWidget", klass)
+      widget = MarshalWidget.find(MarshalWidget.create!(secret: "hello pqc").id)
+      widget.secret
+
+      dumped = Marshal.dump(widget)
+
+      [keypair.secret_key, keypair.authentication_key].each { |secret| expect(dumped.b).not_to include(secret.b) }
+      loaded = Marshal.load(dumped)
+      expect(loaded.secret).to eq("hello pqc")
+      loaded.update!(secret: "after reload") # pragma: allowlist secret
+      expect(MarshalWidget.find(loaded.id).secret).to eq("after reload")
+    end
+
+    # 鍵を読み終えたKeyProviderを、属性ごとのkey_providerに指定したモデル。
+    def class_with_own_key_provider
+      provider = PqcRails::ActiveRecord::KeyProvider.new
+      provider.encryption_key
+      Class.new(::ActiveRecord::Base) do
+        self.table_name = "widgets"
+        encrypts :secret, key_provider: provider
+      end
+    end
+
+    it "暗号化属性を持つレコードは6.1の形式でMarshal.dumpでき、鍵を含まない" do
+      ::ActiveRecord::Marshalling.format_version = 6.1
+
+      expect_marshal_without_keys(widget_class)
+    end
+
+    it "暗号化属性を持つレコードは7.1の形式でMarshal.dumpでき、鍵を含まない" do
+      ::ActiveRecord::Marshalling.format_version = 7.1
+
+      expect_marshal_without_keys(widget_class)
+    end
+
+    it "属性ごとにKeyProvider.newを指定したレコードも6.1の形式でMarshal.dumpでき、鍵を含まない" do
+      ::ActiveRecord::Marshalling.format_version = 6.1
+
+      expect_marshal_without_keys(class_with_own_key_provider)
+    end
+
+    it "属性ごとにKeyProvider.newを指定したレコードも7.1の形式でMarshal.dumpでき、鍵を含まない" do
+      ::ActiveRecord::Marshalling.format_version = 7.1
+
+      expect_marshal_without_keys(class_with_own_key_provider)
+    end
+
+    it "KeyProviderは鍵を読んだ後でも、鍵を含めずにMarshalでき、読み戻すと同じ鍵を読む" do
+      provider = PqcRails::ActiveRecord::KeyProvider.new
+      provider.encryption_key
+
+      dumped = Marshal.dump(provider)
+
+      [keypair.secret_key, keypair.authentication_key].each { |secret| expect(dumped.b).not_to include(secret.b) }
+      expect(Marshal.load(dumped).encryption_key.secret.public_key).to eq(keypair.public_key)
+    end
+  end
+
   describe "既存データの移行(dual-stack, docs/MIGRATION.md)" do
     let(:old_primary_key) { "s" * 32 }
     let(:legacy_widget_class) do

@@ -125,6 +125,17 @@ module PqcRails
                                                       label: @label)
       end
 
+      # Marshalには鍵の置き場所(環境変数名・credentialsのキー)だけを書き、復元した鍵ペアは書かない。
+      # 読み戻した後は、最初の呼び出しでENV・credentialsから鍵を読み直す。
+      def marshal_dump
+        { env_var: @env_var, previous_env_var: @previous_env_var, credentials_key: @credentials_key,
+          previous_credentials_key: @previous_credentials_key, label: @label }
+      end
+
+      def marshal_load(fields)
+        initialize(**fields)
+      end
+
       def previous_keypairs
         @previous_keypairs ||= begin
           raw = KeySource.fetch(env_var: @previous_env_var, credentials_key: @previous_credentials_key)
