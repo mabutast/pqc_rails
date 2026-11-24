@@ -59,6 +59,16 @@ module PqcRails
         @key_source = key_source
       end
 
+      # 属性ごとにkey_providerを指定すると、Railsの6.1のMarshalの形式はレコードの属性の型からこのオブジェクトまでたどる。
+      # 覚えた鍵(@encryption_key)は書かず、鍵ソースだけを書く。読み戻した後は、最初の呼び出しで鍵を読み直す。
+      def marshal_dump
+        @key_source
+      end
+
+      def marshal_load(key_source)
+        @key_source = key_source
+      end
+
       def encryption_key
         @encryption_key ||= build_key(@key_source.current_keypair)
       end
