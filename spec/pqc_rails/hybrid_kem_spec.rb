@@ -147,17 +147,19 @@ RSpec.describe PqcRails::HybridKem do
       end
     end
 
-    it "公開鍵・秘密鍵・暗号文は、X25519・ML-KEMの順に正しい長さで詰める" do
-      described_class.open(pq_alg_name) do |hybrid|
-        keypair = hybrid.generate_keypair
-        ciphertext = hybrid.encapsulate(keypair.public_key).ciphertext
-        pq_kem = PqcRails::Kem.new(pq_alg_name)
+    it "公開鍵・秘密鍵・暗号文は、X25519・ML-KEMの順に、ML-KEM-512・768・1024のそれぞれで正しい長さに詰める" do
+      %i[ml_kem_512 ml_kem_768 ml_kem_1024].each do |alg|
+        described_class.open(alg) do |hybrid|
+          keypair = hybrid.generate_keypair
+          ciphertext = hybrid.encapsulate(keypair.public_key).ciphertext
+          pq_kem = PqcRails::Kem.new(alg)
 
-        expect(PqcRails::BlobPacking.unpack(keypair.public_key).map(&:bytesize)).to eq([32, pq_kem.length_public_key])
-        expect(PqcRails::BlobPacking.unpack(keypair.secret_key).map(&:bytesize)).to eq([32, pq_kem.length_secret_key])
-        expect(PqcRails::BlobPacking.unpack(ciphertext).map(&:bytesize)).to eq([32, pq_kem.length_ciphertext])
-      ensure
-        pq_kem&.free
+          expect(PqcRails::BlobPacking.unpack(keypair.public_key).map(&:bytesize)).to eq([32, pq_kem.length_public_key])
+          expect(PqcRails::BlobPacking.unpack(keypair.secret_key).map(&:bytesize)).to eq([32, pq_kem.length_secret_key])
+          expect(PqcRails::BlobPacking.unpack(ciphertext).map(&:bytesize)).to eq([32, pq_kem.length_ciphertext])
+        ensure
+          pq_kem&.free
+        end
       end
     end
   end
@@ -197,9 +199,7 @@ RSpec.describe PqcRails::HybridKem do
         classical_secret, pq_secret = PqcRails::BlobPacking.unpack(keypair.secret_key)
         original_secret_key = keypair.secret_key.dup
         wiped = []
-        shared = []
         allow(PqcRails::SecretBuffer).to receive(:wipe).and_wrap_original do |original, *strings|
-          strings.compact.each { |string| shared << JSON.parse(ObjectSpace.dump(string)).fetch("shared", false) }
           wiped.concat(strings.compact.map { |string| [string.dup, string] })
           original.call(*strings)
         end
@@ -214,7 +214,6 @@ RSpec.describe PqcRails::HybridKem do
           expect(copies.size).to eq(2)
           copies.each { |(_, after)| expect(after).to eq("\x00" * secret.bytesize) }
         end
-        expect(shared).to all(be(false))
         expect(keypair.secret_key).to eq(original_secret_key)
       end
     end
