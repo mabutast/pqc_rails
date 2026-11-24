@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require "active_record"
-require "sqlite3"
+require_relative "../support/test_database"
 
 # docs/MIGRATION.md「鍵ローテーション（pqc_rails鍵世代間）」に書かれた運用手順
 # (ローテーション→複数世代の併用→一括再暗号化→鍵失効、およびpqc_rails導入前へのロールバック)を
@@ -10,11 +9,11 @@ require "sqlite3"
 # KeyProvider単体の戻り値ではなく、実際のDB書き込み・読み出しを通した結果を確認する。
 RSpec.describe "PqcRails鍵ローテーション(DB, E2E)" do
   before(:all) do
-    ::ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
+    TestDatabase.connect
     ::ActiveRecord::Migration.verbose = false
     ::ActiveRecord::Schema.define do
-      create_table :rotation_widgets do |t|
-        t.string :secret
+      create_table :rotation_widgets, force: true do |t|
+        t.text :secret
       end
     end
   end

@@ -1,0 +1,7 @@
+# frozen_string_literal: true
+
+# CIでPostgreSQLとMySQLのテストに使う。公開するgemの依存には含まれない。
+eval_gemfile "rails_8.1.gemfile"
+
+gem "mysql2", "~> 0.5"
+gem "pg", "~> 1.6"

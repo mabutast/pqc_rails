@@ -1,8 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
-require "active_record"
-require "sqlite3"
+require_relative "../support/test_database"
 
 # 以前の版が書いた暗号文(spec/fixtures/compat/)を、今のコードで元の平文に戻せることを確かめる。
 # 同じテストの中で書いて読むテストは、書く側と読む側の両方が同じように変わると通ってしまう
@@ -11,7 +10,7 @@ require "sqlite3"
 # 検査データの作り方は script/generate-compat-fixtures を参照。
 RSpec.describe "以前の版が書いた暗号文の読み込み(固定の検査データ)" do
   before(:all) do
-    ::ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
+    TestDatabase.connect
     ::ActiveRecord::Migration.verbose = false
     ::ActiveRecord::Schema.define do
       create_table(:compat_records, force: true) { |t| t.text :secret }

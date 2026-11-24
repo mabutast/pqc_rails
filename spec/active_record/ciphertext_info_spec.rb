@@ -1,15 +1,14 @@
 # frozen_string_literal: true
 
-require "active_record"
-require "sqlite3"
+require_relative "../support/test_database"
 
 RSpec.describe PqcRails::ActiveRecord::CiphertextInfo do
   before(:all) do
-    ::ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
+    TestDatabase.connect
     ::ActiveRecord::Migration.verbose = false
     ::ActiveRecord::Schema.define do
-      create_table :info_widgets do |t|
-        t.string :secret
+      create_table :info_widgets, force: true do |t|
+        t.text :secret
       end
     end
   end
