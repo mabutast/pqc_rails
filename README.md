@@ -166,6 +166,31 @@ Rails の `cookie_store` を ML-KEM ベースの PQC ストアで完全に置き
 config.session_store :pqc_cookie_store, pq_alg_name: :ml_kem_512
 ```
 
+#### セッションの中身を JSON で書く
+
+既定では、セッションの中身を Ruby の `Marshal` で書きます。`session_serializer` を `:json` にすると、JSON で書きます。`Marshal` で読む値は、細工されているとサーバー上でコードを実行される危険があります。JSON で書けば、認証鍵が漏れてセッションを偽造された場合でも、コードの実行には広がりません。
+
+```ruby
+# config/initializers/pqc_rails.rb
+PqcRails.configure do |config|
+  config.session_serializer = :json
+  # :json に切り替えた日時に最長のセッション有効期限を足した日時まで、Marshal で書かれた Cookie を読む（既定は nil で読まない）
+  config.accept_marshal_cookies_until = Time.utc(2027, 1, 15)
+end
+```
+
+`:json` で書けるのは、文字列・整数・有限の小数・`true`・`false`・`nil`・配列と、キーが文字列のハッシュです。シンボルの値は文字列で保存します。`Time`・シンボルのキー・独自のオブジェクトをセッションに入れると、保存時に `PqcRails::Error` が発生します。文字列か数値にして入れてください。
+
+`:marshal`（既定）の間は、`:json` で書けない値がセッションにあると、`session_not_json_safe.pqc_rails` のイベントで知らせます。イベントには最上位のキーの名前だけが入り、値は入りません。切り替える前に、このイベントが出ないことを確かめてください。
+
+```ruby
+ActiveSupport::Notifications.subscribe("session_not_json_safe.pqc_rails") do |event|
+  Rails.logger.warn("session keys not JSON-safe: #{event.payload[:keys].join(', ')}")
+end
+```
+
+`:json` で書いた Cookie は、0.6.0 より前の版では読めません。複数台のサーバーを使う場合は、全台を 0.6.0 以降に更新してから切り替えてください。手順は [docs/MIGRATION.md](docs/MIGRATION.md#セッションの中身を-json-に切り替える) を参照してください。`ciphertext_format = :v0` の間は `:json` で書けません（`PqcRails::Error` が発生します）。
+
 ### ActiveRecord::Encryption
 
 ```ruby
@@ -363,7 +388,7 @@ pqc_rails は現在 `0.y.z` 版で開発中です。将来 `1.0` を名乗る時
 
 **安定した公開 API**（1.0 以降は SemVer の対象にする想定）
 
-- `PqcRails.configure` / `PqcRails.liboqs_version` / `PqcRails::Configuration#liboqs_path` / `#ciphertext_format` / `#accept_legacy_records` / `#accept_legacy_cookies_until`
+- `PqcRails.configure` / `PqcRails.liboqs_version` / `PqcRails::Configuration#liboqs_path` / `#ciphertext_format` / `#accept_legacy_records` / `#accept_legacy_cookies_until` / `#session_serializer` / `#accept_marshal_cookies_until`
 - 鍵の生成と保存形式：`PqcRails::HybridKem.open(アルゴリズム) { |hybrid| hybrid.generate_keypair }` と `PqcRails::KeySource.encode` / `.decode`（[docs/MIGRATION.md](docs/MIGRATION.md) の鍵ローテーションの手順で使うもの）
 - `PqcRails::ActiveRecord::CiphertextInfo.parse`（`#format_version` / `#algorithm_id` / `#key_id` / `#pqc?` / `#legacy?`）、`PqcRails::Cipher#algorithm_id`、`PqcRails::CiphertextFormat.key_id`
 - `PqcRails::ActiveRecord::ColumnCapacity.too_short` / `.may_overflow` / `.too_long`（戻り値が持つ `attribute` / `limit` / `required`）

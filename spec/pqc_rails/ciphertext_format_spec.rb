@@ -78,6 +78,27 @@ RSpec.describe PqcRails::CiphertextFormat do
       expect(values.uniq.size).to eq(2)
     end
 
+    it "セッションのJSON形式(v2)は版の欄がv2になり、未知の版はArgumentErrorにする" do
+      expect(described_class.associated_data(algorithm_id: "X25519+ML-KEM-768", key_id: "ab12", purpose: :session,
+                                             version: 2))
+        .to eq("pqc_rails:v2:session:X25519+ML-KEM-768:ab12")
+      expect { described_class.associated_data(algorithm_id: "a", key_id: "ab12", purpose: :session, version: 3) }
+        .to raise_error(ArgumentError, /version/)
+    end
+  end
+
+  describe ".data_key の版" do
+    it "v1とv2では、同じ共有鍵・認証鍵から異なるAES鍵を導く" do
+      shared_secret = "s".b * 32
+      authentication_key = "a".b * 32
+      v1 = described_class.data_key(shared_secret, authentication_key, purpose: :session)
+      v2 = described_class.data_key(shared_secret, authentication_key, purpose: :session, version: 2)
+
+      expect(v2.bytesize).to eq(32)
+      expect(v2).not_to eq(v1)
+      expect(described_class.data_key(shared_secret, authentication_key, purpose: :session, version: 1)).to eq(v1)
+    end
+
     it "未知の用途はArgumentErrorを送出する" do
       [:foo, nil, "record"].each do |purpose|
         expect { described_class.associated_data(algorithm_id: "a", key_id: "b", purpose: purpose) }

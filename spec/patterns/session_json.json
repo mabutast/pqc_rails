@@ -1,0 +1,417 @@
+{
+  "test_command": "bundle exec rspec spec/session spec/pqc_rails/ciphertext_format_spec.rb spec/pqc_rails/configuration_spec.rb",
+  "rows": [
+    {
+      "id": "config",
+      "pattern": "session_serializer・accept_marshal_cookies_until の既定と検証",
+      "source": "spec",
+      "source_ref": "行 config-serializer-*・config-until-*",
+      "tests": [
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "既定は:marshalで、:jsonも受け付ける"
+        },
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "それ以外の値はArgumentErrorを送出する"
+        }
+      ],
+      "guarantee": "既定は :marshal・nil。それ以外の値は ArgumentError",
+      "mutants": [
+        {
+          "id": "default-json",
+          "kind": "既定値を変える",
+          "file": "lib/pqc_rails/configuration.rb",
+          "find": "@session_serializer = :marshal",
+          "replace": "@session_serializer = :json",
+          "result": "killed"
+        },
+        {
+          "id": "until-accepts-anything",
+          "kind": "検査を外す",
+          "file": "lib/pqc_rails/configuration.rb",
+          "find": "unless time.nil? || time.is_a?(Time)\n        raise ArgumentError, \"accept_marshal_cookies_until",
+          "replace": "if false\n        raise ArgumentError, \"accept_marshal_cookies_until",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "marshal-write",
+      "pattern": "`:marshal` で書く",
+      "source": "spec",
+      "source_ref": "行 write-marshal-v1・write-marshal-v0",
+      "tests": [
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "形式v1で書き、Timeも往復する"
+        }
+      ],
+      "guarantee": "既定では今までどおり v1(中身は Marshal)",
+      "mutants": [
+        {
+          "id": "always-json",
+          "kind": "条件を反転する",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "return Base64.strict_encode64(seal_json(data)) if PqcRails.configuration.session_serializer == :json",
+          "replace": "return Base64.strict_encode64(seal_json(data)) unless PqcRails.configuration.session_serializer == :json",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "marshal-event",
+      "pattern": "`:marshal` で JSON に戻らない値を書く",
+      "source": "spec",
+      "source_ref": "行 marshal-*",
+      "tests": [
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "JSONに入る値だけならイベントを出さない"
+        },
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "JSONで同じ形に戻らない値は、最上位のキーの名前だけをイベントで知らせ、書き込みは成功する"
+        }
+      ],
+      "guarantee": "戻らない値(Time・シンボルの値・シンボルのキー・独自のオブジェクト・入れ子)を持つ最上位のキーだけを知らせ、値は出さない。書き込みは成功する",
+      "mutants": [
+        {
+          "id": "no-notify",
+          "kind": "呼び出しを消す",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "        notify_not_json_safe(data)\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "symbol-value-equal",
+          "kind": "比較を外す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "key unless normalize(value, key) == value",
+          "replace": "normalize(value, key) && nil",
+          "result": "killed"
+        },
+        {
+          "id": "symbol-key-ignored",
+          "kind": "分岐を消す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "next key.to_s unless key.is_a?(String)",
+          "replace": "next nil unless key.is_a?(String)",
+          "result": "killed"
+        },
+        {
+          "id": "always-notify",
+          "kind": "早期の return を消す",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "        return if keys.empty?\n\n        ActiveSupport",
+          "replace": "        ActiveSupport",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "json-write",
+      "pattern": "`:json` で書く",
+      "source": "spec",
+      "source_ref": "行 write-json-v2",
+      "tests": [
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "形式v2で書き、v1と同じヘッダーの並びを持つ"
+        }
+      ],
+      "guarantee": "先頭は 2、続く並びは v1 と同じ",
+      "mutants": [
+        {
+          "id": "json-as-v1",
+          "kind": "版を取り違える",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "seal_versioned(JsonPayload.dump(data), CiphertextFormat::SESSION_JSON_VERSION)",
+          "replace": "seal_versioned(JsonPayload.dump(data), CiphertextFormat::VERSION)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "json-values",
+      "pattern": "`:json` で書ける値",
+      "source": "spec",
+      "source_ref": "行 json-allowed-roundtrip・json-empty-hash・json-symbol-value",
+      "tests": [
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "JSONに入る値は同じ形で往復し、シンボルの値は文字列になる"
+        }
+      ],
+      "guarantee": "許す型は同じ形で往復し、シンボルの値(入れ子・配列の中も)は文字列になる",
+      "mutants": [
+        {
+          "id": "symbol-raises",
+          "kind": "型を外す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "        when Symbol then value.to_s\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "array-shallow",
+          "kind": "再帰をやめる",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "when Array then value.map { |item| normalize(item, top_key) }",
+          "replace": "when Array then value",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "json-reject",
+      "pattern": "`:json` で書けない値",
+      "source": "spec",
+      "source_ref": "行 json-time・json-symbol-key・json-non-string-key・json-nonfinite-float・json-custom-object",
+      "tests": [
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "JSONに入らない値はPqcRails::Errorにし、メッセージに値を出さない"
+        },
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "最上位がHashでなければPqcRails::Errorにする"
+        }
+      ],
+      "guarantee": "Time・シンボルや数値のキー・NaN・無限大・独自のオブジェクト・Date は PqcRails::Error。メッセージに値を出さない",
+      "mutants": [
+        {
+          "id": "accept-anything",
+          "kind": "既定の分岐を通す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "        else\n          raise PqcRails::Error,\n                \"the session value under",
+          "replace": "        else\n          return value\n          raise PqcRails::Error,\n                \"the session value under",
+          "result": "killed"
+        },
+        {
+          "id": "nonfinite-ok",
+          "kind": "条件を外す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "unless value.finite?",
+          "replace": "if false",
+          "result": "killed"
+        },
+        {
+          "id": "nested-key-ok",
+          "kind": "条件を外す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "            unless key.is_a?(String)\n              raise",
+          "replace": "            if false\n              raise",
+          "result": "killed"
+        },
+        {
+          "id": "top-key-ok",
+          "kind": "条件を外す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "raise PqcRails::Error, \"session keys must be strings, got #{key.class}\" unless key.is_a?(String)",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "leak-value",
+          "kind": "メッセージに値を出す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "is a #{value.class}, which JSON",
+          "replace": "is a #{value.inspect}, which JSON",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "json-with-v0",
+      "pattern": "`:json` と ciphertext_format `:v0` を同時に設定",
+      "source": "code",
+      "source_ref": "seal_json の write_legacy? の検査（仕様の行 write-json-ignores-v0 は「v2 で書く」と仮定したが、古いサーバーが読めない値を書かないようエラーにした）",
+      "tests": [
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "ciphertext_formatが:v0の間は書けない"
+        }
+      ],
+      "guarantee": "0.3.0 以前のサーバーが読めない v2 を黙って書かない",
+      "mutants": [
+        {
+          "id": "ignore-v0",
+          "kind": "条件を外す",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "        if CiphertextFormat.write_legacy?\n          raise PqcRails::Error,\n                \"session_serializer :json",
+          "replace": "        if false\n          raise PqcRails::Error,\n                \"session_serializer :json",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "read-v2",
+      "pattern": "v2 の読み込み",
+      "source": "spec",
+      "source_ref": "行 read-v2-*",
+      "tests": [
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "v2はどちらの設定でも読む"
+        },
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "v2はMarshal.loadを通らない"
+        }
+      ],
+      "guarantee": "v2 はどちらの設定でも読み、Marshal.load に渡さない",
+      "mutants": [
+        {
+          "id": "v2-marshal",
+          "kind": "読み方を取り違える",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "          JsonPayload.load(open_cookie(bytes))",
+          "replace": "          Marshal.load(open_cookie(bytes))",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "read-marshal-gate",
+      "pattern": "`:json` の間の Marshal の Cookie",
+      "source": "spec",
+      "source_ref": "行 read-v1-json-*・read-v0-json（期限ちょうどは accept_legacy_cookies_until と同じく読む。仕様から書いた行は「読まない」としていた）",
+      "tests": [
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": ":jsonの間、Marshalで書いたv1は期限内(期限ちょうどを含む)だけ読む"
+        },
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": ":jsonの間、Marshalを読まない時はMarshal.loadに届かない"
+        },
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": ":jsonの間、v0はMarshalの期限と旧形式の条件の両方が要る"
+        }
+      ],
+      "guarantee": "期限が nil・過去なら Marshal.load の前に PqcRails::Error。期限内なら読む。v0 は旧形式の条件も要る",
+      "mutants": [
+        {
+          "id": "gate-removed",
+          "kind": "呼び出しを消す",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "          CiphertextFormat.ensure_marshal_cookie_accepted!\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "gate-strict",
+          "kind": "境界を変える",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "      return if deadline && now <= deadline\n\n      raise PqcRails::Error,\n            \"Marshal",
+          "replace": "      return if deadline && now < deadline\n\n      raise PqcRails::Error,\n            \"Marshal",
+          "result": "killed"
+        },
+        {
+          "id": "gate-nil-ok",
+          "kind": "条件を外す",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "      return if deadline && now <= deadline\n\n      raise PqcRails::Error,\n            \"Marshal",
+          "replace": "      return if deadline.nil? || now <= deadline\n\n      raise PqcRails::Error,\n            \"Marshal",
+          "result": "killed"
+        },
+        {
+          "id": "gate-marshal-mode",
+          "kind": "条件を反転する",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "return unless PqcRails.configuration.session_serializer == :json",
+          "replace": "return if PqcRails.configuration.session_serializer == :json",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "version-binding",
+      "pattern": "版の1バイトの書き換え",
+      "source": "spec",
+      "source_ref": "行 v1-relabeled-as-v2・v2-relabeled-as-v1",
+      "tests": [
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "版の1バイトを書き換えたv1・v2は復号できない"
+        },
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "セッションのJSON形式(v2)は版の欄がv2になり、未知の版はArgumentErrorにする"
+        },
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "v1とv2では、同じ共有鍵・認証鍵から異なるAES鍵を導く"
+        }
+      ],
+      "guarantee": "版は AES 鍵の導出と追加認証データのそれぞれに入り、v1 と v2 を取り違えて復号できない",
+      "mutants": [
+        {
+          "id": "ad-without-version",
+          "kind": "版を固定する",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "\"pqc_rails:v#{version_label(version)}:#{purpose_label(purpose)}:#{algorithm_id}:#{key_id}\"",
+          "replace": "\"pqc_rails:v1:#{purpose_label(purpose)}:#{algorithm_id}:#{key_id}\"",
+          "result": "killed"
+        },
+        {
+          "id": "key-without-version",
+          "kind": "版を固定する",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "hkdf(material, \"pqc_rails:v#{version_label(version)}:data-key:#{purpose_label(purpose)}\")",
+          "replace": "hkdf(material, \"pqc_rails:v1:data-key:#{purpose_label(purpose)}\")",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "v2-payload",
+      "pattern": "v2 の中身が壊れている・Hash でない",
+      "source": "spec",
+      "source_ref": "行 v2-broken-json・v2-top-not-hash",
+      "tests": [
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "v2の中身が壊れたJSON・Hashでない値ならPqcRails::Errorにする"
+        }
+      ],
+      "guarantee": "壊れた JSON・Hash でない値は PqcRails::Error",
+      "mutants": [
+        {
+          "id": "top-any",
+          "kind": "検査を外す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "raise PqcRails::Error, \"the session cookie does not hold a JSON object\" unless data.is_a?(Hash)",
+          "replace": "nil",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "rails-roundtrip",
+      "pattern": "Rails の Cookie ストアを通した往復",
+      "source": "spec",
+      "source_ref": "JSON 化の設計（セッション ID・フラッシュが JSON で往復する）",
+      "tests": [
+        {
+          "file": "spec/session/pqc_cookie_store_spec.rb",
+          "name": "session_serializerが:jsonでも、セッションIDとフラッシュを含めて次のリクエストで復元される"
+        }
+      ],
+      "guarantee": ":json でも Rails のセッション(セッション ID・フラッシュ)が次のリクエストで戻る",
+      "mutants": [
+        {
+          "id": "stringify-break",
+          "kind": "値を変える",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "when String, Integer, true, false, nil then value",
+          "replace": "when String, Integer, true, false, nil then value.to_s",
+          "result": "killed"
+        }
+      ]
+    }
+  ]
+}

@@ -186,6 +186,27 @@ DB とセッションには別の鍵を設定してください。`Context` に�
 
 将来 HSM/PKCS#11 経由の鍵管理と連携する場合の拡張ポイントとして用意していますが、pqc_rails 自体は具体的な HSM 連携実装を提供しません。
 
+## セッションの中身を JSON に切り替える
+
+`session_serializer = :json` で書いた Cookie（形式 v2）は 0.6.0 以降の版だけが読めます。0.6.0 以降の版は、設定によらず v2 の Cookie を読みます。切り替えは次の順で進めます。
+
+1. 全台を 0.6.0 以降に更新する。設定は変えない（既定の `:marshal` のまま）
+2. `session_not_json_safe.pqc_rails` のイベントを購読し、JSON で書けない値を持つセッションのキーを確かめる。`Time` は `iso8601` の文字列か整数に、独自のオブジェクトはその ID などに置き換える。イベントが出なくなるまで直す
+3. `session_serializer = :json` と、`accept_marshal_cookies_until` を設定して全台を再起動する。期限には、全台の再起動が終わる日時に、最長のセッション有効期限を足した日時を設定する。期限を設定しないと、それまでのセッション（Marshal で書かれた Cookie）は読まれず、利用者のログインが切れる
+
+   ```ruby
+   PqcRails.configure do |config|
+     config.session_serializer = :json
+     config.accept_marshal_cookies_until = Time.utc(2027, 1, 15)
+   end
+   ```
+
+4. 期限を過ぎたら、`accept_marshal_cookies_until` の設定を削除する。その後は Marshal で書かれた Cookie を読まない
+
+再起動の途中で `:marshal` のサーバーと `:json` のサーバーが混ざっても、どちらも v1・v2 の両方を読むので、ログインは切れません。
+
+`:marshal` に戻す時は、`session_serializer` の設定を削除して再起動します。v2 の Cookie はそのまま読めます。0.6.0 より前の版に戻すと、v2 の Cookie は読めず、そのセッションは切れます。
+
 ## 鍵の紛失・災害復旧
 
 `PQC_RECORD_KEY` / `PQC_SESSION_KEY`（または対応する credentials）を紛失すると、その鍵で暗号化された DB カラム・セッション Cookie は二度と復号できません。pqc_rails 自体は鍵のエスクロー機能を持たず、liboqs にもその機能はないため、鍵のバックアップは利用者側の運用に完全に委ねられています。特に DB カラムは長期間残り続けるデータであるため、**鍵紛失イコールデータの永久喪失**に直結します。
