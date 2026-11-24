@@ -96,6 +96,100 @@ RSpec.describe PqcRails::HybridKem do
     end
   end
 
+  describe "対応するパラメータセット" do
+    it "ML-KEM-512・768・1024のどれでも、鍵生成・カプセル化・復元が往復する" do
+      %i[ml_kem_512 ml_kem_768 ml_kem_1024].each do |alg|
+        described_class.open(alg) do |hybrid|
+          keypair = hybrid.generate_keypair
+          encap = hybrid.encapsulate(keypair.public_key)
+
+          expect(hybrid.decapsulate(encap.ciphertext, keypair.secret_key)).to eq(encap.shared_secret)
+        end
+      end
+    end
+
+    it "別のパラメータセットの暗号文・公開鍵はArgumentErrorを送出する" do
+      ciphertext, public_key = described_class.open(:ml_kem_512) do |h|
+        other_public_key = h.generate_keypair.public_key
+        [h.encapsulate(other_public_key).ciphertext, other_public_key]
+      end
+
+      described_class.open(:ml_kem_768) do |hybrid|
+        keypair = hybrid.generate_keypair
+        expect { hybrid.decapsulate(ciphertext, keypair.secret_key) }.to raise_error(ArgumentError, /wrong length/)
+        expect { hybrid.encapsulate(public_key) }.to raise_error(ArgumentError, /wrong length/)
+      end
+    end
+
+    it "未登録のアルゴリズムはPqcRails::Errorを送出する" do
+      expect { described_class.open(:no_such_algorithm) { raise "not reached" } }.to raise_error(PqcRails::Error)
+      expect { described_class.open("No-Such-KEM") { raise "not reached" } }.to raise_error(PqcRails::Error)
+    end
+  end
+
+  describe "共有鍵の導出" do
+    it "X25519・ML-KEMの順に連結した共有鍵を、ラベル・曲線・アルゴリズム・両方の暗号文を束ねたinfoでHKDF-SHA256にかける" do
+      described_class.open(pq_alg_name) do |hybrid|
+        keypair = hybrid.generate_keypair
+        encap = hybrid.encapsulate(keypair.public_key)
+        classical_ciphertext, pq_ciphertext = PqcRails::BlobPacking.unpack(encap.ciphertext)
+        classical_secret_key, pq_secret_key = PqcRails::BlobPacking.unpack(keypair.secret_key)
+        classical_shared = PqcRails::DhKem.new("X25519").decapsulate(classical_ciphertext, classical_secret_key)
+        pq_kem = PqcRails::Kem.new(pq_alg_name)
+        pq_shared = pq_kem.decapsulate(pq_ciphertext, pq_secret_key)
+        info = ["pqc_rails-hybrid-kem-v1", "X25519", pq_alg_name.to_s, classical_ciphertext, pq_ciphertext].join("\x00")
+        expected = OpenSSL::KDF.hkdf(classical_shared + pq_shared, salt: "", info: info, length: 32, hash: "SHA256")
+
+        expect(encap.shared_secret).to eq(expected)
+        expect(hybrid.decapsulate(encap.ciphertext, keypair.secret_key)).to eq(expected)
+      ensure
+        pq_kem&.free
+      end
+    end
+
+    it "公開鍵・秘密鍵・暗号文は、X25519・ML-KEMの順に正しい長さで詰める" do
+      described_class.open(pq_alg_name) do |hybrid|
+        keypair = hybrid.generate_keypair
+        ciphertext = hybrid.encapsulate(keypair.public_key).ciphertext
+        pq_kem = PqcRails::Kem.new(pq_alg_name)
+
+        expect(PqcRails::BlobPacking.unpack(keypair.public_key).map(&:bytesize)).to eq([32, pq_kem.length_public_key])
+        expect(PqcRails::BlobPacking.unpack(keypair.secret_key).map(&:bytesize)).to eq([32, pq_kem.length_secret_key])
+        expect(PqcRails::BlobPacking.unpack(ciphertext).map(&:bytesize)).to eq([32, pq_kem.length_ciphertext])
+      ensure
+        pq_kem&.free
+      end
+    end
+  end
+
+  describe ".open" do
+    it "ブロックの戻り値を返し、抜けた後はインスタンスを解放する" do
+      kept = nil
+
+      expect(described_class.open(pq_alg_name) { |hybrid| (kept = hybrid) && :result }).to eq(:result)
+      expect { kept.generate_keypair }.to raise_error(PqcRails::Error, /HybridKem instance has already been freed/)
+    end
+
+    it "ブロックで例外が起きても解放し、例外はそのまま伝える" do
+      kept = nil
+
+      expect do
+        described_class.open(pq_alg_name) do |hybrid|
+          kept = hybrid
+          raise IOError, "boom"
+        end
+      end.to raise_error(IOError, "boom")
+      expect { kept.generate_keypair }.to raise_error(PqcRails::Error, /HybridKem instance has already been freed/)
+    end
+
+    it "インスタンスを作れない時は、作る時の例外をそのまま伝える" do
+      allow(PqcRails::Kem).to receive(:new).and_raise(PqcRails::Error, "unsupported")
+
+      expect { described_class.open(pq_alg_name) { raise "not reached" } }
+        .to raise_error(PqcRails::Error, "unsupported")
+    end
+  end
+
   describe "decapsulateで作る秘密鍵のコピー" do
     it "X25519とML-KEMの秘密鍵に分けたコピーを、使い終わりにゼロで埋め、渡された秘密鍵は壊さない" do
       described_class.open(pq_alg_name) do |hybrid|
@@ -205,7 +299,18 @@ RSpec.describe PqcRails::HybridKem do
       keypair = hybrid.generate_keypair
       hybrid.free
 
-      expect { hybrid.encapsulate(keypair.public_key) }.to raise_error(PqcRails::Error, /already been freed/)
+      expect { hybrid.encapsulate(keypair.public_key) }.to raise_error(PqcRails::Error, /HybridKem instance has already been freed/)
+    end
+
+    it "free後にgenerate_keypair・decapsulateを呼ぶとPqcRails::Errorを送出する" do
+      hybrid = described_class.new(pq_alg_name)
+      keypair = hybrid.generate_keypair
+      ciphertext = hybrid.encapsulate(keypair.public_key).ciphertext
+      hybrid.free
+
+      expect { hybrid.generate_keypair }.to raise_error(PqcRails::Error, /HybridKem instance has already been freed/)
+      expect { hybrid.decapsulate(ciphertext, keypair.secret_key) }
+        .to raise_error(PqcRails::Error, /HybridKem instance has already been freed/)
     end
 
     it "freeを複数回呼んでもエラーにならない" do
@@ -213,6 +318,16 @@ RSpec.describe PqcRails::HybridKem do
       hybrid.free
 
       expect { hybrid.free }.not_to raise_error
+    end
+
+    it "freeを複数回呼んでも、ML-KEM側は1回だけ解放する" do
+      hybrid = described_class.new(pq_alg_name)
+      pq_kem = hybrid.instance_variable_get(:@pq)
+      allow(pq_kem).to receive(:free).and_call_original
+
+      2.times { hybrid.free }
+
+      expect(pq_kem).to have_received(:free).once
     end
   end
 end

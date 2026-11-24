@@ -1,0 +1,502 @@
+{
+  "test_command": "bundle exec rspec spec/pqc_rails/hybrid_kem_spec.rb spec/pqc_rails/redacted_struct_spec.rb",
+  "rows": [
+    {
+      "id": "round-trip",
+      "pattern": "ML-KEM-512・768・1024 の鍵生成 → カプセル化 → 復元",
+      "source": "spec",
+      "source_ref": "README「アルゴリズムの指定方法」、docs/MIGRATION.md、NIST SP 800-227 §4.6.1",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "ML-KEM-512・768・1024のどれでも、鍵生成・カプセル化・復元が往復する"
+        },
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "encapsulateとdecapsulateで同じ32バイトの共有鍵が導出される"
+        }
+      ],
+      "guarantee": "3つのパラメータセットで送信側と受信側の共有鍵が一致し、長さは32バイト",
+      "mutants": [
+        {
+          "id": "short-secret",
+          "kind": "定数を±1する",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SHARED_SECRET_LENGTH = 32",
+          "replace": "SHARED_SECRET_LENGTH = 31",
+          "result": "killed"
+        },
+        {
+          "id": "swap-decaps-ciphertexts",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "combine(classical_shared, pq_shared, classical_ciphertext, pq_ciphertext)",
+          "replace": "combine(classical_shared, pq_shared, pq_ciphertext, classical_ciphertext)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "combiner",
+      "pattern": "共有鍵の導出（入力の順序・ラベル・曲線・アルゴリズム・両方の暗号文）",
+      "source": "spec",
+      "source_ref": "docs/THREAT_MODEL.md「技術的な対応範囲」、NIST SP 800-227 §4.6.2・§4.6.3、hybrid_kem.rb の combine",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "X25519・ML-KEMの順に連結した共有鍵を、ラベル・曲線・アルゴリズム・両方の暗号文を束ねたinfoでHKDF-SHA256にかける"
+        }
+      ],
+      "guarantee": "共有鍵は、X25519・ML-KEM の順の連結を、ラベル・曲線・アルゴリズム名・両方の暗号文を NUL で束ねた info で HKDF-SHA256 にかけた値と一致する",
+      "mutants": [
+        {
+          "id": "swap-ikm",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "ikm = classical_secret + pq_secret",
+          "replace": "ikm = pq_secret + classical_secret",
+          "result": "killed"
+        },
+        {
+          "id": "drop-classical-secret",
+          "kind": "鍵の導出を通さない・入力を1つ外す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "ikm = classical_secret + pq_secret",
+          "replace": "ikm = pq_secret",
+          "result": "killed"
+        },
+        {
+          "id": "drop-pq-secret",
+          "kind": "鍵の導出を通さない・入力を1つ外す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "ikm = classical_secret + pq_secret",
+          "replace": "ikm = classical_secret",
+          "result": "killed"
+        },
+        {
+          "id": "change-label",
+          "kind": "定数を変える",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "COMBINER_LABEL = \"pqc_rails-hybrid-kem-v1\"",
+          "replace": "COMBINER_LABEL = \"pqc_rails-hybrid-kem-v2\"",
+          "result": "killed"
+        },
+        {
+          "id": "drop-curve",
+          "kind": "鍵の導出を通さない・入力を1つ外す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "        @classical.curve,\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "drop-alg",
+          "kind": "鍵の導出を通さない・入力を1つ外す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "        @pq.alg_name.to_s,\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "drop-classical-ct",
+          "kind": "鍵の導出を通さない・入力を1つ外す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "        classical_ciphertext,\n        pq_ciphertext\n",
+          "replace": "        pq_ciphertext\n",
+          "result": "killed"
+        },
+        {
+          "id": "drop-pq-ct",
+          "kind": "鍵の導出を通さない・入力を1つ外す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "        classical_ciphertext,\n        pq_ciphertext\n",
+          "replace": "        classical_ciphertext\n",
+          "result": "killed"
+        },
+        {
+          "id": "no-separator",
+          "kind": "定数を変える",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "].join(\"\\x00\")",
+          "replace": "].join",
+          "result": "killed"
+        },
+        {
+          "id": "hash-sha384",
+          "kind": "定数を変える",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "hash: \"SHA256\"",
+          "replace": "hash: \"SHA384\"",
+          "result": "killed"
+        },
+        {
+          "id": "salt",
+          "kind": "定数を変える",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "salt: \"\"",
+          "replace": "salt: \"x\"",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "packing-order",
+      "pattern": "公開鍵・秘密鍵・暗号文の値の並び",
+      "source": "code",
+      "source_ref": "generate_keypair・encapsulate の BlobPacking.pack",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "公開鍵・秘密鍵・暗号文は、X25519・ML-KEMの順に正しい長さで詰める"
+        }
+      ],
+      "guarantee": "3つの値はどれも X25519・ML-KEM の順で、それぞれ正しい長さ",
+      "mutants": [
+        {
+          "id": "swap-public",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "BlobPacking.pack(classical_keypair.public_key, pq_keypair.public_key)",
+          "replace": "BlobPacking.pack(pq_keypair.public_key, classical_keypair.public_key)",
+          "result": "killed"
+        },
+        {
+          "id": "swap-secret",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "BlobPacking.pack(classical_keypair.secret_key, pq_keypair.secret_key)",
+          "replace": "BlobPacking.pack(pq_keypair.secret_key, classical_keypair.secret_key)",
+          "result": "killed"
+        },
+        {
+          "id": "swap-ciphertext",
+          "kind": "引数・順番を入れ替える",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "BlobPacking.pack(classical_encap.ciphertext, pq_encap.ciphertext)",
+          "replace": "BlobPacking.pack(pq_encap.ciphertext, classical_encap.ciphertext)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "authentication-key",
+      "pattern": "認証鍵は鍵ペアごとの32バイトの乱数",
+      "source": "spec",
+      "source_ref": "docs/CRYPTO_INVENTORY.md「記入項目と pqc_rails の記入例」、docs/THREAT_MODEL.md（作成元の認証）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "暗号文の作成元の認証に使う32バイトの認証鍵を、鍵ペアごとにランダムに生成する"
+        }
+      ],
+      "guarantee": "認証鍵は32バイトで、鍵ペアごとに異なる",
+      "mutants": [
+        {
+          "id": "fixed-key",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "OpenSSL::Random.random_bytes(AUTHENTICATION_KEY_LENGTH)",
+          "replace": "(\"\\x00\".b * AUTHENTICATION_KEY_LENGTH)",
+          "result": "killed"
+        },
+        {
+          "id": "short-key",
+          "kind": "定数を±1する",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "AUTHENTICATION_KEY_LENGTH = 32",
+          "replace": "AUTHENTICATION_KEY_LENGTH = 31",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "exact-public-and-ciphertext",
+      "pattern": "公開鍵・暗号文の末尾の余分なバイト",
+      "source": "spec",
+      "source_ref": "README「エラーハンドリング」、docs/THREAT_MODEL.md「FIPS 203/204のshall要件との対応」",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "末尾に余分なバイトがある公開鍵・暗号文はArgumentErrorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "空・nil・長さの欄だけ・古典側だけの公開鍵・暗号文・秘密鍵は、どれもArgumentErrorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "別のパラメータセットの暗号文・公開鍵はArgumentErrorを送出する"
+        }
+      ],
+      "guarantee": "長さの合わない公開鍵・暗号文は ArgumentError になる",
+      "mutants": [
+        {
+          "id": "public-not-exact",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "BlobPacking.unpack(public_key, exact: true)",
+          "replace": "BlobPacking.unpack(public_key)",
+          "result": "killed"
+        },
+        {
+          "id": "ciphertext-not-exact",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "BlobPacking.unpack(ciphertext, exact: true)",
+          "replace": "BlobPacking.unpack(ciphertext)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "secret-key-trailing",
+      "pattern": "秘密鍵の末尾の余分なバイトは受け付ける",
+      "source": "code",
+      "source_ref": "decapsulate の BlobPacking.unpack(secret_key)。仕様から書いた時は「1バイト長い秘密鍵は ArgumentError」としたが、その行は外した。秘密鍵の末尾を拒まないのは、起動時に止まる影響が大きいので見送ると決めたため（判断キュー nightly-pqc_rails-2026-11-01-trailing-bytes の答え）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "秘密鍵は、末尾に余分なバイトがあっても今までどおり読む"
+        }
+      ],
+      "guarantee": "末尾に余分なバイトがある秘密鍵でも、同じ共有鍵を復元する",
+      "mutants": [
+        {
+          "id": "secret-exact",
+          "kind": "条件を反転する・常に真／偽にする",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "BlobPacking.unpack(secret_key)",
+          "replace": "BlobPacking.unpack(secret_key, exact: true)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "wipe-secret-copies",
+      "pattern": "復元で作る秘密鍵のコピーの消去",
+      "source": "spec",
+      "source_ref": "docs/THREAT_MODEL.md（中間値の破棄）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "X25519とML-KEMの秘密鍵に分けたコピーを、使い終わりにゼロで埋め、渡された秘密鍵は壊さない"
+        }
+      ],
+      "guarantee": "分けた2つの秘密鍵のコピーはゼロで埋まり、渡された秘密鍵は変わらない",
+      "mutants": [
+        {
+          "id": "no-wipe",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(classical_secret_key, pq_secret_key)",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "wipe-classical-only",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(classical_secret_key, pq_secret_key)",
+          "replace": "SecretBuffer.wipe(classical_secret_key)",
+          "result": "killed"
+        },
+        {
+          "id": "wipe-pq-only",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(classical_secret_key, pq_secret_key)",
+          "replace": "SecretBuffer.wipe(pq_secret_key)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "use-after-free",
+      "pattern": "解放後の操作",
+      "source": "spec",
+      "source_ref": "README「エラーハンドリング」",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "free後にencapsulateを呼ぶとPqcRails::Errorを送出する"
+        },
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "free後にgenerate_keypair・decapsulateを呼ぶとPqcRails::Errorを送出する"
+        }
+      ],
+      "guarantee": "解放後の3つの操作は、HybridKem の解放済みを示す PqcRails::Error になる",
+      "mutants": [
+        {
+          "id": "no-guard-generate",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "def generate_keypair\n      ensure_not_freed!\n",
+          "replace": "def generate_keypair\n",
+          "result": "killed"
+        },
+        {
+          "id": "no-guard-encapsulate",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "def encapsulate(public_key)\n      ensure_not_freed!\n",
+          "replace": "def encapsulate(public_key)\n",
+          "result": "killed"
+        },
+        {
+          "id": "no-guard-decapsulate",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "def decapsulate(ciphertext, secret_key)\n      ensure_not_freed!\n",
+          "replace": "def decapsulate(ciphertext, secret_key)\n",
+          "result": "killed"
+        },
+        {
+          "id": "wrong-error",
+          "kind": "例外の種類を変える（呼び出し側の rescue の対象外にする）",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "raise PqcRails::Error, \"this PqcRails::HybridKem",
+          "replace": "raise RuntimeError, \"this PqcRails::HybridKem",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "free-once",
+      "pattern": "free を複数回呼ぶ",
+      "source": "code",
+      "source_ref": "free の return if @freed",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "freeを複数回呼んでもエラーにならない"
+        },
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "freeを複数回呼んでも、ML-KEM側は1回だけ解放する"
+        }
+      ],
+      "guarantee": "2回呼んでもエラーにならず、ML-KEM 側の解放は1回だけ",
+      "mutants": [
+        {
+          "id": "no-early-return",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "      return if @freed\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "no-pq-free",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "      @pq.free\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "no-freed-flag",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "      @freed = true\n",
+          "replace": "",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "open-lifecycle",
+      "pattern": "open のブロックの値・例外・作成の失敗",
+      "source": "spec",
+      "source_ref": "docs/MIGRATION.md「0.3.0 以前からの更新」、README「エラーハンドリング」、open の hybrid&.free",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "ブロックの戻り値を返し、抜けた後はインスタンスを解放する"
+        },
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "ブロックで例外が起きても解放し、例外はそのまま伝える"
+        },
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "インスタンスを作れない時は、作る時の例外をそのまま伝える"
+        },
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "未登録のアルゴリズムはPqcRails::Errorを送出する"
+        }
+      ],
+      "guarantee": "ブロックの値を返し、正常時も例外時も解放する。作成の失敗は元の例外のまま伝わる",
+      "mutants": [
+        {
+          "id": "no-safe-navigation",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "hybrid&.free",
+          "replace": "hybrid.free",
+          "result": "killed"
+        },
+        {
+          "id": "no-free",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "    ensure\n      hybrid&.free\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "free-only-on-success",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "      yield hybrid\n    ensure\n      hybrid&.free\n",
+          "replace": "      result = yield hybrid\n      hybrid.free\n      result\n",
+          "result": "killed"
+        },
+        {
+          "id": "return-nil",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "      yield hybrid\n",
+          "replace": "      yield hybrid\n      nil\n",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "redacted-display",
+      "pattern": "Keypair・Encapsulation の表示で秘密の値を伏せる",
+      "source": "code",
+      "source_ref": "Keypair・Encapsulation の include RedactedStruct",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "認証鍵の無い0.3.0の鍵ペアは、認証鍵をnilと表示する"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "inspect・to_s・ppで共有秘密を伏せ、暗号文は長さだけを出す"
+        }
+      ],
+      "guarantee": "鍵ペアと KEM の結果の表示に、秘密の値が出ない",
+      "mutants": [
+        {
+          "id": "keypair-not-redacted",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "Keypair = Struct.new(:public_key, :secret_key, :authentication_key) do\n      include RedactedStruct\n",
+          "replace": "Keypair = Struct.new(:public_key, :secret_key, :authentication_key) do\n",
+          "result": "killed"
+        },
+        {
+          "id": "encapsulation-not-redacted",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "Encapsulation = Struct.new(:ciphertext, :shared_secret) do\n      include RedactedStruct\n",
+          "replace": "Encapsulation = Struct.new(:ciphertext, :shared_secret) do\n",
+          "result": "killed"
+        }
+      ]
+    }
+  ]
+}
