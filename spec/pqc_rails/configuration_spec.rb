@@ -9,6 +9,13 @@ RSpec.describe PqcRails::Configuration do
   end
 
   describe "#liboqs_path" do
+    # 開発機で rake native:liboqs を実行していても、同梱のliboqsが無い前提で確かめる。
+    # 同梱ありの例は、この後に個別に true を返すよう上書きする
+    before do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(a_string_starting_with(PqcRails::Configuration::NATIVE_DIR)).and_return(false)
+    end
+
     it "ENV['LIBOQS_PATH']が設定されていれば最優先で使う" do
       ENV["LIBOQS_PATH"] = "/custom/path/liboqs.dylib"
 
@@ -19,7 +26,6 @@ RSpec.describe PqcRails::Configuration do
       it "同梱のliboqsを、bundle installでビルドしたものより優先して使う" do
         ENV.delete("LIBOQS_PATH")
         native_path = File.join(PqcRails::Configuration::NATIVE_DIR, "liboqs.so")
-        allow(File).to receive(:exist?).and_call_original
         allow(File).to receive(:exist?).with(native_path).and_return(true)
 
         expect(described_class.new.liboqs_path).to eq(native_path)
@@ -36,7 +42,6 @@ RSpec.describe PqcRails::Configuration do
         fake_spec = instance_double(Gem::Specification, gem_dir: "/fake/gems/pqc_rails-0.1.0")
         allow(Gem).to receive(:loaded_specs).and_return({ "pqc_rails" => fake_spec })
         bundled_path = "/fake/gems/pqc_rails-0.1.0/ext/pqc_rails/liboqs.dylib"
-        allow(File).to receive(:exist?).and_call_original
         allow(File).to receive(:exist?).with(bundled_path).and_return(true)
 
         expect(described_class.new.liboqs_path).to eq(bundled_path)
