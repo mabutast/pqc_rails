@@ -351,12 +351,13 @@ RSpec.describe PqcRails::StatusCheck do
       it "抽象クラスと名前の無いクラスは一覧に入れない" do
         Class.new(::ActiveRecord::Base) do
           self.abstract_class = true
-          encrypts :secret
+          encrypts :abstract_only_attribute
         end
 
         attributes = result_for(described_class.run, "暗号化している属性")
 
-        expect(attributes.detail).not_to include("secret")
+        # ほかのspecが作った名前付きのモデル(GCされるまで一覧に残りうる)に左右されないよう、このクラスだけの属性名で確かめる。
+        expect(attributes.detail).not_to include("abstract_only_attribute")
       end
 
       it "暗号化している属性が無い場合、モデルが読み込まれているかを確かめるよう案内する" do
