@@ -7,15 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- With Rails' 6.1 marshalling format (`config.load_defaults` below 7.1), `Marshal.dump` of a record
+  wrote the database secret key and authentication key into the dump when the encrypted attribute
+  was given `key_provider: PqcRails::ActiveRecord::KeyProvider.new`, directly or in a `previous:`
+  scheme, after that key provider had read its keys. Caching such a record (`Rails.cache`) stored the
+  keys in the cache. `PqcRails::ActiveRecord::KeyProvider` and the default key source now write only
+  where the keys come from, and read the keys again after loading. If your application cached such
+  records, rotate the database key and clear the cache.
+
 ### Changed
 
 - **Breaking:** `Marshal.dump` of a key pair, a KEM result (`Encapsulation`) or
   `PqcRails::EnvelopeCipher` now raises `TypeError`, and so does `Marshal.dump` of an object that
-  holds one (such as `PqcRails::ActiveRecord::KeyProvider::Key` or `PqcRails::Session::Encryptor`).
-  Previously the dump contained the secret values as is, so a key stored in `Rails.cache`, a job
-  argument or a file was readable there. The error message does not contain secret values. Store
-  keys with `PqcRails::KeySource.encode`. Records with encrypted attributes do not hold the keys and
-  can still be marshaled.
+  holds one (such as `PqcRails::Session::Encryptor`). Previously the dump contained the secret values
+  as is, so a key object stored in `Rails.cache` or a file was readable there. The error message does
+  not contain secret values. Store keys with `PqcRails::KeySource.encode`. Records with encrypted
+  attributes can still be marshaled with both the 6.1 and 7.1 formats.
 
 ## [0.6.0] - 2026-11-24
 
