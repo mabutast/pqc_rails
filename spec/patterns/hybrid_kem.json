@@ -304,24 +304,223 @@
           "id": "no-wipe",
           "kind": "後始末（ゼロ埋め・解放）を消す",
           "file": "lib/pqc_rails/hybrid_kem.rb",
-          "find": "SecretBuffer.wipe(classical_secret_key, pq_secret_key)",
-          "replace": "nil",
+          "find": "SecretBuffer.wipe(classical_secret_key, pq_secret_key, classical_shared, pq_shared)",
+          "replace": "SecretBuffer.wipe(classical_shared, pq_shared)",
           "result": "killed"
         },
         {
           "id": "wipe-classical-only",
           "kind": "後始末（ゼロ埋め・解放）を消す",
           "file": "lib/pqc_rails/hybrid_kem.rb",
-          "find": "SecretBuffer.wipe(classical_secret_key, pq_secret_key)",
-          "replace": "SecretBuffer.wipe(classical_secret_key)",
+          "find": "SecretBuffer.wipe(classical_secret_key, pq_secret_key, classical_shared, pq_shared)",
+          "replace": "SecretBuffer.wipe(classical_secret_key, classical_shared, pq_shared)",
           "result": "killed"
         },
         {
           "id": "wipe-pq-only",
           "kind": "後始末（ゼロ埋め・解放）を消す",
           "file": "lib/pqc_rails/hybrid_kem.rb",
-          "find": "SecretBuffer.wipe(classical_secret_key, pq_secret_key)",
-          "replace": "SecretBuffer.wipe(pq_secret_key)",
+          "find": "SecretBuffer.wipe(classical_secret_key, pq_secret_key, classical_shared, pq_shared)",
+          "replace": "SecretBuffer.wipe(pq_secret_key, classical_shared, pq_shared)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "wipe-keygen-secret-halves",
+      "pattern": "鍵生成で作る、古典側・PQ側の秘密鍵（まとめる前の値）のゼロ埋め",
+      "source": "spec",
+      "source_ref": "完了条件（PENDING.md「hybrid_kem.rb の残り2件」の1）、docs/THREAT_MODEL.md（中間値の破棄）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "generate_keypairは、まとめる前のX25519とML-KEMの秘密鍵をゼロで埋め、返した秘密鍵は壊さない"
+        }
+      ],
+      "guarantee": "鍵生成の途中の古典側・PQ側の秘密鍵はゼロで埋まり、返した鍵ペアの秘密鍵はそのまま復元に使える",
+      "mutants": [
+        {
+          "id": "keygen-no-wipe",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(classical_keypair&.secret_key, pq_keypair&.secret_key)",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "keygen-wipe-classical-only",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(classical_keypair&.secret_key, pq_keypair&.secret_key)",
+          "replace": "SecretBuffer.wipe(classical_keypair&.secret_key)",
+          "result": "killed"
+        },
+        {
+          "id": "keygen-wipe-pq-only",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(classical_keypair&.secret_key, pq_keypair&.secret_key)",
+          "replace": "SecretBuffer.wipe(pq_keypair&.secret_key)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "wipe-encapsulate-shared-halves",
+      "pattern": "カプセル化で得る、古典側・PQ側の共有鍵（組み合わせる前の値）のゼロ埋め",
+      "source": "spec",
+      "source_ref": "完了条件（PENDING.md「hybrid_kem.rb の残り2件」の1）、docs/THREAT_MODEL.md（中間値の破棄）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "encapsulateは、組み合わせる前のX25519とML-KEMの共有鍵をゼロで埋め、返した共有鍵は壊さない"
+        }
+      ],
+      "guarantee": "カプセル化の途中の古典側・PQ側の共有鍵はゼロで埋まり、返した共有鍵は復元側の共有鍵と一致する",
+      "mutants": [
+        {
+          "id": "encap-no-wipe",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(classical_encap&.shared_secret, pq_encap&.shared_secret)",
+          "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "encap-wipe-classical-only",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(classical_encap&.shared_secret, pq_encap&.shared_secret)",
+          "replace": "SecretBuffer.wipe(classical_encap&.shared_secret)",
+          "result": "killed"
+        },
+        {
+          "id": "encap-wipe-pq-only",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(classical_encap&.shared_secret, pq_encap&.shared_secret)",
+          "replace": "SecretBuffer.wipe(pq_encap&.shared_secret)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "wipe-decapsulate-shared-halves",
+      "pattern": "復元で得る、古典側・PQ側の共有鍵（組み合わせる前の値）のゼロ埋め",
+      "source": "spec",
+      "source_ref": "完了条件（PENDING.md「hybrid_kem.rb の残り2件」の1）、docs/THREAT_MODEL.md（中間値の破棄）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "decapsulateは、組み合わせる前のX25519とML-KEMの共有鍵をゼロで埋め、返した共有鍵は壊さない"
+        }
+      ],
+      "guarantee": "復元の途中の古典側・PQ側の共有鍵はゼロで埋まり、返した共有鍵はカプセル化側の共有鍵と一致する",
+      "mutants": [
+        {
+          "id": "decap-shared-no-wipe",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(classical_secret_key, pq_secret_key, classical_shared, pq_shared)",
+          "replace": "SecretBuffer.wipe(classical_secret_key, pq_secret_key)",
+          "result": "killed"
+        },
+        {
+          "id": "decap-shared-classical-only",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(classical_secret_key, pq_secret_key, classical_shared, pq_shared)",
+          "replace": "SecretBuffer.wipe(classical_secret_key, pq_secret_key, classical_shared)",
+          "result": "killed"
+        },
+        {
+          "id": "decap-shared-pq-only",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(classical_secret_key, pq_secret_key, classical_shared, pq_shared)",
+          "replace": "SecretBuffer.wipe(classical_secret_key, pq_secret_key, pq_shared)",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "wipe-combine-ikm",
+      "pattern": "組み合わせで2つの共有鍵を連結した入力鍵素材（ikm）のゼロ埋め",
+      "source": "spec",
+      "source_ref": "完了条件（PENDING.md「hybrid_kem.rb の残り2件」の1）、docs/THREAT_MODEL.md（中間値の破棄）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "組み合わせでは、2つの共有鍵を連結した入力鍵素材をHKDFの後にゼロで埋める"
+        }
+      ],
+      "guarantee": "連結した入力鍵素材はHKDFの後にゼロで埋まり、導出した共有鍵は壊れない",
+      "mutants": [
+        {
+          "id": "ikm-no-wipe",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(ikm)",
+          "replace": "nil",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "wipe-on-exception",
+      "pattern": "途中で例外が起きて抜けた時も、作った秘密の中間値をゼロで埋める",
+      "source": "spec",
+      "source_ref": "完了条件（PENDING.md「hybrid_kem.rb の残り2件」の1）、docs/THREAT_MODEL.md（中間値の破棄）",
+      "tests": [
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "generate_keypairでML-KEMの鍵の生成が失敗しても、作ったX25519の秘密鍵をゼロで埋める"
+        },
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "encapsulateでML-KEM側が失敗しても、X25519の共有鍵をゼロで埋める"
+        },
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "decapsulateでML-KEM側が失敗しても、X25519の共有鍵をゼロで埋める"
+        },
+        {
+          "file": "spec/pqc_rails/hybrid_kem_spec.rb",
+          "name": "HKDFが失敗しても、入力鍵素材と2つの共有鍵をゼロで埋める"
+        }
+      ],
+      "guarantee": "3つの操作のどこで例外が起きても、その時点までに作った中間値はゼロで埋まり、例外はそのまま伝わる",
+      "mutants": [
+        {
+          "id": "keygen-wipe-only-on-success",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(classical_keypair&.secret_key, pq_keypair&.secret_key)",
+          "replace": "SecretBuffer.wipe(classical_keypair&.secret_key, pq_keypair&.secret_key) unless $!",
+          "result": "killed"
+        },
+        {
+          "id": "encap-wipe-only-on-success",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(classical_encap&.shared_secret, pq_encap&.shared_secret)",
+          "replace": "SecretBuffer.wipe(classical_encap&.shared_secret, pq_encap&.shared_secret) unless $!",
+          "result": "killed"
+        },
+        {
+          "id": "decap-wipe-only-on-success",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(classical_secret_key, pq_secret_key, classical_shared, pq_shared)",
+          "replace": "SecretBuffer.wipe(classical_secret_key, pq_secret_key, classical_shared, pq_shared) unless $!",
+          "result": "killed"
+        },
+        {
+          "id": "ikm-wipe-only-on-success",
+          "kind": "後始末（ゼロ埋め・解放）を消す",
+          "file": "lib/pqc_rails/hybrid_kem.rb",
+          "find": "SecretBuffer.wipe(ikm)",
+          "replace": "SecretBuffer.wipe(ikm) unless $!",
           "result": "killed"
         }
       ]

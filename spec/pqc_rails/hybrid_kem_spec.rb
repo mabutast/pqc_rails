@@ -219,6 +219,145 @@ RSpec.describe PqcRails::HybridKem do
     end
   end
 
+  describe "途中の秘密の値のゼロ埋め" do
+    # 古典側(DhKem)・PQ側(Kem)が返した値を、返したオブジェクトそのまま集める。
+    def capture_results(kem, method_name, into:)
+      allow(kem).to receive(method_name).and_wrap_original do |original, *args|
+        original.call(*args).tap { |result| into << result }
+      end
+    end
+
+    def classical_of(hybrid) = hybrid.instance_variable_get(:@classical)
+    def pq_of(hybrid) = hybrid.instance_variable_get(:@pq)
+
+    def expect_zeroed(strings)
+      expect(strings).not_to be_empty
+      strings.each { |string| expect(string).to eq("\x00" * string.bytesize) }
+    end
+
+    it "generate_keypairは、まとめる前のX25519とML-KEMの秘密鍵をゼロで埋め、返した秘密鍵は壊さない" do
+      described_class.open(pq_alg_name) do |hybrid|
+        results = []
+        capture_results(classical_of(hybrid), :generate_keypair, into: results)
+        capture_results(pq_of(hybrid), :generate_keypair, into: results)
+
+        keypair = hybrid.generate_keypair
+
+        expect(results.size).to eq(2)
+        expect_zeroed(results.map(&:secret_key))
+        encap = hybrid.encapsulate(keypair.public_key)
+        expect(hybrid.decapsulate(encap.ciphertext, keypair.secret_key)).to eq(encap.shared_secret)
+      end
+    end
+
+    it "encapsulateは、組み合わせる前のX25519とML-KEMの共有鍵をゼロで埋め、返した共有鍵は壊さない" do
+      described_class.open(pq_alg_name) do |hybrid|
+        keypair = hybrid.generate_keypair
+        results = []
+        capture_results(classical_of(hybrid), :encapsulate, into: results)
+        capture_results(pq_of(hybrid), :encapsulate, into: results)
+
+        encap = hybrid.encapsulate(keypair.public_key)
+
+        expect(results.size).to eq(2)
+        expect_zeroed(results.map(&:shared_secret))
+        expect(encap.shared_secret).not_to eq("\x00" * encap.shared_secret.bytesize)
+        expect(hybrid.decapsulate(encap.ciphertext, keypair.secret_key)).to eq(encap.shared_secret)
+      end
+    end
+
+    it "decapsulateは、組み合わせる前のX25519とML-KEMの共有鍵をゼロで埋め、返した共有鍵は壊さない" do
+      described_class.open(pq_alg_name) do |hybrid|
+        keypair = hybrid.generate_keypair
+        encap = hybrid.encapsulate(keypair.public_key)
+        expected = encap.shared_secret.dup
+        results = []
+        capture_results(classical_of(hybrid), :decapsulate, into: results)
+        capture_results(pq_of(hybrid), :decapsulate, into: results)
+
+        shared = hybrid.decapsulate(encap.ciphertext, keypair.secret_key)
+
+        expect(results.size).to eq(2)
+        expect_zeroed(results)
+        expect(shared).to eq(expected)
+      end
+    end
+
+    it "組み合わせでは、2つの共有鍵を連結した入力鍵素材をHKDFの後にゼロで埋める" do
+      described_class.open(pq_alg_name) do |hybrid|
+        keypair = hybrid.generate_keypair
+        ikms = []
+        allow(OpenSSL::KDF).to receive(:hkdf).and_wrap_original do |original, ikm, **options|
+          ikms << ikm
+          original.call(ikm, **options)
+        end
+
+        encap = hybrid.encapsulate(keypair.public_key)
+        shared = hybrid.decapsulate(encap.ciphertext, keypair.secret_key)
+
+        expect(ikms.size).to eq(2)
+        expect_zeroed(ikms)
+        expect(shared).to eq(encap.shared_secret)
+      end
+    end
+
+    it "generate_keypairでML-KEMの鍵の生成が失敗しても、作ったX25519の秘密鍵をゼロで埋める" do
+      described_class.open(pq_alg_name) do |hybrid|
+        results = []
+        capture_results(classical_of(hybrid), :generate_keypair, into: results)
+        allow(pq_of(hybrid)).to receive(:generate_keypair).and_raise(PqcRails::Error, "keypair failed")
+
+        expect { hybrid.generate_keypair }.to raise_error(PqcRails::Error, "keypair failed")
+        expect_zeroed(results.map(&:secret_key))
+      end
+    end
+
+    it "encapsulateでML-KEM側が失敗しても、X25519の共有鍵をゼロで埋める" do
+      described_class.open(pq_alg_name) do |hybrid|
+        keypair = hybrid.generate_keypair
+        results = []
+        capture_results(classical_of(hybrid), :encapsulate, into: results)
+        allow(pq_of(hybrid)).to receive(:encapsulate).and_raise(PqcRails::Error, "encaps failed")
+
+        expect { hybrid.encapsulate(keypair.public_key) }.to raise_error(PqcRails::Error, "encaps failed")
+        expect_zeroed(results.map(&:shared_secret))
+      end
+    end
+
+    it "decapsulateでML-KEM側が失敗しても、X25519の共有鍵をゼロで埋める" do
+      described_class.open(pq_alg_name) do |hybrid|
+        keypair = hybrid.generate_keypair
+        encap = hybrid.encapsulate(keypair.public_key)
+        results = []
+        capture_results(classical_of(hybrid), :decapsulate, into: results)
+        allow(pq_of(hybrid)).to receive(:decapsulate).and_raise(PqcRails::Error, "decaps failed")
+
+        expect { hybrid.decapsulate(encap.ciphertext, keypair.secret_key) }
+          .to raise_error(PqcRails::Error, "decaps failed")
+        expect_zeroed(results)
+      end
+    end
+
+    it "HKDFが失敗しても、入力鍵素材と2つの共有鍵をゼロで埋める" do
+      described_class.open(pq_alg_name) do |hybrid|
+        keypair = hybrid.generate_keypair
+        encap = hybrid.encapsulate(keypair.public_key)
+        results = []
+        ikms = []
+        capture_results(classical_of(hybrid), :decapsulate, into: results)
+        capture_results(pq_of(hybrid), :decapsulate, into: results)
+        allow(OpenSSL::KDF).to receive(:hkdf) do |ikm, **|
+          ikms << ikm
+          raise OpenSSL::KDF::KDFError, "hkdf failed"
+        end
+
+        expect { hybrid.decapsulate(encap.ciphertext, keypair.secret_key) }
+          .to raise_error(OpenSSL::KDF::KDFError, "hkdf failed")
+        expect_zeroed(ikms + results)
+      end
+    end
+  end
+
   describe "改ざんした暗号文のdecapsulate" do
     def flip_last_byte(bytes)
       bytes.dup.tap { |copy| copy.setbyte(copy.bytesize - 1, copy.getbyte(copy.bytesize - 1) ^ 0x01) }
