@@ -62,13 +62,23 @@ jobs:
         if: startsWith(matrix.image, 'almalinux')
         run: |
           docker run --rm -v "$PWD":/src -w /src "${{ matrix.image }}" bash -c '
-            dnf -q -y install cmake gcc make binutils >/dev/null && script/build-native-liboqs'
+            for i in 1 2 3 4; do
+              dnf -q -y install cmake gcc make binutils >/dev/null && break
+              [ "$i" = 4 ] && exit 1
+              sleep $((i * 15))
+            done
+            script/build-native-liboqs'
 
       - name: Build liboqs (musl)
         if: startsWith(matrix.image, 'alpine')
         run: |
           docker run --rm -v "$PWD":/src -w /src "${{ matrix.image }}" sh -c '
-            apk add -q bash cmake gcc make musl-dev linux-headers binutils >/dev/null && bash script/build-native-liboqs'
+            for i in 1 2 3 4; do
+              apk add -q bash cmake gcc make musl-dev linux-headers binutils >/dev/null && break
+              [ "$i" = 4 ] && exit 1
+              sleep $((i * 15))
+            done
+            bash script/build-native-liboqs'
 
       - name: Build liboqs (macOS)
         if: matrix.image == ''
@@ -150,7 +160,12 @@ jobs:
         if: matrix.image == 'alpine'
         run: |
           docker run --rm -v "$PWD":/src -w /src "ruby:${{ matrix.ruby }}-alpine" sh -c '
-            apk add -q bash >/dev/null && ! command -v cc && bash script/native-smoke pkg/pqc_rails-*-${{ matrix.platform }}.gem'
+            for i in 1 2 3 4; do
+              apk add -q bash >/dev/null && break
+              [ "$i" = 4 ] && exit 1
+              sleep $((i * 15))
+            done
+            ! command -v cc && bash script/native-smoke pkg/pqc_rails-*-${{ matrix.platform }}.gem'
 
       - uses: ruby/setup-ruby@v1
         if: matrix.image == ''
