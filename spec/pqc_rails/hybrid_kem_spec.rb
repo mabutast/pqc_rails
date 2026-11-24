@@ -108,12 +108,16 @@ RSpec.describe PqcRails::HybridKem do
       end
     end
 
-    it "別のパラメータセットの暗号文はArgumentErrorを送出する" do
-      ciphertext = described_class.open(:ml_kem_512) { |h| h.encapsulate(h.generate_keypair.public_key).ciphertext }
+    it "別のパラメータセットの暗号文・公開鍵はArgumentErrorを送出する" do
+      ciphertext, public_key = described_class.open(:ml_kem_512) do |h|
+        other_public_key = h.generate_keypair.public_key
+        [h.encapsulate(other_public_key).ciphertext, other_public_key]
+      end
 
       described_class.open(:ml_kem_768) do |hybrid|
         keypair = hybrid.generate_keypair
-        expect { hybrid.decapsulate(ciphertext, keypair.secret_key) }.to raise_error(ArgumentError)
+        expect { hybrid.decapsulate(ciphertext, keypair.secret_key) }.to raise_error(ArgumentError, /wrong length/)
+        expect { hybrid.encapsulate(public_key) }.to raise_error(ArgumentError, /wrong length/)
       end
     end
 
