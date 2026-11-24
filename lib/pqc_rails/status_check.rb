@@ -38,6 +38,7 @@ module PqcRails
         legacy_cookie_result,
         active_record_encryption_result,
         encrypted_attributes_result,
+        column_capacity_result,
         algorithms_result
       ]
     end
@@ -207,6 +208,34 @@ module PqcRails
                           .reject { |model| model.abstract_class? || model.name.nil? }
                           .select { |model| model.respond_to?(:encrypted_attributes) && model.encrypted_attributes.present? }
                           .sort_by(&:name)
+    end
+
+    # 例外のメッセージは接続情報を含みうるので、クラス名だけを出す。
+    def column_capacity_result
+      name = "暗号文が入る列"
+      unless defined?(::ActiveRecord::Encryption) && ::ActiveRecord::Encryption.context.cipher.is_a?(PqcRails::Cipher)
+        return Result.new(name: name, ok: true, detail: "PqcRails::Cipherを使っていないので確かめていません")
+      end
+
+      short = encrypted_models.flat_map do |model|
+        ActiveRecord::ColumnCapacity.too_short(model).map do |column|
+          "#{model.name}##{column.attribute}(列の上限#{column.limit}、暗号文は#{column.required}以上)"
+        end
+      end
+      if short.empty?
+        bounded = encrypted_models.flat_map do |model|
+          ActiveRecord::ColumnCapacity.may_overflow(model).map { |column| "#{model.name}##{column.attribute}(列の上限#{column.limit})" }
+        end
+        return Result.new(name: name, ok: true, detail: "短い値の暗号文はすべての列に入ります") if bounded.empty?
+
+        return Result.new(name: name, ok: true,
+                          detail: "短い値の暗号文は入りますが、#{bounded.join(', ')}は長い値で上限を超えることがあります。text列を勧めます(docs/MIGRATION.md)")
+      end
+
+      Result.new(name: name, ok: false,
+                 detail: "#{short.join(', ')}。text列に変更してください(docs/MIGRATION.md)")
+    rescue StandardError => e
+      Result.new(name: name, ok: false, detail: "確認できませんでした(#{e.class})")
     end
 
     # DBとセッションが新しく暗号化する時に暗号文へ書くアルゴリズムID。

@@ -205,6 +205,9 @@ RSpec.describe PqcRails::StatusCheck do
         PqcRails.configuration.ciphertext_format, PqcRails.configuration.accept_legacy_cookies_until = original
       end
 
+      # ほかのspecがinstall!したKeyProviderは鍵を覚えているので、ここでの判定に混ぜない。
+      before { allow(PqcRails::ActiveRecord::KeyProvider).to receive(:configured).and_return([]) }
+
       def legacy_cookie_result = result_for(described_class.run, "旧形式のCookie")
 
       it "ciphertext_formatが:v0の間は、設定の削除を促す警告を出す" do
@@ -298,6 +301,7 @@ RSpec.describe PqcRails::StatusCheck do
         source = Struct.new(:current_keypair, :previous_keypairs).new(keypair, [])
         provider = PqcRails::ActiveRecord::KeyProvider.new(key_source: source)
         PqcRails.configuration.ciphertext_format = :v0
+        allow(PqcRails::ActiveRecord::KeyProvider).to receive(:configured).and_call_original
 
         ActiveRecord::Encryption.with_encryption_context(key_provider: provider) do
           expect(legacy_cookie_result.detail).to include("DBレコード鍵", "エラー")

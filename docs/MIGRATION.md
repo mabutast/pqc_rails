@@ -4,6 +4,26 @@
 
 一括で全レコードを再暗号化できない場合は、Rails 標準の `previous:` スキーム機構を使って段階移行できます。新しい書き込みは `pqc_rails` で暗号化しつつ、既存データは旧方式のまま読み出せる状態にする方法です。
 
+## 移行の前に列の型を確かめる
+
+暗号文は短い値でも長くなります（ML-KEM-768 で13文字の値を暗号化すると1,643文字）。MySQL の `string` 列（255文字まで）には保存できないので、暗号化する列を先に `text` 型へ変更してください。`strict: false` の接続で変更せずに書き込むと、値が切れて保存され、元の値を復元できなくなります。
+
+`rails pqc_rails:status` の「暗号文が入る列」で、変更が必要な列を確認できます。長さの上限がある `string` 列は、短い値が入っても長い値で上限を超えることがあるので、これも `text` 型を勧めます。
+
+```ruby
+class ChangeUsersEmailToText < ActiveRecord::Migration[8.1]
+  def up
+    change_column :users, :email, :text
+  end
+
+  def down
+    change_column :users, :email, :string
+  end
+end
+```
+
+MySQL の `text` 列には、長さを指定しないインデックスを作成できません。列にインデックスがある場合は、変更の前に外してください。変更の前に DB のバックアップを取ってください。
+
 ## 設定
 
 ```ruby
