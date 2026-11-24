@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `Marshal.dump` of a key pair, a KEM result (`Encapsulation`) or
+  `PqcRails::EnvelopeCipher` now raises `TypeError`, and so does `Marshal.dump` of an object that
+  holds one (such as `PqcRails::ActiveRecord::KeyProvider::Key` or `PqcRails::Session::Encryptor`).
+  Previously the dump contained the secret values as is, so a key stored in `Rails.cache`, a job
+  argument or a file was readable there. The error message does not contain secret values. Store
+  keys with `PqcRails::KeySource.encode`. Records with encrypted attributes do not hold the keys and
+  can still be marshaled.
+
 ## [0.6.0] - 2026-11-24
 
 ### Added
