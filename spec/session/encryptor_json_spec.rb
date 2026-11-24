@@ -74,6 +74,15 @@ RSpec.describe PqcRails::Session::Encryptor, "session_serializer" do
       expect(events).to eq([{ keys: %w[at nested sym_key list] }])
       expect(encryptor.decrypt(blob).keys).to eq(session.keys)
     end
+
+    it "UTF-8にできない文字列・自分自身を含む値も、落ちずにキーの名前を知らせる" do
+      cyclic = []
+      cyclic << cyclic
+      session = { "bin" => "\xFF".b, "cyclic" => cyclic, "ok" => "fine" }
+      events = events_during { encryptor.encrypt(session) }
+
+      expect(events).to eq([{ keys: %w[bin cyclic] }])
+    end
   end
 
   describe ":jsonで書く時" do
@@ -112,6 +121,25 @@ RSpec.describe PqcRails::Session::Encryptor, "session_serializer" do
       end
     end
 
+    it "UTF-8にできない文字列・深すぎる入れ子・自分自身を含む値は、値を出さずにPqcRails::Errorにする" do
+      marker = "value\xFFthat-must-not-appear".b
+      cyclic = []
+      cyclic << cyclic
+      deep = 70.times.reduce("x") { |inner, _| [inner] }
+      [{ "bin" => marker }, { "deep" => deep }, { "cyclic" => cyclic }].each do |session|
+        with_json do
+          expect { encryptor.encrypt(session) }
+            .to raise_error(PqcRails::Error) { |e| expect(e.message.b).not_to include("must-not-appear") }
+        end
+      end
+    end
+
+    it "UTF-8以外の文字コードでも、UTF-8にできる文字列はUTF-8で保存する" do
+      sjis = "日本語".encode(Encoding::Shift_JIS)
+
+      with_json { expect(encryptor.decrypt(encryptor.encrypt({ "s" => sjis, "ascii" => "abc".b }))).to eq({ "s" => "日本語", "ascii" => "abc" }) }
+    end
+
     it "最上位がHashでなければPqcRails::Errorにする" do
       with_json { expect { encryptor.encrypt([1]) }.to raise_error(PqcRails::Error, /Hash/) }
     end
@@ -133,6 +161,12 @@ RSpec.describe PqcRails::Session::Encryptor, "session_serializer" do
       blob = v2_blob
       expect(encryptor.decrypt(blob)).to eq({ "user_id" => 2 })
       with_json { expect(encryptor.decrypt(blob)).to eq({ "user_id" => 2 }) }
+    end
+
+    it ":jsonの間も、未知の形式バージョンは形式のエラーにする" do
+      bytes = bytes_of(v1_blob).tap { |b| b.setbyte(0, 3) }
+
+      with_json { expect { encryptor.decrypt(Base64.strict_encode64(bytes)) }.to raise_error(PqcRails::Error, /format version/) }
     end
 
     it "v2はMarshal.loadを通らない" do

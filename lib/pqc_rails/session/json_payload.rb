@@ -12,6 +12,10 @@ module PqcRails
     # 黙って文字列にすると読み戻した時に型が変わるので、書き込みの時にPqcRails::Errorにする。
     # エラーのメッセージには、最上位のキーの名前とクラス名だけを出し、値は出さない。
     module JsonPayload
+      # 入れ子の深さの上限。自分自身を含む配列・ハッシュで再帰が終わらないことを防ぎ、
+      # JSONの既定の上限(100段)より先にPqcRails::Errorにする。
+      MAX_DEPTH = 64
+
       module_function
 
       def dump(data)
@@ -49,22 +53,27 @@ module PqcRails
         end
       end
 
-      def normalize(value, top_key)
+      def normalize(value, top_key, depth = 1)
+        if depth > MAX_DEPTH
+          raise PqcRails::Error, "the session value under #{top_key.inspect} is nested more than #{MAX_DEPTH} levels"
+        end
+
         case value
-        when String, Integer, true, false, nil then value
+        when String then utf8(value, top_key)
+        when Integer, true, false, nil then value
         when Symbol then value.to_s
         when Float
           raise PqcRails::Error, "the session value under #{top_key.inspect} is not a finite number" unless value.finite?
 
           value
-        when Array then value.map { |item| normalize(item, top_key) }
+        when Array then value.map { |item| normalize(item, top_key, depth + 1) }
         when Hash
           value.to_h do |key, item|
             unless key.is_a?(String)
               raise PqcRails::Error, "the session value under #{top_key.inspect} has a #{key.class} key; use strings"
             end
 
-            [key, normalize(item, top_key)]
+            [key, normalize(item, top_key, depth + 1)]
           end
         else
           raise PqcRails::Error,
@@ -73,6 +82,17 @@ module PqcRails
         end
       end
       private_class_method :normalize
+
+      # JSONはUTF-8の文字列だけを書ける。UTF-8に変換できない文字列(バイナリなど)は、値を出さずにエラーにする。
+      def utf8(value, top_key)
+        return value if value.encoding == Encoding::UTF_8 && value.valid_encoding?
+        return value if value.ascii_only? && value.valid_encoding?
+
+        value.encode(Encoding::UTF_8)
+      rescue EncodingError
+        raise PqcRails::Error, "the session value under #{top_key.inspect} is not a valid UTF-8 string"
+      end
+      private_class_method :utf8
     end
   end
 end

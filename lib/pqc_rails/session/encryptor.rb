@@ -43,12 +43,10 @@ module PqcRails
       # v2はJSONとして読み、Marshal.loadに渡さない。v0・v1(Marshal)は、session_serializerが:jsonの間は期限内だけ読む。
       def decrypt(blob)
         bytes = Base64.strict_decode64(blob)
-        if bytes.getbyte(0) == CiphertextFormat::SESSION_JSON_VERSION
-          JsonPayload.load(open_cookie(bytes))
-        else
-          CiphertextFormat.ensure_marshal_cookie_accepted!
-          Marshal.load(open_cookie(bytes))
-        end
+        payload = open_cookie(bytes)
+        return JsonPayload.load(payload) if bytes.getbyte(0) == CiphertextFormat::SESSION_JSON_VERSION
+
+        Marshal.load(payload)
       end
 
       # この鍵で旧形式のCookieを書けない理由(読み戻せないため)。書ける場合はnil。
@@ -87,8 +85,12 @@ module PqcRails
 
       def open_cookie(bytes)
         case bytes.getbyte(0)
-        when 0 then open_legacy(bytes)
-        when CiphertextFormat::VERSION then open_versioned(bytes, CiphertextFormat::VERSION)
+        when 0
+          CiphertextFormat.ensure_marshal_cookie_accepted!
+          open_legacy(bytes)
+        when CiphertextFormat::VERSION
+          CiphertextFormat.ensure_marshal_cookie_accepted!
+          open_versioned(bytes, CiphertextFormat::VERSION)
         when CiphertextFormat::SESSION_JSON_VERSION then open_versioned(bytes, CiphertextFormat::SESSION_JSON_VERSION)
         else raise PqcRails::Error, "unsupported ciphertext format version: #{bytes.getbyte(0).inspect}"
         end

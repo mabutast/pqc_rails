@@ -158,7 +158,7 @@
           "id": "array-shallow",
           "kind": "再帰をやめる",
           "file": "lib/pqc_rails/session/json_payload.rb",
-          "find": "when Array then value.map { |item| normalize(item, top_key) }",
+          "find": "when Array then value.map { |item| normalize(item, top_key, depth + 1) }",
           "replace": "when Array then value",
           "result": "killed"
         }
@@ -267,8 +267,8 @@
           "id": "v2-marshal",
           "kind": "読み方を取り違える",
           "file": "lib/pqc_rails/session/encryptor.rb",
-          "find": "          JsonPayload.load(open_cookie(bytes))",
-          "replace": "          Marshal.load(open_cookie(bytes))",
+          "find": "return JsonPayload.load(payload) if",
+          "replace": "return Marshal.load(payload) if",
           "result": "killed"
         }
       ]
@@ -290,16 +290,28 @@
         {
           "file": "spec/session/encryptor_json_spec.rb",
           "name": ":jsonの間、v0はMarshalの期限と旧形式の条件の両方が要る"
+        },
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": ":jsonの間も、未知の形式バージョンは形式のエラーにする"
         }
       ],
-      "guarantee": "期限が nil・過去なら Marshal.load の前に PqcRails::Error。期限内なら読む。v0 は旧形式の条件も要る",
+      "guarantee": "期限が nil・過去なら Marshal.load の前に PqcRails::Error。期限内なら読む。v0 は旧形式の条件も要る。未知の版は形式のエラーのまま",
       "mutants": [
         {
-          "id": "gate-removed",
+          "id": "gate-removed-v1",
           "kind": "呼び出しを消す",
           "file": "lib/pqc_rails/session/encryptor.rb",
-          "find": "          CiphertextFormat.ensure_marshal_cookie_accepted!\n",
-          "replace": "",
+          "find": "          CiphertextFormat.ensure_marshal_cookie_accepted!\n          open_versioned",
+          "replace": "          open_versioned",
+          "result": "killed"
+        },
+        {
+          "id": "gate-removed-v0",
+          "kind": "呼び出しを消す",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "          CiphertextFormat.ensure_marshal_cookie_accepted!\n          open_legacy",
+          "replace": "          open_legacy",
           "result": "killed"
         },
         {
@@ -407,8 +419,55 @@
           "id": "stringify-break",
           "kind": "値を変える",
           "file": "lib/pqc_rails/session/json_payload.rb",
-          "find": "when String, Integer, true, false, nil then value",
-          "replace": "when String, Integer, true, false, nil then value.to_s",
+          "find": "        when Integer, true, false, nil then value",
+          "replace": "        when Integer, true, false, nil then value.to_s",
+          "result": "killed"
+        }
+      ]
+    },
+    {
+      "id": "json-encoding-depth",
+      "pattern": "UTF-8 にできない文字列・UTF-8 以外の文字コード・深い入れ子・自分自身を含む値",
+      "source": "code",
+      "source_ref": "レビューの指摘（JSON.generate で初めて落ちる値、unsafe_keys の無限の再帰）。normalize の utf8・MAX_DEPTH",
+      "tests": [
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "UTF-8にできない文字列・深すぎる入れ子・自分自身を含む値は、値を出さずにPqcRails::Errorにする"
+        },
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "UTF-8以外の文字コードでも、UTF-8にできる文字列はUTF-8で保存する"
+        },
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "UTF-8にできない文字列・自分自身を含む値も、落ちずにキーの名前を知らせる"
+        }
+      ],
+      "guarantee": ":json では値を出さない PqcRails::Error、:marshal では落ちずにキーを知らせる。変換できる文字コードは UTF-8 で保存する",
+      "mutants": [
+        {
+          "id": "no-depth",
+          "kind": "上限を外す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "        if depth > MAX_DEPTH\n",
+          "replace": "        if false\n",
+          "result": "killed"
+        },
+        {
+          "id": "no-utf8-check",
+          "kind": "検査を外す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "        when String then utf8(value, top_key)",
+          "replace": "        when String then value",
+          "result": "killed"
+        },
+        {
+          "id": "no-encode",
+          "kind": "変換をやめる",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "        value.encode(Encoding::UTF_8)\n",
+          "replace": "        value\n",
           "result": "killed"
         }
       ]

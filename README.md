@@ -168,7 +168,7 @@ config.session_store :pqc_cookie_store, pq_alg_name: :ml_kem_512
 
 #### セッションの中身を JSON で書く
 
-既定では、セッションの中身を Ruby の `Marshal` で書きます。`session_serializer` を `:json` にすると、JSON で書きます。`Marshal` で読む値は、細工されているとサーバー上でコードを実行される危険があります。JSON で書けば、認証鍵が漏れてセッションを偽造された場合でも、コードの実行には広がりません。
+既定では、セッションの中身を Ruby の `Marshal` で書きます。`session_serializer` を `:json` にすると、JSON で書きます。`Marshal` で読む値は、細工されているとサーバー上でコードを実行される危険があります。JSON に切り替え、`Marshal` で書かれた Cookie を読む期限（`accept_marshal_cookies_until`）が過ぎた後は、認証鍵が漏れてセッションを偽造された場合でも、コードの実行には広がりません。
 
 ```ruby
 # config/initializers/pqc_rails.rb
@@ -179,9 +179,9 @@ PqcRails.configure do |config|
 end
 ```
 
-`:json` で書けるのは、文字列・整数・有限の小数・`true`・`false`・`nil`・配列と、キーが文字列のハッシュです。シンボルの値は文字列で保存します。`Time`・シンボルのキー・独自のオブジェクトをセッションに入れると、保存時に `PqcRails::Error` が発生します。文字列か数値にして入れてください。
+`:json` で書けるのは、UTF-8 の文字列・整数・有限の小数・`true`・`false`・`nil`・配列と、キーが文字列のハッシュです。シンボルの値は文字列で保存します。`Time`・シンボルのキー・独自のオブジェクトをセッションに入れると、保存時に `PqcRails::Error` が発生します。文字列か数値にして入れてください。
 
-`:marshal`（既定）の間は、`:json` で書けない値がセッションにあると、`session_not_json_safe.pqc_rails` のイベントで知らせます。イベントには最上位のキーの名前だけが入り、値は入りません。切り替える前に、このイベントが出ないことを確かめてください。
+`:marshal`（既定）の間は、`:json` で書けない値か、`:json` で書くと文字列に変わる値（シンボル）がセッションにあると、`session_not_json_safe.pqc_rails` のイベントで知らせます。イベントには最上位のキーの名前だけが入り、値は入りません。切り替える前に、このイベントが出ないことを確かめてください。
 
 ```ruby
 ActiveSupport::Notifications.subscribe("session_not_json_safe.pqc_rails") do |event|

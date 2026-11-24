@@ -192,7 +192,7 @@ DB とセッションには別の鍵を設定してください。`Context` に�
 
 1. 全台を 0.6.0 以降に更新する。設定は変えない（既定の `:marshal` のまま）
 2. `session_not_json_safe.pqc_rails` のイベントを購読し、JSON で書けない値を持つセッションのキーを確かめる。`Time` は `iso8601` の文字列か整数に、独自のオブジェクトはその ID などに置き換える。イベントが出なくなるまで直す
-3. `session_serializer = :json` と、`accept_marshal_cookies_until` を設定して全台を再起動する。期限には、全台の再起動が終わる日時に、最長のセッション有効期限を足した日時を設定する。期限を設定しないと、それまでのセッション（Marshal で書かれた Cookie）は読まれず、利用者のログインが切れる
+3. `session_serializer = :json` と、`accept_marshal_cookies_until` を設定して全台を再起動する。期限には、全台の再起動が終わる日時に、最長のセッション有効期限を足した日時を設定する。期限を設定しないと、それまでのセッション（Marshal で書かれた Cookie）は読まれず、利用者のログインが切れる。期限を過ぎて読まなかった Cookie も、復号の失敗（`decryption_failed.pqc_rails`）として通知されるので、期限の直後は通知が増える
 
    ```ruby
    PqcRails.configure do |config|
