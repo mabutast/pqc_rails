@@ -2,6 +2,7 @@
 
 require "openssl"
 require_relative "length_validation"
+require_relative "redacted_struct"
 
 module PqcRails
   # AES-256-GCMによるエンベロープ暗号化。HybridKem等で導出した32バイトの共有鍵を使って
@@ -73,6 +74,11 @@ module PqcRails
     def encode_with(coder)
       coder.represent_map(nil, as_json)
       coder.implicit = true
+    end
+
+    # 鍵をそのまま含むため、Marshalで書き出さない(RedactedStructと同じ)。
+    def marshal_dump
+      raise TypeError, RedactedStruct.marshal_refusal(self.class)
     end
   end
 end

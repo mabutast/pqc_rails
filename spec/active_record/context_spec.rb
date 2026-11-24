@@ -81,6 +81,17 @@ RSpec.describe PqcRails::ActiveRecord::Context do
     expect { widget_class.find(widget.id).secret }.to raise_error(ActiveRecord::Encryption::Errors::Base)
   end
 
+  it "暗号化属性を持つレコードはMarshal.dumpでき(Rails.cacheに入れられる)、鍵を含まない" do
+    stub_const("MarshalWidget", widget_class)
+    widget = MarshalWidget.find(MarshalWidget.create!(secret: "hello pqc").id)
+    widget.secret
+
+    dumped = Marshal.dump(widget)
+
+    expect(Marshal.load(dumped).secret).to eq("hello pqc")
+    [keypair.secret_key, keypair.authentication_key].each { |secret| expect(dumped.b).not_to include(secret.b) }
+  end
+
   describe "既存データの移行(dual-stack, docs/MIGRATION.md)" do
     let(:old_primary_key) { "s" * 32 }
     let(:legacy_widget_class) do

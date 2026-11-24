@@ -251,15 +251,76 @@ RSpec.describe "秘密の値を持つオブジェクトの表示" do
       end
     end
 
-    it "Marshalの往復は元の値を保つ" do
-      keypair = PqcRails::HybridKem.open(:ml_kem_768, &:generate_keypair)
-      encap = PqcRails::HybridKem.open(:ml_kem_768) { |kem| kem.encapsulate(keypair.public_key) }
-      key = OpenSSL::Random.random_bytes(32)
-      encrypted = PqcRails::EnvelopeCipher.new(key).encrypt("plain")
+  end
 
-      expect(Marshal.load(Marshal.dump(keypair))).to eq(keypair)
-      expect(Marshal.load(Marshal.dump(encap))).to eq(encap)
-      expect(Marshal.load(Marshal.dump(PqcRails::EnvelopeCipher.new(key))).decrypt(encrypted)).to eq("plain")
+  describe "Marshal" do
+    # Marshal.dumpがTypeErrorになり、メッセージに秘密の値が出ず、KeySource.encodeを案内することを確かめる。
+    def expect_marshal_refused(object, secrets)
+      expect { Marshal.dump(object) }.to raise_error(TypeError) { |error|
+        secrets.compact.each { |secret| expect_not_to_reveal(error.message, secret) }
+        expect(error.message).to include("PqcRails::KeySource.encode")
+      }
+    end
+
+    let(:hybrid_keypair) { PqcRails::HybridKem.open(:ml_kem_768, &:generate_keypair) }
+
+    it "鍵ペアはどのアルゴリズムでもMarshal.dumpでTypeErrorを送出し、メッセージに秘密の値を含めない" do
+      keypairs = [
+        hybrid_keypair,
+        PqcRails::Kem.open(:ml_kem_768, &:generate_keypair),
+        PqcRails::DhKem.new.generate_keypair,
+        PqcRails::Sig.open(:ml_dsa_65, &:generate_keypair)
+      ]
+
+      keypairs.each do |keypair|
+        expect_marshal_refused(keypair, [keypair.secret_key, keypair.to_h[:authentication_key]])
+      end
+    end
+
+    it "KEMの結果(Encapsulation)は3種類ともMarshal.dumpでTypeErrorを送出し、共有秘密を含めない" do
+      kem_keypair = PqcRails::Kem.open(:ml_kem_768, &:generate_keypair)
+      dh = PqcRails::DhKem.new
+      encaps = [
+        PqcRails::HybridKem.open(:ml_kem_768) { |kem| kem.encapsulate(hybrid_keypair.public_key) },
+        PqcRails::Kem.open(:ml_kem_768) { |kem| kem.encapsulate(kem_keypair.public_key) },
+        dh.encapsulate(dh.generate_keypair.public_key)
+      ]
+
+      encaps.each { |encap| expect_marshal_refused(encap, [encap.shared_secret]) }
+    end
+
+    it "配列・ハッシュに入れた鍵ペアもMarshal.dumpでTypeErrorを送出する" do
+      [[hybrid_keypair], { key: hybrid_keypair }, [{ nested: [hybrid_keypair] }]].each do |container|
+        expect_marshal_refused(container, [hybrid_keypair.secret_key, hybrid_keypair.authentication_key])
+      end
+    end
+
+    it "AES鍵を持つEnvelopeCipherはMarshal.dumpでTypeErrorを送出し、鍵を含めない" do
+      key = OpenSSL::Random.random_bytes(32)
+
+      expect_marshal_refused(PqcRails::EnvelopeCipher.new(key), [key])
+    end
+
+    it "認証鍵の無い0.3.0の鍵ペアもMarshal.dumpでTypeErrorを送出する" do
+      legacy = hybrid_keypair.class.new(hybrid_keypair.public_key, hybrid_keypair.secret_key, nil)
+
+      expect_marshal_refused(legacy, [legacy.secret_key])
+    end
+
+    it "鍵ペアを内部に持つKeyProvider::KeyとSession::EncryptorもMarshal.dumpでTypeErrorを送出する" do
+      owners = [PqcRails::ActiveRecord::KeyProvider::Key.new(hybrid_keypair), PqcRails::Session::Encryptor.new(hybrid_keypair)]
+
+      owners.each do |owner|
+        expect_marshal_refused(owner, [hybrid_keypair.secret_key, hybrid_keypair.authentication_key])
+      end
+    end
+
+    it "Marshal以外(==・to_h・inspect)は変わらない" do
+      copy = hybrid_keypair.class.new(*hybrid_keypair.to_a)
+
+      expect(copy).to eq(hybrid_keypair)
+      expect(copy.to_h[:secret_key]).to eq(hybrid_keypair.secret_key)
+      expect(copy.inspect).to include("secret_key=[FILTERED]")
     end
   end
 end

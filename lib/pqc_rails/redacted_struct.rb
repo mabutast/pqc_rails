@@ -15,9 +15,21 @@ module PqcRails
   # 値の取り出し(keypair.secret_key・to_h・to_a)と==はStructのまま変えない。
   # to_h・to_aで取り出した値をログやJSONに渡せば、秘密の値はそのまま出る。
   # YAML(to_yaml、Railsのdebugヘルパー)はas_jsonと同じ内容のタグ無しのマップにする。読み戻しても鍵にはならない。
-  # Marshalは復元のための形式なので伏せず、秘密の値をそのまま含む。
+  # Marshalは伏せた形では復元できないため、書き出し自体を拒む(marshal_dumpでTypeError)。
+  # Rails.cache・ジョブの引数・ファイルに鍵が丸ごと残るのを防ぐ。鍵を保存する時はKeySource.encodeを使う。
+  # このオブジェクトを内部に持つオブジェクト(KeyProvider::Key・Session::Encryptor等)のMarshalも、ここで止まる。
   module RedactedStruct
     PUBLIC_MEMBERS = %i[public_key ciphertext].freeze
+
+    # Marshalを拒む時のメッセージ。秘密の値は含めない。
+    def self.marshal_refusal(klass)
+      "#{klass.name} holds secret values and cannot be marshaled; " \
+        "to store a key pair, use PqcRails::KeySource.encode"
+    end
+
+    def marshal_dump
+      raise TypeError, RedactedStruct.marshal_refusal(self.class)
+    end
 
     def inspect
       fields = each_pair.map { |name, value| "#{name}=#{redacted_value(name, value) || 'nil'}" }
