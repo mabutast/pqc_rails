@@ -31,6 +31,10 @@ RSpec.describe "README.mdの「API の安定性」節に列挙されたクラス
       expect(PqcRails::KeySource.decode(PqcRails::KeySource.encode(keypair)).public_key).to eq(keypair.public_key)
     end
 
+    it "ColumnCapacityのtoo_short・may_overflow・too_longが存在する" do
+      expect(PqcRails::ActiveRecord::ColumnCapacity).to respond_to(:too_short, :may_overflow, :too_long)
+    end
+    
     it "CiphertextInfo.parse・Cipher#algorithm_id・CiphertextFormat.key_idが存在する" do
       expect(PqcRails::ActiveRecord::CiphertextInfo).to respond_to(:parse)
       expect(PqcRails::ActiveRecord::CiphertextInfo.instance_methods)

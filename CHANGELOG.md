@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `rails pqc_rails:status` reports encrypted columns that are too short for the
+  ciphertext and `string` columns that longer values can overflow. `PqcRails::ActiveRecord::ColumnCapacity`
+  provides `too_short`, `may_overflow`, and `too_long`.
+
+### Fixed
+
+- The README and `docs/MIGRATION.md` now state that encrypted columns need the `text` type.
+  A MySQL `string` column (255 characters) cannot hold a ciphertext: the write raises
+  `ActiveRecord::ValueTooLong` in strict mode, and with `strict: false` the value is truncated
+  and cannot be recovered. Run `rails pqc_rails:status`, and change any reported column to `text`.
+
 ## [0.4.1] - 2026-11-24
 
 ### Fixed

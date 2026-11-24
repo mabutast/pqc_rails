@@ -184,6 +184,8 @@ end
 
 鍵は Rails credentials の `pqc_record_key` から読み込みます。環境変数 `PQC_RECORD_KEY` で上書き可能です。セッション用の鍵とは別管理です。
 
+暗号化する列には `text` 型を使ってください。暗号文は短い値でも長くなります（ML-KEM-768 で13文字の値を暗号化すると1,643文字）。MySQL の `string` 列（255文字まで）には保存できません。strict モード（Rails の既定）では保存時に `ActiveRecord::ValueTooLong` になります。`strict: false` では値が切れて保存され、元の値を復元できなくなります。`varchar(2000)` のように長さの上限がある列は、短い値が入っても長い値で上限を超えることがあります。`rails pqc_rails:status` で、暗号文が入らない列と、長い値で超えうる列を確認できます。既存の列を変更する手順は [docs/MIGRATION.md](docs/MIGRATION.md) にあります。
+
 ### 暗号文の形式
 
 DB カラム・セッション Cookie とも、暗号文は形式バージョン・アルゴリズムID（例: `X25519+ML-KEM-768`）・鍵IDを持ちます。復号は暗号文に書かれたアルゴリズムで行い、鍵IDが一致する鍵だけを試します。これらの値は AES-256-GCM の追加認証データに含まれるため、書き換えられた暗号文は復号できません。暗号文に書かれたアルゴリズムのうち、復号に使うのはアルゴリズムのレジストリに登録されたものと、設定で指定したものだけです。
@@ -364,6 +366,7 @@ pqc_rails は現在 `0.y.z` 版で開発中です。将来 `1.0` を名乗る時
 - `PqcRails.configure` / `PqcRails.liboqs_version` / `PqcRails::Configuration#liboqs_path` / `#ciphertext_format` / `#accept_legacy_records` / `#accept_legacy_cookies_until`
 - 鍵の生成と保存形式：`PqcRails::HybridKem.open(アルゴリズム) { |hybrid| hybrid.generate_keypair }` と `PqcRails::KeySource.encode` / `.decode`（[docs/MIGRATION.md](docs/MIGRATION.md) の鍵ローテーションの手順で使うもの）
 - `PqcRails::ActiveRecord::CiphertextInfo.parse`（`#format_version` / `#algorithm_id` / `#key_id` / `#pqc?` / `#legacy?`）、`PqcRails::Cipher#algorithm_id`、`PqcRails::CiphertextFormat.key_id`
+- `PqcRails::ActiveRecord::ColumnCapacity.too_short` / `.may_overflow` / `.too_long`（戻り値が持つ `attribute` / `limit` / `required`）
 - `config.session_store :pqc_cookie_store`（`keypair:` / `previous_keypairs:` / `pq_alg_name:` オプション含む）
 - `PqcRails::ActiveRecord::Context.install!`
 - `PqcRails::ActiveRecord::KeyProvider`（HSM 連携・ロールバック時の `previous:` スキームで使う拡張点。[docs/MIGRATION.md](docs/MIGRATION.md) 参照）
