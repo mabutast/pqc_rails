@@ -56,6 +56,15 @@ RSpec.describe PqcRails::StatusCheck, "暗号文が入る列" do
     expect(result.detail).not_to include("hunter2")
   end
 
+  [::ActiveRecord::ConnectionNotEstablished, ::ActiveRecord::NoDatabaseError].each do |error|
+    it "DBに接続できない場合(#{error})は失敗にせず、確かめていないと報告する" do
+      allow(PqcRails::ActiveRecord::ColumnCapacity).to receive(:too_short).and_raise(error)
+
+      expect(result.ok).to be true
+      expect(result.detail).to include("確かめていません")
+    end
+  end
+
   it "PqcRails::Cipherを使っていない場合は確かめない" do
     allow(::ActiveRecord::Encryption.context).to receive(:cipher).and_return(::ActiveRecord::Encryption::Cipher.new)
 
