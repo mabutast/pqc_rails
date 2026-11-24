@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- `PqcRails::HybridKem` now overwrites with zeros the X25519 and ML-KEM secret keys made during key
+  generation, the X25519 and ML-KEM shared secrets before they are combined, and their concatenation
+  passed to HKDF, as soon as they are no longer needed, including when an error is raised. The combined
+  shared secret and the AES key derived from it are not overwritten.
+
 ## [0.7.0] - 2026-11-25
 
 ### Security
