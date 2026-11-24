@@ -252,7 +252,7 @@
       "id": "secret-key-trailing",
       "pattern": "秘密鍵の末尾の余分なバイトは受け付ける",
       "source": "code",
-      "source_ref": "decapsulate の BlobPacking.unpack(secret_key)。仕様の行 decapsulate-secret-key-one-long（1バイト長い秘密鍵は ArgumentError）とは異なる",
+      "source_ref": "decapsulate の BlobPacking.unpack(secret_key)。仕様の行 decapsulate-secret-key-one-long（1バイト長い秘密鍵は ArgumentError）とは異なる。秘密鍵の末尾を拒まないのは、起動時に止まる影響が大きいので見送ると決めたため（判断キュー nightly-pqc_rails-2026-11-01-trailing-bytes の答え）",
       "tests": [
         {
           "file": "spec/pqc_rails/hybrid_kem_spec.rb",
