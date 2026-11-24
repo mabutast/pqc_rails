@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-24
+
 ### Added
 
 - `PqcRails.configuration.session_serializer = :json` writes session cookies in a new format (v2)
@@ -422,7 +424,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   documentation for decision-makers and developers.
 - CI workflow building liboqs from source and running the test suite on push/PR.
 
-[Unreleased]: https://github.com/mabutast/pqc_rails/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/mabutast/pqc_rails/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/mabutast/pqc_rails/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/mabutast/pqc_rails/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/mabutast/pqc_rails/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/mabutast/pqc_rails/compare/v0.3.0...v0.4.0
