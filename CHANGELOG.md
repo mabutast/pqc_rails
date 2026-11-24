@@ -10,12 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - With Rails' 6.1 marshalling format (`config.load_defaults` below 7.1), `Marshal.dump` of a record
-  wrote the database secret key and authentication key into the dump when the encrypted attribute
+  wrote the current and previous database secret keys and authentication keys into the dump when the encrypted attribute
   was given `key_provider: PqcRails::ActiveRecord::KeyProvider.new`, directly or in a `previous:`
   scheme, after that key provider had read its keys. Caching such a record (`Rails.cache`) stored the
   keys in the cache. `PqcRails::ActiveRecord::KeyProvider` and the default key source now write only
   where the keys come from, and read the keys again after loading. If your application cached such
-  records, rotate the database key and clear the cache.
+  records, update all servers, clear the cache, and rotate the database key. Servers on 0.6.0 or
+  earlier cannot read key providers cached by 0.7.0, so clear the cache again if you roll back. A
+  custom key source passed to a per-attribute `KeyProvider` is written as is, so it must not keep keys
+  in a form that `Marshal` writes.
 
 ### Changed
 
@@ -24,7 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   holds one (such as `PqcRails::Session::Encryptor`). Previously the dump contained the secret values
   as is, so a key object stored in `Rails.cache` or a file was readable there. The error message does
   not contain secret values. Store keys with `PqcRails::KeySource.encode`. Records with encrypted
-  attributes can still be marshaled with both the 6.1 and 7.1 formats.
+  attributes can still be marshaled with both the 6.1 and 7.1 formats when they use the default key
+  source.
 
 ## [0.6.0] - 2026-11-24
 

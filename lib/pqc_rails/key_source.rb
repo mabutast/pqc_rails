@@ -103,7 +103,8 @@ module PqcRails
     #
     # Session::KeyManagerとActiveRecord::KeyProviderは、鍵の取得をこのクラスのインスタンスに
     # 委譲する。`#current_keypair`/`#previous_keypairs`の2メソッドを実装するオブジェクトであれば
-    # 差し替え可能(例: HSM/PKCS#11経由の鍵ソース)。
+    # 差し替え可能(例: HSM/PKCS#11経由の鍵ソース)。属性ごとのkey_providerに渡す鍵ソースは、Railsの6.1の
+    # Marshalの形式でレコードと一緒に書き出されるため、EnvCredentialsと同じく鍵を含めずにMarshalできる必要がある。
     #
     # 旧鍵世代は、ENVではカンマ区切りの文字列、credentialsでは配列として指定する
     # (ENVは文字列しか保持できないため)。世代数に上限はない。鍵のローテーションを

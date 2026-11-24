@@ -138,6 +138,21 @@ RSpec.describe PqcRails::ActiveRecord::Context do
       expect_marshal_without_keys(class_with_own_key_provider)
     end
 
+    it "旧鍵を読んだ後のKeyProviderも、旧鍵を含めずにMarshalできる" do
+      previous = PqcRails::HybridKem.open(:ml_kem_512, &:generate_keypair)
+      original = ENV.fetch("PQC_RECORD_PREVIOUS_KEYS", nil)
+      ENV["PQC_RECORD_PREVIOUS_KEYS"] = PqcRails::KeySource.encode(previous)
+      provider = PqcRails::ActiveRecord::KeyProvider.new
+      expect(provider.decryption_keys(nil).size).to eq(2)
+
+      dumped = Marshal.dump(provider)
+
+      [previous.secret_key, previous.authentication_key].each { |secret| expect(dumped.b).not_to include(secret.b) }
+      expect(Marshal.load(dumped).decryption_keys(nil).last.secret.public_key).to eq(previous.public_key)
+    ensure
+      ENV["PQC_RECORD_PREVIOUS_KEYS"] = original
+    end
+
     it "KeyProviderは鍵を読んだ後でも、鍵を含めずにMarshalでき、読み戻すと同じ鍵を読む" do
       provider = PqcRails::ActiveRecord::KeyProvider.new
       provider.encryption_key
