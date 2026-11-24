@@ -71,6 +71,9 @@ module PqcRails
         BlobPacking.pack(classical_keypair.secret_key, pq_keypair.secret_key),
         OpenSSL::Random.random_bytes(AUTHENTICATION_KEY_LENGTH)
       )
+    ensure
+      # まとめる前の秘密鍵を消す。返す鍵ペアの秘密鍵はpackが作った別の領域にある。
+      SecretBuffer.wipe(classical_keypair&.secret_key, pq_keypair&.secret_key)
     end
 
     def encapsulate(public_key)
@@ -85,6 +88,9 @@ module PqcRails
         combine(classical_encap.shared_secret, pq_encap.shared_secret,
                 classical_encap.ciphertext, pq_encap.ciphertext)
       )
+    ensure
+      # 組み合わせる前の共有鍵を消す。返す共有鍵はHKDFが作った別の値。
+      SecretBuffer.wipe(classical_encap&.shared_secret, pq_encap&.shared_secret)
     end
 
     def decapsulate(ciphertext, secret_key)
@@ -98,8 +104,9 @@ module PqcRails
 
       combine(classical_shared, pq_shared, classical_ciphertext, pq_ciphertext)
     ensure
-      # unpackが作った秘密鍵のコピーを消す。呼び出し側が渡したsecret_keyはそのまま残る。
-      SecretBuffer.wipe(classical_secret_key, pq_secret_key)
+      # unpackが作った秘密鍵のコピーと、組み合わせる前の共有鍵を消す。
+      # 呼び出し側が渡したsecret_keyと、返す共有鍵はそのまま残る。
+      SecretBuffer.wipe(classical_secret_key, pq_secret_key, classical_shared, pq_shared)
     end
 
     def free
@@ -135,6 +142,8 @@ module PqcRails
       # NIST SP 800-56C §8.2が「全参加者間でsaltを共有する手段が無い場合は
       # 既定値(全ゼロ等)を使ってよい」と明記しており許容される。
       OpenSSL::KDF.hkdf(ikm, salt: "", info: info, length: SHARED_SECRET_LENGTH, hash: "SHA256")
+    ensure
+      SecretBuffer.wipe(ikm)
     end
 
     def ensure_not_freed!
