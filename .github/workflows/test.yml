@@ -116,6 +116,81 @@ jobs:
           LIBOQS_PATH: ${{ env.LIBOQS_INSTALL_PREFIX }}/lib/liboqs.so
         run: bundle exec rspec
 
+  rspec-databases:
+    # DBごとの違いはRuby・Railsの版とほぼ独立しているので、最新の組み合わせだけで確かめる。
+    name: rspec-databases (${{ matrix.database }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - database: postgresql
+            url: postgresql://postgres@127.0.0.1:5432/pqc_test
+          - database: mysql
+            url: mysql2://root@127.0.0.1:3306/pqc_test
+    services:
+      postgres:
+        image: ${{ matrix.database == 'postgresql' && 'postgres:17' || '' }}
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: pqc_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      mysql:
+        image: ${{ matrix.database == 'mysql' && 'mysql:8.4' || '' }}
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes" # pragma: allowlist secret
+          MYSQL_DATABASE: pqc_test
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+    env:
+      LIBOQS_VERSION: "0.16.0"
+      LIBOQS_INSTALL_PREFIX: ${{ github.workspace }}/.liboqs
+      BUNDLE_GEMFILE: ${{ github.workspace }}/gemfiles/rails_8.1_databases.gemfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install database client libraries
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev default-libmysqlclient-dev
+
+      - name: Cache liboqs
+        id: cache-liboqs
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.LIBOQS_INSTALL_PREFIX }}
+          key: liboqs-${{ runner.os }}-${{ env.LIBOQS_VERSION }}-v2
+
+      - name: Install liboqs build dependencies
+        if: steps.cache-liboqs.outputs.cache-hit != 'true'
+        run: sudo apt-get install -y cmake ninja-build libssl-dev
+
+      - name: Build and install liboqs
+        if: steps.cache-liboqs.outputs.cache-hit != 'true'
+        run: |
+          git clone --branch "${LIBOQS_VERSION}" --depth 1 https://github.com/open-quantum-safe/liboqs.git
+          cmake -GNinja -S liboqs -B liboqs/build \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${LIBOQS_INSTALL_PREFIX}"
+          cmake --build liboqs/build
+          cmake --install liboqs/build
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Run RSpec
+        env:
+          LIBOQS_PATH: ${{ env.LIBOQS_INSTALL_PREFIX }}/lib/liboqs.so
+          PQC_TEST_DATABASE_URL: ${{ matrix.url }}
+        run: bundle exec rspec
+
   extension-build:
     # `bundle install`(gemspecのpath source経由)は拡張ビルド(ext/pqc_rails/extconf.rb)を
     # 通らないため、rspecジョブだけではこの経路の回帰を検知できない。実際に`gem build`→
