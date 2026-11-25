@@ -710,6 +710,14 @@
           "find": "Encapsulation = Struct.new(:ciphertext, :shared_secret) do\n      include RedactedStruct\n",
           "replace": "Encapsulation = Struct.new(:ciphertext, :shared_secret) do\n",
           "result": "killed"
+        },
+        {
+          "id": "redact-allowlist-to-denylist-leaks-auth-key",
+          "kind": "公開してよい一覧を、伏せる一覧にする",
+          "file": "lib/pqc_rails/redacted_struct.rb",
+          "find": "return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
+          "replace": "return \"[FILTERED]\" if %i[secret_key].include?(name)\n      return value.inspect unless PUBLIC_MEMBERS.include?(name)",
+          "result": "killed"
         }
       ]
     }
