@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PqcRails::ActiveRecord::KeyProvider` (`encrypts ..., key_provider:`, including `previous:`), not only the
   database key of the context. Only models that are loaded at that time are compared, so with lazy loading
   (`config.eager_load = false`) a model that has not been loaded yet is not compared. Rails' own key providers
-  are not compared. If an attribute uses a custom key provider that does not return public keys
+  are not compared when all their keys are AES keys; a Rails key provider that holds a pqc_rails key pair
+  cannot be compared, so legacy cookies are refused. If an attribute uses a custom key provider that does not return public keys
   (`#public_keys`), the keys cannot be compared and legacy cookies are refused. `rails pqc_rails:status` reports
   the same-key condition, and reports that legacy cookies are not read when the per-attribute keys cannot be
   checked or the models fail to load, instead of stopping.

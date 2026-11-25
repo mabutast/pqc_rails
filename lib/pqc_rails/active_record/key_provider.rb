@@ -76,16 +76,25 @@ module PqcRails
           end
         end
 
-        # クラスだけでなく鍵の中身も見る(Railsのクラスにpqc_railsの鍵ペアを入れた場合は比べる側に残す)。
+        # クラスだけでなく鍵の中身も見る。Railsのクラスにpqc_railsの鍵ペアを1つでも入れた場合は比べる側に残す。
         # 鍵を読めない時も比べる側に残し、呼び出し側で比べられないことが分かるようにする。
         def rails_key_provider?(provider)
           return false if provider.respond_to?(:public_keys)
-          return false unless provider.is_a?(::ActiveRecord::Encryption::KeyProvider) ||
-                              provider.is_a?(::ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider)
 
-          provider.encryption_key.secret.is_a?(::String)
+          rails_provider_keys(provider)&.all? { |key| key.secret.is_a?(::String) } || false
         rescue StandardError
           false
+        end
+
+        # Rails標準のkey_providerが持つ鍵。KeyProviderは鍵の参照を持たないメッセージで全部の鍵を返す。
+        # EnvelopeEncryptionKeyProviderは暗号化のたびにAESのデータ鍵を作るので、そのデータ鍵を見る。
+        def rails_provider_keys(provider)
+          case provider
+          when ::ActiveRecord::Encryption::KeyProvider
+            provider.decryption_keys(::ActiveRecord::Encryption::Message.new)
+          when ::ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider
+            [provider.encryption_key]
+          end
         end
 
         def connection_defined?(model)
