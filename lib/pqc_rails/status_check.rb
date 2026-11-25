@@ -127,6 +127,9 @@ module PqcRails
         Result.new(name: name, ok: true, detail: "読みません")
       elsif Time.now > deadline
         Result.new(name: name, ok: true, detail: "期限を過ぎたので読みません。accept_legacy_cookies_untilは削除できます")
+      elsif (error = attribute_key_check_error)
+        Result.new(name: name, ok: false,
+                   detail: "属性ごとのkey_providerの鍵を確かめられないので、期限内でも旧形式のCookieは読みません(#{error.class})")
       elsif legacy_session_key_shared?
         Result.new(name: name, ok: false,
                    detail: "セッションとDBに同じ鍵を設定しているので、期限内でも旧形式のCookieは読みません。既存のセッションは切れます")
@@ -163,10 +166,20 @@ module PqcRails
       false
     end
 
-    # 旧形式のCookieを読むはずの鍵(認証鍵を持たないセッション鍵)が、DBの鍵と同じかどうか。
-    # 属性ごとのkey_providerも比べるので、先にモデルを読み込む。
-    def legacy_session_key_shared?
+    # 属性ごとのkey_providerの公開鍵を読めない時の例外。読めればnil。
+    # 先にモデルを読み込む。モデルの読み込みの失敗(NameError・LoadError等)もここで受け、statusを止めない。
+    # 例外のメッセージは接続情報を含みうるので、呼び出し側はクラス名だけを出す。
+    def attribute_key_check_error
       eager_load_models
+      ActiveRecord::KeyProvider.per_attribute.each(&:public_keys)
+      nil
+    rescue StandardError, LoadError => e
+      e
+    end
+
+    # 旧形式のCookieを読むはずの鍵(認証鍵を持たないセッション鍵)が、DBの鍵と同じかどうか。
+    # 属性ごとのkey_providerも比べる(モデルはattribute_key_check_errorで読み込み済み)。
+    def legacy_session_key_shared?
       keypairs = [Session::KeyManager.keypair] + Session::KeyManager.previous_keypairs
       keypairs.any? { |keypair| keypair.authentication_key.nil? && Session::Encryptor.new(keypair).legacy_write_blocker }
     rescue PqcRails::Error, ArgumentError, TypeError
@@ -200,7 +213,7 @@ module PqcRails
       else
         Result.new(name: name, ok: true, detail: listed.join(", "))
       end
-    rescue StandardError => e
+    rescue StandardError, LoadError => e
       Result.new(name: name, ok: false, detail: "確認できませんでした(#{e.message})")
     end
 

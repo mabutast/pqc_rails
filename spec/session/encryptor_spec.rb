@@ -337,7 +337,11 @@ RSpec.describe PqcRails::Session::Encryptor do
         before do
           ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(PqcRails::HybridKem.open(:ml_kem_512, &:generate_keypair))
           ENV.delete("PQC_RECORD_PREVIOUS_KEYS")
+          @models_before = ::ActiveRecord::Base.descendants
         end
+
+        # 例ごとに作ったモデルを、後の例の判定に残さない(匿名のクラスはGCされるまでdescendantsに残る)。
+        after { ActiveSupport::DescendantsTracker.clear(::ActiveRecord::Base.descendants - @models_before) }
 
         def provider_for(keypair)
           PqcRails::ActiveRecord::KeyProvider.new(
@@ -371,6 +375,21 @@ RSpec.describe PqcRails::Session::Encryptor do
 
           expect { legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 })) }
             .to raise_error(PqcRails::Error, /records/)
+        end
+
+        it "公開鍵を返さない独自のkey_providerを指定した属性があれば、比べられないので旧形式のCookieを拒否する" do
+          attribute_model(Object.new)
+          PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+
+          expect { legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 })) }
+            .to raise_error(PqcRails::Error, /per-attribute/)
+        end
+
+        it "Rails標準のkey_providerを指定した属性は比べず、期限内は旧形式のCookieを読む" do
+          attribute_model(::ActiveRecord::Encryption::KeyProvider.new(::ActiveRecord::Encryption::Key.new("a" * 32)))
+          PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+
+          expect(legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 }))).to eq({ "user_id" => 1 })
         end
 
         it "属性ごとのprevious:に指定したkey_providerの鍵と同じでも拒否する" do

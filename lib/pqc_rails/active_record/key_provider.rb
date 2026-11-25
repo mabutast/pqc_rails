@@ -44,12 +44,14 @@ module PqcRails
           [installed, current_context_provider].compact.uniq.select { |provider| provider.respond_to?(:public_keys) }
         end
 
-        # 読み込まれたモデルの暗号化属性に指定したKeyProvider(previous:の分も含む)のうち、pqc_railsの鍵を返すもの。
+        # 読み込まれたモデルの暗号化属性に指定したkey_provider(previous:の分も含む)。
+        # Rails標準のkey_provider(AESの鍵を返し、pqc_railsの鍵を持たない)は含まない。
+        # それ以外で公開鍵を返さない独自のkey_providerは含めるので、呼び出し側の#public_keysで例外になり、比べられないことが分かる。
         # key_providerを指定していない属性(既定のKeyProviderを使う属性)は含まない。既定のものはconfiguredで見る。
         # 属性の型を読むので、スキーマが読み込まれていなければDBに問い合わせる。
         # 遅延読み込みでまだ読み込まれていないモデルは含まれない。
         def per_attribute
-          encrypted_models.flat_map { |model| attribute_providers(model) }.uniq.select { |provider| provider.respond_to?(:public_keys) }
+          encrypted_models.flat_map { |model| attribute_providers(model) }.uniq.reject { |provider| rails_key_provider?(provider) }
         end
 
         # encryptsで暗号化属性を持つ、読み込まれたモデル(抽象クラスを除く)。
@@ -72,6 +74,13 @@ module PqcRails
             scheme = model.type_for_attribute(name).scheme
             [scheme, *scheme.previous_schemes].filter_map { |each_scheme| each_scheme.to_h[:key_provider] }
           end
+        end
+
+        def rails_key_provider?(provider)
+          return false if provider.respond_to?(:public_keys)
+
+          provider.is_a?(::ActiveRecord::Encryption::KeyProvider) ||
+            provider.is_a?(::ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider)
         end
 
         def connection_defined?(model)

@@ -302,6 +302,30 @@ RSpec.describe PqcRails::StatusCheck do
         expect(calls).to include(:per_attribute)
       end
 
+      it "期限内に属性ごとのkey_providerの鍵を確かめられなければ、読まないことを警告する" do
+        legacy = PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key)
+        ENV["PQC_SESSION_KEY"] = PqcRails::KeySource.encode(legacy)
+        ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(PqcRails::HybridKem.open(:ml_kem_512, &:generate_keypair))
+        allow(PqcRails::ActiveRecord::KeyProvider).to receive(:per_attribute).and_return([Object.new])
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now + 3600
+
+        expect(legacy_cookie_result.ok).to be(false)
+        expect(legacy_cookie_result.detail).to include("確かめられない", "NoMethodError")
+      end
+
+      it "モデルの読み込みが失敗しても、statusを止めずに旧形式の警告を出す" do
+        legacy = PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key)
+        ENV["PQC_SESSION_KEY"] = PqcRails::KeySource.encode(legacy)
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now + 3600
+        app = Object.new
+        app.define_singleton_method(:eager_load!) { raise LoadError, "cannot load such file" }
+        app.define_singleton_method(:credentials) { {} }
+        allow(Rails).to receive(:application).and_return(app)
+
+        expect(legacy_cookie_result.ok).to be(false)
+        expect(legacy_cookie_result.detail).to include("LoadError")
+      end
+
       it "認証鍵を持つセッション鍵がDBと同じだけなら、旧形式の警告を出さない" do
         ENV["PQC_SESSION_KEY"] = PqcRails::KeySource.encode(keypair)
         ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(keypair)
