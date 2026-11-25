@@ -292,6 +292,7 @@ RSpec.describe PqcRails::StatusCheck do
         calls = []
         app = Object.new
         app.define_singleton_method(:eager_load!) { calls << :eager_load }
+        app.define_singleton_method(:credentials) { {} }
         allow(Rails).to receive(:application).and_return(app)
         allow(PqcRails::ActiveRecord::KeyProvider).to receive(:per_attribute) { calls << :per_attribute && [] }
 
