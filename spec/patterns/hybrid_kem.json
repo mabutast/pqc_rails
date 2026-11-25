@@ -691,6 +691,10 @@
         {
           "file": "spec/pqc_rails/redacted_struct_spec.rb",
           "name": "inspect・to_s・ppで共有秘密を伏せ、暗号文は長さだけを出す"
+        },
+        {
+          "file": "spec/pqc_rails/redacted_struct_spec.rb",
+          "name": "公開してよい一覧に無いメンバーは、名前に関係なく伏せる"
         }
       ],
       "guarantee": "鍵ペアと KEM の結果の表示に、秘密の値が出ない",
@@ -709,6 +713,14 @@
           "file": "lib/pqc_rails/hybrid_kem.rb",
           "find": "Encapsulation = Struct.new(:ciphertext, :shared_secret) do\n      include RedactedStruct\n",
           "replace": "Encapsulation = Struct.new(:ciphertext, :shared_secret) do\n",
+          "result": "killed"
+        },
+        {
+          "id": "redact-full-denylist",
+          "kind": "公開してよい一覧を、伏せる一覧にする",
+          "file": "lib/pqc_rails/redacted_struct.rb",
+          "find": "return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
+          "replace": "return \"[FILTERED]\" if %i[secret_key authentication_key shared_secret].include?(name)\n      return value.inspect unless PUBLIC_MEMBERS.include?(name)",
           "result": "killed"
         }
       ]
