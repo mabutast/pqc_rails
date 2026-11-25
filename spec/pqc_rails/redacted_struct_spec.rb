@@ -125,6 +125,8 @@ RSpec.describe "秘密の値を持つオブジェクトの表示" do
       expect(output).to include("seed=[FILTERED]")
       expect_not_to_reveal(output, seed)
     end
+    expect(holder.as_json["seed"]).to eq("[FILTERED]")
+    (json_outputs_of(holder) + [holder.to_yaml]).each { |output| expect_not_to_reveal(output, seed) }
   end
 
   describe "Encapsulationの表示" do
