@@ -461,6 +461,14 @@
           "find": "Keypair = Struct.new(:public_key, :secret_key) do\n      include RedactedStruct\n",
           "replace": "Keypair = Struct.new(:public_key, :secret_key) do\n      include RedactedStruct\n\n      def to_h = {}\n",
           "result": "killed"
+        },
+        {
+          "id": "redact-allowlist-to-denylist",
+          "kind": "公開してよい一覧を、伏せる一覧にする",
+          "file": "lib/pqc_rails/redacted_struct.rb",
+          "find": "return \"[FILTERED]\" unless PUBLIC_MEMBERS.include?(name)",
+          "replace": "return \"[FILTERED]\" if %i[secret_key].include?(name)\n      return value.inspect unless PUBLIC_MEMBERS.include?(name)",
+          "result": "killed"
         }
       ]
     },

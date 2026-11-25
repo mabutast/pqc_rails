@@ -1,6 +1,6 @@
 # 壊し方の種類（pqc_rails の追加分）
 
-最後に読んだ fix の commit：2a2f9f0
+最後に読んだ fix の commit：6a53d05
 
 | 種類 | 例 | 由来 |
 |---|---|---|
@@ -14,3 +14,6 @@
 | 戻り値の文字コード・型を変える | `return clear_text.force_encoding(Encoding::UTF_8)` → `return clear_text`（BINARY のまま返す） | pqc_rails eca261b（復号した日本語の値が BINARY で返った） |
 | 元の領域を返す（コピーを作らない） | `copy(blob, 4, n)` → `blob.byteslice(4, n)`（切り出した値が元のバイト列と領域を共有する） | pqc_rails 3aa3810（取り出した秘密鍵が元の領域と共有され、後でゼロ埋めしても残った） |
 | 確かめる前に使う（処理の順番を入れ替える） | 長さの確認より前にコピーする（確認の順番を後ろにずらす） | pqc_rails 7ee3546（長さが足りない時も秘密鍵のコピーを作ってしまった） |
+| 秘密を伏せる出力を消す（表示・JSON・YAML を既定に戻す） | `Keypair = Struct.new(...) do include RedactedStruct end` → `Struct.new(...)`（inspect・to_s・pp・as_json・to_yaml が全メンバーを出す） | pqc_rails 4bbf2bc・0f820c8・aa59a57（鍵ペア・共有秘密・AES 鍵の値がログ・JSON・YAML に出た） |
+| 公開してよい一覧を、伏せる一覧にする（一覧に無い値が出る） | `return "[FILTERED]" unless PUBLIC_MEMBERS.include?(name)` → `return "[FILTERED]" if %i[secret_key].include?(name)`（認証鍵など一覧に無い秘密が出る） | pqc_rails 1378750（秘密のメンバーを列挙していたので、後から増えた秘密が伏せられなかった） |
+| 例外の原因（cause）を残す | `raise invalid_key_error(raw), cause: nil` → `raise invalid_key_error(raw)`（rescue 中の送出は元の例外を cause に付け、そのメッセージの秘密も報告に出る） | pqc_rails 99da34f（鍵の値の先頭4バイトが、BlobPacking のエラーの cause から出た） |
