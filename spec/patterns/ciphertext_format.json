@@ -705,7 +705,7 @@
       "id": "legacy-cookie-shared-key",
       "pattern": "セッションの鍵が DB の現行鍵・旧鍵・属性ごとの key_provider の鍵と同じ時の旧形式の Cookie",
       "source": "spec",
-      "source_ref": "README「暗号文の形式」：旧形式には用途の区別が無いので、DB と同じ鍵では旧形式の Cookie を読まない。属性ごとの key_provider は旧形式の Cookie を読む設定の間だけ比べる（PENDING.md「旧形式の Cookie を読む間、属性ごとの key_provider の鍵もセッションの鍵と比べる」）",
+      "source_ref": "README「暗号文の形式」：旧形式には用途の区別が無いので、DB と同じ鍵では旧形式の Cookie を読まない。属性ごとの key_provider は旧形式の Cookie を読む設定の間だけ比べる",
       "tests": [
         {
           "file": "spec/session/encryptor_spec.rb",
