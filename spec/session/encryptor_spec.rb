@@ -392,6 +392,15 @@ RSpec.describe PqcRails::Session::Encryptor do
           expect(legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 }))).to eq({ "user_id" => 1 })
         end
 
+        it "Rails標準のkey_providerにpqc_railsの鍵ペアを入れた属性があれば、比べられないので旧形式のCookieを拒否する" do
+          key = PqcRails::ActiveRecord::KeyProvider::Key.new(legacy_keypair)
+          attribute_model(::ActiveRecord::Encryption::KeyProvider.new(key))
+          PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+
+          expect { legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 })) }
+            .to raise_error(PqcRails::Error, /per-attribute/)
+        end
+
         it "属性ごとのprevious:に指定したkey_providerの鍵と同じでも拒否する" do
           attribute_model(provider_for(legacy_keypair), previous: true)
           PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60

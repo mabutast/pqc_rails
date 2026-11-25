@@ -802,9 +802,21 @@
         {
           "file": "spec/pqc_rails/status_check_spec.rb",
           "name": "モデルの読み込みが失敗しても、statusを止めずに旧形式の警告を出す"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "Rails標準のkey_providerにpqc_railsの鍵ペアを入れた属性があれば、比べられないので旧形式のCookieを拒否する"
+        },
+        {
+          "file": "spec/pqc_rails/status_check_spec.rb",
+          "name": "モデルのファイルに構文の誤りがあっても、statusを止めずに旧形式の警告を出す"
+        },
+        {
+          "file": "spec/pqc_rails/status_check_spec.rb",
+          "name": "属性ごとのkey_providerの公開鍵が文字列でなければ、確かめられないとして警告する"
         }
       ],
-      "guarantee": "DB の現行鍵・旧鍵と同じ鍵、旧形式を読む設定の間は読み込まれたモデルの属性ごとの key_provider（previous: を含む）の鍵と同じ鍵では、旧形式の Cookie を Marshal.load の前に拒否し、:v0 でも書かない。属性ごとの鍵を確かめられなければ拒否し、テーブル・接続の無いモデルは比べない。読む設定でない時は集めない。別の鍵なら期限内は読む。status も報告する。公開鍵を返さない独自の key_provider があれば比べられないので拒否し、Rails 標準の key_provider は比べない。status は属性ごとの鍵を確かめられない時と、モデルの読み込みが失敗した時に止まらず ok:false を報告する",
+      "guarantee": "DB の現行鍵・旧鍵と同じ鍵、旧形式を読む設定の間は読み込まれたモデルの属性ごとの key_provider（previous: を含む）の鍵と同じ鍵では、旧形式の Cookie を Marshal.load の前に拒否し、:v0 でも書かない。属性ごとの鍵を確かめられなければ拒否し、テーブル・接続の無いモデルは比べない。読む設定でない時は集めない。別の鍵なら期限内は読む。status も報告する。公開鍵を返さない独自の key_provider があれば比べられないので拒否し、Rails 標準の key_provider は AES の鍵を持つ時だけ比べない（pqc_rails の鍵ペアを入れた時は拒否する）。status は属性ごとの鍵を確かめられない時と、モデルの読み込みが失敗した時に止まらず ok:false を報告する",
       "mutants": [
         {
           "id": "shared-check-removed",
@@ -970,8 +982,24 @@
           "id": "status-load-error-not-rescued",
           "kind": "例外の範囲を狭める",
           "file": "lib/pqc_rails/status_check.rb",
-          "find": "    rescue StandardError, LoadError => e\n      e\n",
-          "replace": "    rescue StandardError => e\n      e\n",
+          "find": "    rescue StandardError, ScriptError => e\n      e\n",
+          "replace": "    rescue StandardError, LoadError => e\n      e\n",
+          "result": "killed"
+        },
+        {
+          "id": "rails-provider-by-class-only",
+          "kind": "比較の条件を変える",
+          "file": "lib/pqc_rails/active_record/key_provider.rb",
+          "find": "          provider.encryption_key.secret.is_a?(::String)\n",
+          "replace": "          true\n",
+          "result": "killed"
+        },
+        {
+          "id": "status-public-keys-not-converted",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/status_check.rb",
+          "find": "ActiveRecord::KeyProvider.per_attribute.flat_map(&:public_keys).map(&:b)\n      nil",
+          "replace": "ActiveRecord::KeyProvider.per_attribute.each(&:public_keys)\n      nil",
           "result": "killed"
         }
       ]

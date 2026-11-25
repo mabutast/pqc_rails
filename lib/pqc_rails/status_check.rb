@@ -167,13 +167,14 @@ module PqcRails
     end
 
     # 属性ごとのkey_providerの公開鍵を読めない時の例外。読めればnil。
-    # 先にモデルを読み込む。モデルの読み込みの失敗(NameError・LoadError等)もここで受け、statusを止めない。
+    # 先にモデルを読み込む。モデルの読み込みの失敗(NameError・LoadError・SyntaxError等)もここで受け、statusを止めない。
+    # 実行時の比べ方(Encryptorの#attribute_record_public_keys)と同じく、公開鍵をバイト列に直すところまで通す。
     # 例外のメッセージは接続情報を含みうるので、呼び出し側はクラス名だけを出す。
     def attribute_key_check_error
       eager_load_models
-      ActiveRecord::KeyProvider.per_attribute.each(&:public_keys)
+      ActiveRecord::KeyProvider.per_attribute.flat_map(&:public_keys).map(&:b)
       nil
-    rescue StandardError, LoadError => e
+    rescue StandardError, ScriptError => e
       e
     end
 
@@ -213,7 +214,7 @@ module PqcRails
       else
         Result.new(name: name, ok: true, detail: listed.join(", "))
       end
-    rescue StandardError, LoadError => e
+    rescue StandardError, ScriptError => e
       Result.new(name: name, ok: false, detail: "確認できませんでした(#{e.message})")
     end
 
