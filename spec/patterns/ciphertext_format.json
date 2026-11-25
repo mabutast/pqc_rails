@@ -1,5 +1,5 @@
 {
-  "test_command": "bundle exec rspec spec/pqc_rails/ciphertext_format_spec.rb spec/cipher_spec.rb spec/session/encryptor_spec.rb spec/compat",
+  "test_command": "bundle exec rspec spec/pqc_rails/ciphertext_format_spec.rb spec/pqc_rails/status_check_spec.rb spec/cipher_spec.rb spec/session/encryptor_spec.rb spec/compat",
   "rows": [
     {
       "id": "algorithm-id-format",
@@ -745,6 +745,10 @@
         },
         {
           "file": "spec/session/encryptor_spec.rb",
+          "name": "属性ごとのkey_providerの公開鍵の文字コードが違っても、同じバイト列なら拒否する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
           "name": "属性ごとのprevious:に指定したkey_providerの鍵と同じでも拒否する"
         },
         {
@@ -912,7 +916,7 @@
           "file": "lib/pqc_rails/session/encryptor.rb",
           "find": "ActiveRecord::KeyProvider.per_attribute.flat_map(&:public_keys).map(&:b)",
           "replace": "ActiveRecord::KeyProvider.per_attribute.flat_map(&:public_keys)",
-          "result": "survived"
+          "result": "killed"
         },
         {
           "id": "status-models-not-loaded",
@@ -920,7 +924,7 @@
           "file": "lib/pqc_rails/status_check.rb",
           "find": "    def legacy_session_key_shared?\n      eager_load_models\n",
           "replace": "    def legacy_session_key_shared?\n",
-          "result": "survived"
+          "result": "killed"
         }
       ]
     }

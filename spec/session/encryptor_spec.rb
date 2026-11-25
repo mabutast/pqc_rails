@@ -363,6 +363,16 @@ RSpec.describe PqcRails::Session::Encryptor do
           expect(Marshal).not_to have_received(:load)
         end
 
+        it "属性ごとのkey_providerの公開鍵の文字コードが違っても、同じバイト列なら拒否する" do
+          utf8 = PqcRails::HybridKem::Keypair.new(legacy_keypair.public_key.dup.force_encoding(Encoding::UTF_8),
+                                                  legacy_keypair.secret_key)
+          attribute_model(provider_for(utf8))
+          PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+
+          expect { legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 })) }
+            .to raise_error(PqcRails::Error, /records/)
+        end
+
         it "属性ごとのprevious:に指定したkey_providerの鍵と同じでも拒否する" do
           attribute_model(provider_for(legacy_keypair), previous: true)
           PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
