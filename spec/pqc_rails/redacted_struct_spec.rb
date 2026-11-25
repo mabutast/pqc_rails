@@ -115,6 +115,18 @@ RSpec.describe "秘密の値を持つオブジェクトの表示" do
     end
   end
 
+  # 公開してよいメンバーを列挙する作りなので、後から増えた秘密のメンバーも伏せることを、名前の違うメンバーで確かめる。
+  it "公開してよい一覧に無いメンバーは、名前に関係なく伏せる" do
+    klass = Struct.new(:public_key, :seed) { include PqcRails::RedactedStruct }
+    seed = Random.bytes(32)
+    holder = klass.new(Random.bytes(16), seed)
+
+    outputs_of(holder).each_value do |output|
+      expect(output).to include("seed=[FILTERED]")
+      expect_not_to_reveal(output, seed)
+    end
+  end
+
   describe "Encapsulationの表示" do
     {
       PqcRails::Kem::Encapsulation => -> { PqcRails::Kem.open(:ml_kem_768) { |kem| kem.encapsulate(kem.generate_keypair.public_key) } },

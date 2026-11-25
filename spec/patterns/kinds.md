@@ -9,7 +9,7 @@
 | 前の値の引き継ぎを消す（既定値で上書きする） | `configure(primary_key: existing_config_value(:primary_key), ...)` → `configure(...)`（未指定が nil で上書きされる） | pqc_rails a362a53（install! が既存の primary_key などを nil に戻した） |
 | メモ化を消す（呼ぶたびに新しいオブジェクトを返す） | `@public_tags ||= Properties.new` → `{}`（書き込んだ値が次の呼び出しで消える。8112ec2 は、普通の Hash では短い名前への置き換えも通らなかった） | pqc_rails 8112ec2（store_key_references を有効にしても鍵の参照が残らなかった） |
 | 引数の配列をシェルの文字列にする | `sh!("cmake", "-S", src_dir, "-B", BUILD_DIR)` → `sh!("cmake -S #{src_dir} -B #{BUILD_DIR}")`（壊し方は `system(*cmd)` → `system(cmd.join(" "))`） | pqc_rails e9ab3f0（インストール先のパスに空白があると liboqs のビルドが失敗した） |
-| 鍵の導出を通さない・入力を1つ外す | `hkdf(shared_secret + authentication_key, info)` → `shared_secret`（共有鍵をそのまま AES 鍵にする）、または `hkdf(shared_secret, info)` | pqc_rails db3f113（公開鍵だけで、正しく復号できる暗号文を作れた） |
+| 鍵の導出を通さない・入力を1つ外す | `hkdf(shared_secret + authentication_key, info)` → `shared_secret`（共有鍵をそのまま AES 鍵にする）、または `hkdf(shared_secret, info)`。info・追加認証データから用途（record / session）を外す形も含む | pqc_rails db3f113（公開鍵だけで、正しく復号できる暗号文を作れた）、6a53d05（DB の値をセッションの Cookie として渡すと読めた） |
 | 後始末（ゼロ埋め・解放）を消す | `ensure pointer&.clear`（SecretBuffer.with）→ 消す。`SecretBuffer.wipe(raw)` → 消す | pqc_rails c212139・ac2c3b2（liboqs に渡した秘密の領域が、使い終えた後も残った）、3aa3810（Base64 から戻したバイト列を消していなかった） |
 | 戻り値の文字コード・型を変える | `return clear_text.force_encoding(Encoding::UTF_8)` → `return clear_text`（BINARY のまま返す） | pqc_rails eca261b（復号した日本語の値が BINARY で返った） |
 | 元の領域を返す（コピーを作らない） | `copy(blob, 4, n)` → `blob.byteslice(4, n)`（切り出した値が元のバイト列と領域を共有する） | pqc_rails 3aa3810（取り出した秘密鍵が元の領域と共有され、後でゼロ埋めしても残った） |
