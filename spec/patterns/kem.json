@@ -660,7 +660,7 @@
       "id": "yaml-redacted",
       "pattern": "鍵ペア・Encapsulation・EnvelopeCipher と、それらを持つオブジェクトの YAML",
       "source": "spec",
-      "source_ref": "README・CHANGELOG の Security：YAML は as_json と同じタグ無しのマップにする。Marshal は変えない",
+      "source_ref": "README・CHANGELOG の Security：YAML は as_json と同じタグ無しのマップにする",
       "tests": [
         {
           "file": "spec/pqc_rails/redacted_struct_spec.rb",
@@ -679,7 +679,7 @@
           "name": "鍵ペアを内部に持つKeyProvider::KeyとSession::EncryptorのYAMLにも秘密の値が出ない"
         }
       ],
-      "guarantee": "YAML に秘密の値が出ず、クラスのタグが無く、同じオブジェクトが1回だけなら safe_load すると as_json と同じ Hash になる。鍵ペア・Encapsulation・EnvelopeCipher の Marshal の往復は元の値を保つ",
+      "guarantee": "YAML に秘密の値が出ず、クラスのタグが無く、同じオブジェクトが1回だけなら safe_load すると as_json と同じ Hash になる",
       "mutants": [
         {
           "id": "struct-encode-with-removed",
@@ -711,14 +711,6 @@
           "file": "lib/pqc_rails/redacted_struct.rb",
           "find": "coder.represent_map(nil, as_json)",
           "replace": "coder.represent_map(nil, to_h.transform_keys(&:to_s))",
-          "result": "killed"
-        },
-        {
-          "id": "struct-marshal-redacted",
-          "kind": "戻り値を空・nil・固定値にする",
-          "file": "lib/pqc_rails/redacted_struct.rb",
-          "find": "    def encode_with(coder)\n",
-          "replace": "    def marshal_dump = as_json\n\n    def marshal_load(data) = data\n\n    def encode_with(coder)\n",
           "result": "killed"
         }
       ]
