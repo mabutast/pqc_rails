@@ -133,13 +133,19 @@ module PqcRails
       if shared_with_records
         raise PqcRails::Error, "legacy (v0) session cookies are not read with a key also configured for records"
       end
-      return if write_legacy?
-
-      deadline = PqcRails.configuration.accept_legacy_cookies_until
-      return if deadline && now <= deadline
+      return if legacy_cookies_readable?(now: now)
 
       raise PqcRails::Error,
-            "legacy (v0) session cookies are not accepted (accept_legacy_cookies_until: #{deadline.inspect})"
+            "legacy (v0) session cookies are not accepted " \
+            "(accept_legacy_cookies_until: #{PqcRails.configuration.accept_legacy_cookies_until.inspect})"
+    end
+
+    # 旧形式(v0)のCookieを読む設定か。旧形式を書いている間(順番デプロイ中)か、accept_legacy_cookies_untilの期限内。
+    def legacy_cookies_readable?(now: Time.now)
+      return true if write_legacy?
+
+      deadline = PqcRails.configuration.accept_legacy_cookies_until
+      !deadline.nil? && now <= deadline
     end
 
     # session_serializerが:jsonの間、Marshalで書かれたCookie(形式v0・v1)を読まない状態なら、PqcRails::Errorを送出する。

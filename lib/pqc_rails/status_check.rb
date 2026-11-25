@@ -164,7 +164,9 @@ module PqcRails
     end
 
     # 旧形式のCookieを読むはずの鍵(認証鍵を持たないセッション鍵)が、DBの鍵と同じかどうか。
+    # 属性ごとのkey_providerも比べるので、先にモデルを読み込む。
     def legacy_session_key_shared?
+      eager_load_models
       keypairs = [Session::KeyManager.keypair] + Session::KeyManager.previous_keypairs
       keypairs.any? { |keypair| keypair.authentication_key.nil? && Session::Encryptor.new(keypair).legacy_write_blocker }
     rescue PqcRails::Error, ArgumentError, TypeError
@@ -185,13 +187,12 @@ module PqcRails
     end
 
     # encryptsで暗号化している属性の一覧。件数・暗号文の内訳は数えない(pqc_rails Proのpqc_rails:pro:inventory)。
-    # rakeタスクの:environmentはモデルを読み込まないので、一覧を作る前にeager_load!する。
+    # 一覧を作る前にモデルを読み込む(eager_load_models)。
     def encrypted_attributes_result
       name = "暗号化している属性"
       return Result.new(name: name, ok: true, detail: "activerecordが読み込まれていません") unless defined?(::ActiveRecord::Base)
 
-      app = rails_application
-      app.eager_load! if app.respond_to?(:eager_load!)
+      eager_load_models
       listed = encrypted_models.map { |model| "#{model.name}(#{model.encrypted_attributes.map(&:to_s).sort.join(', ')})" }
       if listed.empty?
         Result.new(name: name, ok: true,
@@ -204,10 +205,13 @@ module PqcRails
     end
 
     def encrypted_models
-      ::ActiveRecord::Base.descendants
-                          .reject { |model| model.abstract_class? || model.name.nil? }
-                          .select { |model| model.respond_to?(:encrypted_attributes) && model.encrypted_attributes.present? }
-                          .sort_by(&:name)
+      ActiveRecord::KeyProvider.encrypted_models.reject { |model| model.name.nil? }.sort_by(&:name)
+    end
+
+    # rakeタスクの:environmentはモデルを読み込まないので、モデルを見る前に読み込む。
+    def eager_load_models
+      app = rails_application
+      app.eager_load! if app.respond_to?(:eager_load!)
     end
 
     # 例外のメッセージは接続情報を含みうるので、クラス名だけを出す。

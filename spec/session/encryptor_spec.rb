@@ -324,6 +324,115 @@ RSpec.describe PqcRails::Session::Encryptor do
         expect { legacy_encryptor.encrypt({ "user_id" => 1 }) }.to raise_error(PqcRails::Error, /records/)
       end
 
+      context "属性ごとにkey_providerを指定したモデルがあるとき" do
+        before(:all) do
+          require_relative "../support/test_database"
+          TestDatabase.connect
+          ::ActiveRecord::Migration.verbose = false
+          ::ActiveRecord::Schema.define do
+            create_table(:legacy_cookie_widgets, force: true) { |t| t.text :secret }
+          end
+        end
+
+        before do
+          ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(PqcRails::HybridKem.open(:ml_kem_512, &:generate_keypair))
+          ENV.delete("PQC_RECORD_PREVIOUS_KEYS")
+        end
+
+        def provider_for(keypair)
+          PqcRails::ActiveRecord::KeyProvider.new(
+            key_source: Struct.new(:current_keypair, :previous_keypairs).new(keypair, [])
+          )
+        end
+
+        # 属性の型(暗号化のスキーム)を読み込んだモデルを返す。
+        def attribute_model(provider, previous: false)
+          Class.new(::ActiveRecord::Base) do
+            self.table_name = "legacy_cookie_widgets"
+            previous ? encrypts(:secret, previous: { key_provider: provider }) : encrypts(:secret, key_provider: provider)
+          end.tap { |model| model.type_for_attribute(:secret) }
+        end
+
+        it "属性ごとのkey_providerの鍵と同じなら、期限内でも旧形式のCookieをMarshal.loadに渡さず拒否する" do
+          attribute_model(provider_for(legacy_keypair))
+          PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+          allow(Marshal).to receive(:load).and_call_original
+
+          expect { legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 })) }
+            .to raise_error(PqcRails::Error, /records/)
+          expect(Marshal).not_to have_received(:load)
+        end
+
+        it "属性ごとのprevious:に指定したkey_providerの鍵と同じでも拒否する" do
+          attribute_model(provider_for(legacy_keypair), previous: true)
+          PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+
+          expect { legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 })) }
+            .to raise_error(PqcRails::Error, /records/)
+        end
+
+        it "属性ごとのkey_providerの鍵と同じなら、:v0でCookieを書くとPqcRails::Errorを送出する" do
+          attribute_model(provider_for(legacy_keypair))
+          PqcRails.configuration.ciphertext_format = :v0
+
+          expect { legacy_encryptor.encrypt({ "user_id" => 1 }) }.to raise_error(PqcRails::Error, /records/)
+        end
+
+        it "属性ごとのkey_providerが別の鍵なら、期限内は旧形式のCookieを読む" do
+          attribute_model(provider_for(PqcRails::HybridKem.open(:ml_kem_512, &:generate_keypair)))
+          PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+
+          expect(legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 }))).to eq({ "user_id" => 1 })
+        end
+
+        it "旧形式のCookieを読む設定でない時は、属性ごとのkey_providerを集めない" do
+          attribute_model(provider_for(legacy_keypair))
+          PqcRails.configuration.accept_legacy_cookies_until = nil
+          allow(PqcRails::ActiveRecord::KeyProvider).to receive(:per_attribute).and_call_original
+
+          expect { legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 })) }
+            .to raise_error(PqcRails::Error, /not accepted/)
+          expect(PqcRails::ActiveRecord::KeyProvider).not_to have_received(:per_attribute)
+        end
+
+        it "テーブルの無いモデルは、属性ごとのkey_providerを比べずに旧形式のCookieを読む" do
+          provider = provider_for(legacy_keypair)
+          Class.new(::ActiveRecord::Base) do
+            self.table_name = "legacy_cookie_missing_widgets"
+            encrypts :secret, key_provider: provider
+          end
+          PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+
+          expect(legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 }))).to eq({ "user_id" => 1 })
+        end
+
+        it "DBに接続できないモデルがあれば、旧形式のCookieを拒否する" do
+          model = attribute_model(provider_for(PqcRails::HybridKem.open(:ml_kem_512, &:generate_keypair)))
+          allow(model).to receive(:table_exists?).and_raise(::ActiveRecord::ConnectionNotEstablished, "down")
+          PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+
+          expect { legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 })) }
+            .to raise_error(PqcRails::Error, /could not compare.*ConnectionNotEstablished/)
+        end
+
+        it "DBの接続が定義されていないモデルは、比べずに旧形式のCookieを読む" do
+          model = attribute_model(provider_for(legacy_keypair))
+          allow(model).to receive(:connection_specification_name).and_return("UndefinedConnection")
+          PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+
+          expect(legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 }))).to eq({ "user_id" => 1 })
+        end
+
+        it "属性ごとのkey_providerを確かめられない時は、旧形式のCookieを拒否する" do
+          PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+          allow(PqcRails::ActiveRecord::KeyProvider).to receive(:per_attribute)
+            .and_raise(::ActiveRecord::StatementInvalid, "no such table")
+
+          expect { legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 })) }
+            .to raise_error(PqcRails::Error, /could not compare/)
+        end
+      end
+
       it "DBと別の鍵なら、期限内は旧形式のCookieを読む" do
         ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(PqcRails::HybridKem.open(:ml_kem_512, &:generate_keypair))
         ENV.delete("PQC_RECORD_PREVIOUS_KEYS")
