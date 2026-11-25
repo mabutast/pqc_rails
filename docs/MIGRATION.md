@@ -182,7 +182,7 @@ ML-KEM-768 から ML-KEM-1024 に変える場合のように、アルゴリズ�
 - **DB側**: `PqcRails::ActiveRecord::Context.install!(key_provider: PqcRails::ActiveRecord::KeyProvider.new(key_source: your_source))` のように注入できます。
 - **セッション側**: `PqcRails::Session::KeyManager` はモジュール実装のため同様の注入口はありませんが、`PqcCookieStore` は `keypair:` / `previous_keypairs:` オプションで実際の鍵ペアを直接受け取れます（`KeyManager` を経由しない）。外部鍵ソースから取得した鍵ペアをこのオプションに渡すことで、同様に差し替え可能です。
 
-DB とセッションには別の鍵を設定してください。`Context` に設定した鍵ソースと、属性ごとに指定した `PqcRails::ActiveRecord::KeyProvider` は、旧形式の Cookie の「同じ鍵」の判定の対象です。この判定は、旧形式の Cookie を読む設定（`accept_legacy_cookies_until` の期限内、または `ciphertext_format = :v0`）の間だけ行います。読み込まれていないモデルの属性は判定の対象になりません。Rails 標準の `key_provider`（AES の鍵を返すもの）は対象外です。公開鍵（`#public_keys`）を返さない独自の `key_provider` を属性に指定している場合は、同じ鍵かを確かめられないため、旧形式の Cookie を読みません。
+DB とセッションには別の鍵を設定してください。`Context` に設定した鍵ソースと、属性ごとに指定した `PqcRails::ActiveRecord::KeyProvider` は、旧形式の Cookie の「同じ鍵」の判定の対象です。この判定は、旧形式の Cookie を読む設定（`accept_legacy_cookies_until` の期限内、または `ciphertext_format = :v0`）の間だけ行います。読み込まれていないモデルの属性は判定の対象になりません。Rails 標準の `key_provider` は、持っている鍵がすべて AES の鍵なら対象外です。公開鍵（`#public_keys`）を返さない独自の `key_provider` や、pqc_rails の鍵ペアを入れた Rails 標準の `key_provider` を属性に指定している場合は、同じ鍵かを確かめられないため、旧形式の Cookie を読みません。
 
 将来 HSM/PKCS#11 経由の鍵管理と連携する場合の拡張ポイントとして用意していますが、pqc_rails 自体は具体的な HSM 連携実装を提供しません。
 

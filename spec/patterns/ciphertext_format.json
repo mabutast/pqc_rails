@@ -814,9 +814,13 @@
         {
           "file": "spec/pqc_rails/status_check_spec.rb",
           "name": "属性ごとのkey_providerの公開鍵が文字列でなければ、確かめられないとして警告する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "Rails標準のkey_providerにpqc_railsの鍵ペアとAESの鍵を混ぜた属性があれば、AESの鍵が最後でも拒否する"
         }
       ],
-      "guarantee": "DB の現行鍵・旧鍵と同じ鍵、旧形式を読む設定の間は読み込まれたモデルの属性ごとの key_provider（previous: を含む）の鍵と同じ鍵では、旧形式の Cookie を Marshal.load の前に拒否し、:v0 でも書かない。属性ごとの鍵を確かめられなければ拒否し、テーブル・接続の無いモデルは比べない。読む設定でない時は集めない。別の鍵なら期限内は読む。status も報告する。公開鍵を返さない独自の key_provider があれば比べられないので拒否し、Rails 標準の key_provider は AES の鍵を持つ時だけ比べない（pqc_rails の鍵ペアを入れた時は拒否する）。status は属性ごとの鍵を確かめられない時と、モデルの読み込みが失敗した時に止まらず ok:false を報告する",
+      "guarantee": "DB の現行鍵・旧鍵と同じ鍵、旧形式を読む設定の間は読み込まれたモデルの属性ごとの key_provider（previous: を含む）の鍵と同じ鍵では、旧形式の Cookie を Marshal.load の前に拒否し、:v0 でも書かない。属性ごとの鍵を確かめられなければ拒否し、テーブル・接続の無いモデルは比べない。読む設定でない時は集めない。別の鍵なら期限内は読む。status も報告する。公開鍵を返さない独自の key_provider があれば比べられないので拒否し、Rails 標準の key_provider は全部の鍵が AES の鍵の時だけ比べない（pqc_rails の鍵ペアを1つでも入れた時は拒否する）。status は属性ごとの鍵を確かめられない時と、モデルの読み込みが失敗した時に止まらず ok:false を報告する",
       "mutants": [
         {
           "id": "shared-check-removed",
@@ -990,8 +994,8 @@
           "id": "rails-provider-by-class-only",
           "kind": "比較の条件を変える",
           "file": "lib/pqc_rails/active_record/key_provider.rb",
-          "find": "          provider.encryption_key.secret.is_a?(::String)\n",
-          "replace": "          true\n",
+          "find": "rails_provider_keys(provider)&.all? { |key| key.secret.is_a?(::String) } || false",
+          "replace": "!rails_provider_keys(provider).nil?",
           "result": "killed"
         },
         {
@@ -1000,6 +1004,14 @@
           "file": "lib/pqc_rails/status_check.rb",
           "find": "ActiveRecord::KeyProvider.per_attribute.flat_map(&:public_keys).map(&:b)\n      nil",
           "replace": "ActiveRecord::KeyProvider.per_attribute.each(&:public_keys)\n      nil",
+          "result": "killed"
+        },
+        {
+          "id": "rails-provider-last-key-only",
+          "kind": "範囲を狭める",
+          "file": "lib/pqc_rails/active_record/key_provider.rb",
+          "find": "rails_provider_keys(provider)&.all? { |key| key.secret.is_a?(::String) }",
+          "replace": "rails_provider_keys(provider)&.last(1)&.all? { |key| key.secret.is_a?(::String) }",
           "result": "killed"
         }
       ]

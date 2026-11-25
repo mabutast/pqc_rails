@@ -340,8 +340,11 @@ RSpec.describe PqcRails::Session::Encryptor do
           @models_before = ::ActiveRecord::Base.descendants
         end
 
-        # 例ごとに作ったモデルを、後の例の判定に残さない(匿名のクラスはGCされるまでdescendantsに残る)。
-        after { ActiveSupport::DescendantsTracker.clear(::ActiveRecord::Base.descendants - @models_before) }
+        # 例ごとに作ったモデルを、後の例の判定に残さない。匿名のクラスはGCされるまでdescendantsに残るので、
+        # 抽象クラスにして、属性ごとのkey_providerを集める対象(抽象クラスを除くモデル)から外す。
+        after do
+          (::ActiveRecord::Base.descendants - @models_before).each { |model| model.abstract_class = true }
+        end
 
         def provider_for(keypair)
           PqcRails::ActiveRecord::KeyProvider.new(
@@ -395,6 +398,15 @@ RSpec.describe PqcRails::Session::Encryptor do
         it "Rails標準のkey_providerにpqc_railsの鍵ペアを入れた属性があれば、比べられないので旧形式のCookieを拒否する" do
           key = PqcRails::ActiveRecord::KeyProvider::Key.new(legacy_keypair)
           attribute_model(::ActiveRecord::Encryption::KeyProvider.new(key))
+          PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+
+          expect { legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 })) }
+            .to raise_error(PqcRails::Error, /per-attribute/)
+        end
+
+        it "Rails標準のkey_providerにpqc_railsの鍵ペアとAESの鍵を混ぜた属性があれば、AESの鍵が最後でも拒否する" do
+          mixed = [PqcRails::ActiveRecord::KeyProvider::Key.new(legacy_keypair), ::ActiveRecord::Encryption::Key.new("a" * 32)]
+          attribute_model(::ActiveRecord::Encryption::KeyProvider.new(mixed))
           PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
 
           expect { legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 })) }
