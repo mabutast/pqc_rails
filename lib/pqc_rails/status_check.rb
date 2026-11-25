@@ -127,6 +127,9 @@ module PqcRails
         Result.new(name: name, ok: true, detail: "読みません")
       elsif Time.now > deadline
         Result.new(name: name, ok: true, detail: "期限を過ぎたので読みません。accept_legacy_cookies_untilは削除できます")
+      elsif (error = attribute_key_check_error)
+        Result.new(name: name, ok: false,
+                   detail: "属性ごとのkey_providerの鍵を確かめられないので、期限内でも旧形式のCookieは読みません(#{error.class})")
       elsif legacy_session_key_shared?
         Result.new(name: name, ok: false,
                    detail: "セッションとDBに同じ鍵を設定しているので、期限内でも旧形式のCookieは読みません。既存のセッションは切れます")
@@ -163,7 +166,20 @@ module PqcRails
       false
     end
 
+    # 属性ごとのkey_providerの公開鍵を読めない時の例外。読めればnil。
+    # 先にモデルを読み込む。モデルの読み込みの失敗(NameError・LoadError・SyntaxError等)もここで受け、statusを止めない。
+    # 実行時の比べ方(Encryptorの#attribute_record_public_keys)と同じく、公開鍵をバイト列に直すところまで通す。
+    # 例外のメッセージは接続情報を含みうるので、呼び出し側はクラス名だけを出す。
+    def attribute_key_check_error
+      eager_load_models
+      ActiveRecord::KeyProvider.per_attribute.flat_map(&:public_keys).map(&:b)
+      nil
+    rescue StandardError, ScriptError => e
+      e
+    end
+
     # 旧形式のCookieを読むはずの鍵(認証鍵を持たないセッション鍵)が、DBの鍵と同じかどうか。
+    # 属性ごとのkey_providerも比べる(モデルはattribute_key_check_errorで読み込み済み)。
     def legacy_session_key_shared?
       keypairs = [Session::KeyManager.keypair] + Session::KeyManager.previous_keypairs
       keypairs.any? { |keypair| keypair.authentication_key.nil? && Session::Encryptor.new(keypair).legacy_write_blocker }
@@ -185,13 +201,12 @@ module PqcRails
     end
 
     # encryptsで暗号化している属性の一覧。件数・暗号文の内訳は数えない(pqc_rails Proのpqc_rails:pro:inventory)。
-    # rakeタスクの:environmentはモデルを読み込まないので、一覧を作る前にeager_load!する。
+    # 一覧を作る前にモデルを読み込む(eager_load_models)。
     def encrypted_attributes_result
       name = "暗号化している属性"
       return Result.new(name: name, ok: true, detail: "activerecordが読み込まれていません") unless defined?(::ActiveRecord::Base)
 
-      app = rails_application
-      app.eager_load! if app.respond_to?(:eager_load!)
+      eager_load_models
       listed = encrypted_models.map { |model| "#{model.name}(#{model.encrypted_attributes.map(&:to_s).sort.join(', ')})" }
       if listed.empty?
         Result.new(name: name, ok: true,
@@ -199,15 +214,18 @@ module PqcRails
       else
         Result.new(name: name, ok: true, detail: listed.join(", "))
       end
-    rescue StandardError => e
+    rescue StandardError, ScriptError => e
       Result.new(name: name, ok: false, detail: "確認できませんでした(#{e.message})")
     end
 
     def encrypted_models
-      ::ActiveRecord::Base.descendants
-                          .reject { |model| model.abstract_class? || model.name.nil? }
-                          .select { |model| model.respond_to?(:encrypted_attributes) && model.encrypted_attributes.present? }
-                          .sort_by(&:name)
+      ActiveRecord::KeyProvider.encrypted_models.reject { |model| model.name.nil? }.sort_by(&:name)
+    end
+
+    # rakeタスクの:environmentはモデルを読み込まないので、モデルを見る前に読み込む。
+    def eager_load_models
+      app = rails_application
+      app.eager_load! if app.respond_to?(:eager_load!)
     end
 
     # 例外のメッセージは接続情報を含みうるので、クラス名だけを出す。

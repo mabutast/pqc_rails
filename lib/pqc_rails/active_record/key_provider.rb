@@ -44,7 +44,53 @@ module PqcRails
           [installed, current_context_provider].compact.uniq.select { |provider| provider.respond_to?(:public_keys) }
         end
 
+        # 読み込まれたモデルの暗号化属性に指定したkey_provider(previous:の分も含む)。
+        # Rails標準のkey_provider(AESの鍵を返し、pqc_railsの鍵を持たない)は含まない。
+        # それ以外で公開鍵を返さない独自のkey_providerは含めるので、呼び出し側の#public_keysで例外になり、比べられないことが分かる。
+        # key_providerを指定していない属性(既定のKeyProviderを使う属性)は含まない。既定のものはconfiguredで見る。
+        # 属性の型を読むので、スキーマが読み込まれていなければDBに問い合わせる。
+        # 遅延読み込みでまだ読み込まれていないモデルは含まれない。
+        def per_attribute
+          encrypted_models.flat_map { |model| attribute_providers(model) }.uniq.reject { |provider| rails_key_provider?(provider) }
+        end
+
+        # encryptsで暗号化属性を持つ、読み込まれたモデル(抽象クラスを除く)。
+        def encrypted_models
+          return [] unless defined?(::ActiveRecord::Base)
+
+          ::ActiveRecord::Base.descendants
+                              .reject(&:abstract_class?)
+                              .select { |model| model.respond_to?(:encrypted_attributes) && model.encrypted_attributes.present? }
+        end
+
         private
+
+        # テーブルの無いモデルと、DBの接続が定義されていないモデルには暗号化した値が無いので、鍵を比べる対象から外す。
+        # DBに接続できない時(接続は定義済み)は例外をそのまま送出する。
+        def attribute_providers(model)
+          return [] unless connection_defined?(model) && model.table_exists?
+
+          model.encrypted_attributes.flat_map do |name|
+            scheme = model.type_for_attribute(name).scheme
+            [scheme, *scheme.previous_schemes].filter_map { |each_scheme| each_scheme.to_h[:key_provider] }
+          end
+        end
+
+        # クラスだけでなく鍵の中身も見る(Railsのクラスにpqc_railsの鍵ペアを入れた場合は比べる側に残す)。
+        # 鍵を読めない時も比べる側に残し、呼び出し側で比べられないことが分かるようにする。
+        def rails_key_provider?(provider)
+          return false if provider.respond_to?(:public_keys)
+          return false unless provider.is_a?(::ActiveRecord::Encryption::KeyProvider) ||
+                              provider.is_a?(::ActiveRecord::Encryption::EnvelopeEncryptionKeyProvider)
+
+          provider.encryption_key.secret.is_a?(::String)
+        rescue StandardError
+          false
+        end
+
+        def connection_defined?(model)
+          model.connection_handler.connection_pool_names.include?(model.connection_specification_name)
+        end
 
         def current_context_provider
           return unless defined?(::ActiveRecord::Encryption)

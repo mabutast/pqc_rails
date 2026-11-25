@@ -1,5 +1,5 @@
 {
-  "test_command": "bundle exec rspec spec/pqc_rails/ciphertext_format_spec.rb spec/cipher_spec.rb spec/session/encryptor_spec.rb spec/compat",
+  "test_command": "bundle exec rspec spec/pqc_rails/ciphertext_format_spec.rb spec/pqc_rails/status_check_spec.rb spec/cipher_spec.rb spec/session/encryptor_spec.rb spec/compat",
   "rows": [
     {
       "id": "algorithm-id-format",
@@ -228,16 +228,16 @@
           "id": "drop-algorithm-id",
           "kind": "確かめる処理を消す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "\"pqc_rails:v#{VERSION}:#{purpose_label(purpose)}:#{algorithm_id}:#{key_id}\"",
-          "replace": "\"pqc_rails:v#{VERSION}:#{purpose_label(purpose)}:#{key_id}\"",
+          "find": "\"pqc_rails:v#{version_label(version)}:#{purpose_label(purpose)}:#{algorithm_id}:#{key_id}\"",
+          "replace": "\"pqc_rails:v#{version_label(version)}:#{purpose_label(purpose)}:#{key_id}\"",
           "result": "killed"
         },
         {
           "id": "drop-key-id",
           "kind": "確かめる処理を消す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "\"pqc_rails:v#{VERSION}:#{purpose_label(purpose)}:#{algorithm_id}:#{key_id}\"",
-          "replace": "\"pqc_rails:v#{VERSION}:#{purpose_label(purpose)}:#{algorithm_id}\"",
+          "find": "\"pqc_rails:v#{version_label(version)}:#{purpose_label(purpose)}:#{algorithm_id}:#{key_id}\"",
+          "replace": "\"pqc_rails:v#{version_label(version)}:#{purpose_label(purpose)}:#{algorithm_id}\"",
           "result": "killed"
         }
       ]
@@ -478,24 +478,24 @@
           "id": "boundary",
           "kind": "境界をずらす",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "now <= deadline",
-          "replace": "now < deadline",
+          "find": "      !deadline.nil? && now <= deadline\n",
+          "replace": "      !deadline.nil? && now < deadline\n",
           "result": "killed"
         },
         {
           "id": "drop-nil",
           "kind": "打ち切りを消す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "return if deadline && now <= deadline",
-          "replace": "return if deadline.nil? || now <= deadline",
+          "find": "      !deadline.nil? && now <= deadline\n",
+          "replace": "      deadline.nil? || now <= deadline\n",
           "result": "killed"
         },
         {
           "id": "invert",
           "kind": "条件を反転する",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "now <= deadline",
-          "replace": "now > deadline",
+          "find": "      !deadline.nil? && now <= deadline\n",
+          "replace": "      !deadline.nil? && now > deadline\n",
           "result": "killed"
         },
         {
@@ -518,7 +518,7 @@
           "id": "v0-mode-removed",
           "kind": "打ち切りを消す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "      return if write_legacy?\n",
+          "find": "      return true if write_legacy?\n",
           "replace": "",
           "result": "killed"
         },
@@ -608,9 +608,9 @@
           "id": "aad-without-purpose",
           "kind": "戻り値を空・nil・固定値にする",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "\"pqc_rails:v#{VERSION}:#{purpose_label(purpose)}:#{algorithm_id}:#{key_id}\"",
-          "replace": "\"pqc_rails:v#{VERSION}:#{algorithm_id}:#{key_id}\"",
-          "result": "stale"
+          "find": "\"pqc_rails:v#{version_label(version)}:#{purpose_label(purpose)}:#{algorithm_id}:#{key_id}\"",
+          "replace": "\"pqc_rails:v#{version_label(version)}:#{algorithm_id}:#{key_id}\"",
+          "result": "killed"
         },
         {
           "id": "both-without-purpose",
@@ -631,10 +631,10 @@
         {
           "id": "session-uses-record",
           "kind": "定数を変える",
-          "file": "lib/pqc_rails/session/encryptor.rb",
-          "find": "CiphertextFormat.data_key(shared_secret, @keypair.authentication_key, purpose: :session)",
-          "replace": "CiphertextFormat.data_key(shared_secret, @keypair.authentication_key, purpose: :record)",
-          "result": "stale"
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "      purpose.to_s\n",
+          "replace": "      \"record\"\n",
+          "result": "killed"
         }
       ]
     },
@@ -703,9 +703,9 @@
     },
     {
       "id": "legacy-cookie-shared-key",
-      "pattern": "セッションの鍵が DB の現行鍵・旧鍵と同じ時の旧形式の Cookie",
+      "pattern": "セッションの鍵が DB の現行鍵・旧鍵・属性ごとの key_provider の鍵と同じ時の旧形式の Cookie",
       "source": "spec",
-      "source_ref": "README「暗号文の形式」：旧形式には用途の区別が無いので、DB と同じ鍵では旧形式の Cookie を読まない",
+      "source_ref": "README「暗号文の形式」：旧形式には用途の区別が無いので、DB と同じ鍵では旧形式の Cookie を読まない。属性ごとの key_provider は旧形式の Cookie を読む設定の間だけ比べる",
       "tests": [
         {
           "file": "spec/session/encryptor_spec.rb",
@@ -738,9 +738,85 @@
         {
           "file": "spec/session/encryptor_spec.rb",
           "name": "install!の鍵ソースと同じ鍵は、別のコンテキストの中でも拒否する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "属性ごとのkey_providerの鍵と同じなら、期限内でも旧形式のCookieをMarshal.loadに渡さず拒否する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "属性ごとのkey_providerの公開鍵の文字コードが違っても、同じバイト列なら拒否する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "属性ごとのprevious:に指定したkey_providerの鍵と同じでも拒否する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "属性ごとのkey_providerの鍵と同じなら、:v0でCookieを書くとPqcRails::Errorを送出する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "属性ごとのkey_providerが別の鍵なら、期限内は旧形式のCookieを読む"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "旧形式のCookieを読む設定でない時は、属性ごとのkey_providerを集めない"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "テーブルの無いモデルは、属性ごとのkey_providerを比べずに旧形式のCookieを読む"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "DBに接続できないモデルがあれば、旧形式のCookieを拒否する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "DBの接続が定義されていないモデルは、比べずに旧形式のCookieを読む"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "属性ごとのkey_providerを確かめられない時は、旧形式のCookieを拒否する"
+        },
+        {
+          "file": "spec/pqc_rails/status_check_spec.rb",
+          "name": "期限内でも、旧鍵のセッション鍵が属性ごとのkey_providerの鍵と同じなら、読まないことを警告する"
+        },
+        {
+          "file": "spec/pqc_rails/status_check_spec.rb",
+          "name": "属性ごとのkey_providerを比べる前に、モデルを読み込む"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "公開鍵を返さない独自のkey_providerを指定した属性があれば、比べられないので旧形式のCookieを拒否する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "Rails標準のkey_providerを指定した属性は比べず、期限内は旧形式のCookieを読む"
+        },
+        {
+          "file": "spec/pqc_rails/status_check_spec.rb",
+          "name": "期限内に属性ごとのkey_providerの鍵を確かめられなければ、読まないことを警告する"
+        },
+        {
+          "file": "spec/pqc_rails/status_check_spec.rb",
+          "name": "モデルの読み込みが失敗しても、statusを止めずに旧形式の警告を出す"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "Rails標準のkey_providerにpqc_railsの鍵ペアを入れた属性があれば、比べられないので旧形式のCookieを拒否する"
+        },
+        {
+          "file": "spec/pqc_rails/status_check_spec.rb",
+          "name": "モデルのファイルに構文の誤りがあっても、statusを止めずに旧形式の警告を出す"
+        },
+        {
+          "file": "spec/pqc_rails/status_check_spec.rb",
+          "name": "属性ごとのkey_providerの公開鍵が文字列でなければ、確かめられないとして警告する"
         }
       ],
-      "guarantee": "DB の現行鍵・旧鍵と同じ鍵では、旧形式の Cookie を Marshal.load の前に拒否し、:v0 でも書かない。別の鍵なら期限内は読む",
+      "guarantee": "DB の現行鍵・旧鍵と同じ鍵、旧形式を読む設定の間は読み込まれたモデルの属性ごとの key_provider（previous: を含む）の鍵と同じ鍵では、旧形式の Cookie を Marshal.load の前に拒否し、:v0 でも書かない。属性ごとの鍵を確かめられなければ拒否し、テーブル・接続の無いモデルは比べない。読む設定でない時は集めない。別の鍵なら期限内は読む。status も報告する。公開鍵を返さない独自の key_provider があれば比べられないので拒否し、Rails 標準の key_provider は AES の鍵を持つ時だけ比べない（pqc_rails の鍵ペアを入れた時は拒否する）。status は属性ごとの鍵を確かめられない時と、モデルの読み込みが失敗した時に止まらず ok:false を報告する",
       "mutants": [
         {
           "id": "shared-check-removed",
@@ -812,6 +888,118 @@
           "file": "lib/pqc_rails/active_record/key_provider.rb",
           "find": "[installed, current_context_provider]",
           "replace": "[installed]",
+          "result": "killed"
+        },
+        {
+          "id": "attribute-providers-ignored",
+          "kind": "範囲を狭める",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": " ||\n          (CiphertextFormat.legacy_cookies_readable? && attribute_record_public_keys.include?(public_key))",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "attribute-collected-always",
+          "kind": "打ち切りを消す",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "(CiphertextFormat.legacy_cookies_readable? && attribute_record_public_keys",
+          "replace": "(attribute_record_public_keys",
+          "result": "killed"
+        },
+        {
+          "id": "previous-schemes-ignored",
+          "kind": "範囲を狭める",
+          "file": "lib/pqc_rails/active_record/key_provider.rb",
+          "find": "[scheme, *scheme.previous_schemes]",
+          "replace": "[scheme]",
+          "result": "killed"
+        },
+        {
+          "id": "missing-table-compared",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/active_record/key_provider.rb",
+          "find": "connection_defined?(model) && model.table_exists?",
+          "replace": "connection_defined?(model)",
+          "result": "killed"
+        },
+        {
+          "id": "undefined-connection-compared",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/active_record/key_provider.rb",
+          "find": "connection_defined?(model) && model.table_exists?",
+          "replace": "model.table_exists?",
+          "result": "killed"
+        },
+        {
+          "id": "fail-open-on-error",
+          "kind": "例外を握りつぶす",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "        raise PqcRails::Error, \"could not compare the session key with per-attribute key providers (#{e.class})\"\n",
+          "replace": "        []\n",
+          "result": "killed"
+        },
+        {
+          "id": "attribute-encoding-compared",
+          "kind": "比較の条件を変える",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "ActiveRecord::KeyProvider.per_attribute.flat_map(&:public_keys).map(&:b)",
+          "replace": "ActiveRecord::KeyProvider.per_attribute.flat_map(&:public_keys)",
+          "result": "killed"
+        },
+        {
+          "id": "status-models-not-loaded",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/status_check.rb",
+          "find": "    def attribute_key_check_error\n      eager_load_models\n",
+          "replace": "    def attribute_key_check_error\n",
+          "result": "killed"
+        },
+        {
+          "id": "unknown-provider-skipped",
+          "kind": "例外を握りつぶす",
+          "file": "lib/pqc_rails/active_record/key_provider.rb",
+          "find": ".uniq.reject { |provider| rails_key_provider?(provider) }",
+          "replace": ".uniq.select { |provider| provider.respond_to?(:public_keys) }",
+          "result": "killed"
+        },
+        {
+          "id": "rails-provider-compared",
+          "kind": "範囲を広げる",
+          "file": "lib/pqc_rails/active_record/key_provider.rb",
+          "find": ".uniq.reject { |provider| rails_key_provider?(provider) }",
+          "replace": ".uniq",
+          "result": "killed"
+        },
+        {
+          "id": "status-attribute-error-ignored",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/status_check.rb",
+          "find": "elsif (error = attribute_key_check_error)",
+          "replace": "elsif (error = nil)",
+          "result": "killed"
+        },
+        {
+          "id": "status-load-error-not-rescued",
+          "kind": "例外の範囲を狭める",
+          "file": "lib/pqc_rails/status_check.rb",
+          "find": "    rescue StandardError, ScriptError => e\n      e\n",
+          "replace": "    rescue StandardError, LoadError => e\n      e\n",
+          "result": "killed"
+        },
+        {
+          "id": "rails-provider-by-class-only",
+          "kind": "比較の条件を変える",
+          "file": "lib/pqc_rails/active_record/key_provider.rb",
+          "find": "          provider.encryption_key.secret.is_a?(::String)\n",
+          "replace": "          true\n",
+          "result": "killed"
+        },
+        {
+          "id": "status-public-keys-not-converted",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/status_check.rb",
+          "find": "ActiveRecord::KeyProvider.per_attribute.flat_map(&:public_keys).map(&:b)\n      nil",
+          "replace": "ActiveRecord::KeyProvider.per_attribute.each(&:public_keys)\n      nil",
           "result": "killed"
         }
       ]

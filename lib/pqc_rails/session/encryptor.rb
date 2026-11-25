@@ -59,10 +59,12 @@ module PqcRails
       private
 
       # 既定の鍵の置き場所と、Context.install!の鍵ソース、ActiveRecord::Encryptionの今のコンテキストの鍵ソースを見る。
-      # 属性ごとに指定したkey_providerは対象外。
+      # 旧形式のCookieを読む設定の間は、読み込まれたモデルの属性ごとに指定したkey_providerも見る
+      # (全モデルの属性の型を読むので、読まない間は集めない)。
       def shared_with_records?
         public_key = @keypair.public_key.b
-        default_record_public_keys.include?(public_key) || configured_record_public_keys.include?(public_key)
+        default_record_public_keys.include?(public_key) || configured_record_public_keys.include?(public_key) ||
+          (CiphertextFormat.legacy_cookies_readable? && attribute_record_public_keys.include?(public_key))
       end
 
       # 既定の鍵の置き場所はプロセスの間変わらないので、読み込みは1回だけにする。
@@ -73,6 +75,13 @@ module PqcRails
       # コンテキストはスレッドや処理の範囲で変わるので、結果を覚えない。
       def configured_record_public_keys
         ActiveRecord::KeyProvider.configured.flat_map(&:public_keys).map(&:b)
+      end
+
+      # 確かめられない時は、同じ鍵かもしれないので旧形式を使わせない。例外のメッセージは接続情報を含みうるので、クラス名だけを出す。
+      def attribute_record_public_keys
+        ActiveRecord::KeyProvider.per_attribute.flat_map(&:public_keys).map(&:b)
+      rescue StandardError => e
+        raise PqcRails::Error, "could not compare the session key with per-attribute key providers (#{e.class})"
       end
 
       # :marshalで書く間に、:jsonへ切り替えると書けなくなる値があれば、最上位のキーの名前だけを知らせる。
