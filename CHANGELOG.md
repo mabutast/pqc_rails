@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-25
+
 ### Security
 
+- While legacy session cookies are read (before `accept_legacy_cookies_until` or with `ciphertext_format = :v0`),
+  a legacy cookie is now refused when the session key is also the key of a per-attribute
+  `PqcRails::ActiveRecord::KeyProvider` (`encrypts ..., key_provider:`, including `previous:`), not only the
+  database key of the context. If the per-attribute keys cannot be read, the legacy cookie is refused as well.
+  `rails pqc_rails:status` reports the same-key condition.
 - `PqcRails::HybridKem` now overwrites with zeros the X25519 and ML-KEM secret keys made during key
   generation, the X25519 and ML-KEM shared secrets before they are combined, and their concatenation
   passed to HKDF, as soon as they are no longer needed, including when an error is raised. The combined
