@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- `PqcRails::Error` raised by the session encryption no longer keeps the original exception as its `cause` when
+  that exception's message can hold session data or connection details. When a session is written, a session
+  value that cannot be converted to UTF-8 (with `session_serializer = :json`) and a failure to compare the session
+  key with per-attribute key providers no longer pass part of the session value or connection details to error
+  pages and error reporting services that show the `cause`. When `PqcRails::Session::Encryptor#decrypt` is
+  called directly, invalid JSON in a session cookie no longer keeps part of the decrypted cookie in the `cause`.
+
 ## [0.7.1] - 2026-11-25
 
 ### Security

@@ -35,7 +35,8 @@ module PqcRails
 
         data
       rescue JSON::ParserError
-        raise PqcRails::Error, "the session cookie does not hold valid JSON"
+        # JSON::ParserErrorのメッセージは入力の一部(復号したCookieの中身)を含むので、原因として残さない。
+        raise PqcRails::Error, "the session cookie does not hold valid JSON", cause: nil
       end
 
       # JSONで同じ形に戻らない値を持つ最上位のキー。Marshalで書く間に、:jsonへ切り替えられるかを知らせるために使う。
@@ -90,7 +91,8 @@ module PqcRails
 
         value.encode(Encoding::UTF_8)
       rescue EncodingError
-        raise PqcRails::Error, "the session value under #{top_key.inspect} is not a valid UTF-8 string"
+        # EncodingErrorのメッセージは変換できなかったバイト(セッションの値の一部)を含むので、原因として残さない。
+        raise PqcRails::Error, "the session value under #{top_key.inspect} is not a valid UTF-8 string", cause: nil
       end
       private_class_method :utf8
     end

@@ -129,7 +129,11 @@ RSpec.describe PqcRails::Session::Encryptor, "session_serializer" do
       [{ "bin" => marker }, { "deep" => deep }, { "cyclic" => cyclic }].each do |session|
         with_json do
           expect { encryptor.encrypt(session) }
-            .to raise_error(PqcRails::Error) { |e| expect(e.message.b).not_to include("must-not-appear") }
+            .to raise_error(PqcRails::Error) { |e|
+              expect(e.message.b).not_to include("must-not-appear")
+              expect(e.cause).to be_nil
+              expect(e.full_message).not_to include(%q(\\xFF))
+            }
         end
       end
     end
@@ -227,6 +231,27 @@ RSpec.describe PqcRails::Session::Encryptor, "session_serializer" do
       expect { PqcRails::Session::JsonPayload.load("{not json") }.to raise_error(PqcRails::Error, /valid JSON/)
       ["[1]", "\"s\"", "null", "1"].each do |json|
         expect { PqcRails::Session::JsonPayload.load(json) }.to raise_error(PqcRails::Error, /JSON object/)
+      end
+    end
+
+    it "壊れたJSONのエラーは、Cookieの中身を例外の原因にもメッセージにも残さない" do
+      marker = "cookie-content-123"
+      expect { PqcRails::Session::JsonPayload.load("{\"a\": #{marker}}") }.to raise_error(PqcRails::Error) { |error|
+        expect(error.cause).to be_nil
+        expect(error.message).not_to include(marker)
+        expect(error.full_message).not_to include(marker)
+      }
+
+      broken = with_json do
+        allow(JSON).to receive(:generate).and_return("{\"a\": #{marker}}")
+        encryptor.encrypt({ "a" => 1 })
+      end
+      allow(JSON).to receive(:generate).and_call_original
+      with_json do
+        expect { encryptor.decrypt(broken) }.to raise_error(PqcRails::Error, /valid JSON/) { |error|
+          expect(error.cause).to be_nil
+          expect(error.full_message).not_to include(marker)
+        }
       end
     end
   end

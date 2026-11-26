@@ -458,11 +458,14 @@ RSpec.describe PqcRails::Session::Encryptor do
 
         it "DBに接続できないモデルがあれば、旧形式のCookieを拒否する" do
           model = attribute_model(provider_for(PqcRails::HybridKem.open(:ml_kem_512, &:generate_keypair)))
-          allow(model).to receive(:table_exists?).and_raise(::ActiveRecord::ConnectionNotEstablished, "down")
+          allow(model).to receive(:table_exists?).and_raise(::ActiveRecord::ConnectionNotEstablished, "host=db.internal must-not-appear")
           PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
 
           expect { legacy_encryptor.decrypt(forge_legacy(keypair.public_key, { "user_id" => 1 })) }
-            .to raise_error(PqcRails::Error, /could not compare.*ConnectionNotEstablished/)
+            .to raise_error(PqcRails::Error, /could not compare.*ConnectionNotEstablished/) { |e|
+              expect(e.full_message).not_to include("must-not-appear")
+              expect(e.cause).to be_nil
+            }
         end
 
         it "DBの接続が定義されていないモデルは、比べずに旧形式のCookieを読む" do

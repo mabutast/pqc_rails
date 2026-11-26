@@ -820,7 +820,7 @@
           "name": "Rails標準のkey_providerにpqc_railsの鍵ペアとAESの鍵を混ぜた属性があれば、AESの鍵が最後でも拒否する"
         }
       ],
-      "guarantee": "DB の現行鍵・旧鍵と同じ鍵、旧形式を読む設定の間は読み込まれたモデルの属性ごとの key_provider（previous: を含む）の鍵と同じ鍵では、旧形式の Cookie を Marshal.load の前に拒否し、:v0 でも書かない。属性ごとの鍵を確かめられなければ拒否し、テーブル・接続の無いモデルは比べない。読む設定でない時は集めない。別の鍵なら期限内は読む。status も報告する。公開鍵を返さない独自の key_provider があれば比べられないので拒否し、Rails 標準の key_provider は全部の鍵が AES の鍵の時だけ比べない（pqc_rails の鍵ペアを1つでも入れた時は拒否する）。status は属性ごとの鍵を確かめられない時と、モデルの読み込みが失敗した時に止まらず ok:false を報告する",
+      "guarantee": "DB の現行鍵・旧鍵と同じ鍵、旧形式を読む設定の間は読み込まれたモデルの属性ごとの key_provider（previous: を含む）の鍵と同じ鍵では、旧形式の Cookie を Marshal.load の前に拒否し、:v0 でも書かない。属性ごとの鍵を確かめられなければ拒否し（元の例外は接続情報を含みうるので、原因に残さずクラス名だけを出す）、テーブル・接続の無いモデルは比べない。読む設定でない時は集めない。別の鍵なら期限内は読む。status も報告する。公開鍵を返さない独自の key_provider があれば比べられないので拒否し、Rails 標準の key_provider は全部の鍵が AES の鍵の時だけ比べない（pqc_rails の鍵ペアを1つでも入れた時は拒否する）。status は属性ごとの鍵を確かめられない時と、モデルの読み込みが失敗した時に止まらず ok:false を報告する",
       "mutants": [
         {
           "id": "shared-check-removed",
@@ -938,7 +938,7 @@
           "id": "fail-open-on-error",
           "kind": "例外を握りつぶす",
           "file": "lib/pqc_rails/session/encryptor.rb",
-          "find": "        raise PqcRails::Error, \"could not compare the session key with per-attribute key providers (#{e.class})\"\n",
+          "find": "        raise PqcRails::Error, \"could not compare the session key with per-attribute key providers (#{e.class})\", cause: nil\n",
           "replace": "        []\n",
           "result": "killed"
         },
@@ -1012,6 +1012,14 @@
           "file": "lib/pqc_rails/active_record/key_provider.rb",
           "find": "rails_provider_keys(provider)&.all? { |key| key.secret.is_a?(::String) }",
           "replace": "rails_provider_keys(provider)&.last(1)&.all? { |key| key.secret.is_a?(::String) }",
+          "result": "killed"
+        },
+        {
+          "id": "compare-error-cause-kept",
+          "kind": "例外の原因（cause）を残す",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "per-attribute key providers (#{e.class})\", cause: nil",
+          "replace": "per-attribute key providers (#{e.class})\"",
           "result": "killed"
         }
       ]

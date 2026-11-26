@@ -77,11 +77,12 @@ module PqcRails
         ActiveRecord::KeyProvider.configured.flat_map(&:public_keys).map(&:b)
       end
 
-      # 確かめられない時は、同じ鍵かもしれないので旧形式を使わせない。例外のメッセージは接続情報を含みうるので、クラス名だけを出す。
+      # 確かめられない時は、同じ鍵かもしれないので旧形式を使わせない。例外のメッセージは接続情報を含みうるので、
+      # クラス名だけを出し、元の例外も原因として残さない。
       def attribute_record_public_keys
         ActiveRecord::KeyProvider.per_attribute.flat_map(&:public_keys).map(&:b)
       rescue StandardError => e
-        raise PqcRails::Error, "could not compare the session key with per-attribute key providers (#{e.class})"
+        raise PqcRails::Error, "could not compare the session key with per-attribute key providers (#{e.class})", cause: nil
       end
 
       # :marshalで書く間に、:jsonへ切り替えると書けなくなる値があれば、最上位のキーの名前だけを知らせる。
