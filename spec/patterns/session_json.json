@@ -388,9 +388,13 @@
         {
           "file": "spec/session/encryptor_json_spec.rb",
           "name": "v2の中身が壊れたJSON・Hashでない値ならPqcRails::Errorにする"
+        },
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "壊れたJSONのエラーは、Cookieの中身を例外の原因にもメッセージにも残さない"
         }
       ],
-      "guarantee": "壊れた JSON・Hash でない値は PqcRails::Error",
+      "guarantee": "壊れた JSON・Hash でない値は PqcRails::Error。壊れた JSON の例外は Cookie の中身を原因（cause）にもメッセージにも残さない",
       "mutants": [
         {
           "id": "top-any",
@@ -398,6 +402,14 @@
           "file": "lib/pqc_rails/session/json_payload.rb",
           "find": "raise PqcRails::Error, \"the session cookie does not hold a JSON object\" unless data.is_a?(Hash)",
           "replace": "nil",
+          "result": "killed"
+        },
+        {
+          "id": "parse-error-cause-kept",
+          "kind": "例外の原因（cause）を残す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "raise PqcRails::Error, \"the session cookie does not hold valid JSON\", cause: nil",
+          "replace": "raise PqcRails::Error, \"the session cookie does not hold valid JSON\"",
           "result": "killed"
         }
       ]
@@ -444,7 +456,7 @@
           "name": "UTF-8にできない文字列・自分自身を含む値も、落ちずにキーの名前を知らせる"
         }
       ],
-      "guarantee": ":json では値を出さない PqcRails::Error、:marshal では落ちずにキーを知らせる。変換できる文字コードは UTF-8 で保存する",
+      "guarantee": ":json では値を出さない PqcRails::Error（変換できなかったバイトを含む元の例外も原因に残さない）、:marshal では落ちずにキーを知らせる。変換できる文字コードは UTF-8 で保存する",
       "mutants": [
         {
           "id": "no-depth",
@@ -468,6 +480,14 @@
           "file": "lib/pqc_rails/session/json_payload.rb",
           "find": "        value.encode(Encoding::UTF_8)\n",
           "replace": "        value\n",
+          "result": "killed"
+        },
+        {
+          "id": "utf8-error-cause-kept",
+          "kind": "例外の原因（cause）を残す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "is not a valid UTF-8 string\", cause: nil",
+          "replace": "is not a valid UTF-8 string\"",
           "result": "killed"
         }
       ]
