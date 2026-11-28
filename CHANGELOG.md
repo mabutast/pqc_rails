@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-11-28
+
 ### Security
 
 - `PqcRails::Error` raised by the session encryption no longer keeps the original exception as its `cause` when
