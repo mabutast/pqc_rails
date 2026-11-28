@@ -15,9 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   key with per-attribute key providers no longer pass part of the session value or connection details to error
   pages and error reporting services that show the `cause`. When `PqcRails::Session::Encryptor#decrypt` is
   called directly, invalid JSON in a session cookie no longer keeps part of the decrypted cookie in the `cause`.
+- With `session_serializer = :json`, a session string that is labeled UTF-8 but holds invalid bytes, and a
+  session key (at the top level or in a nested hash) that is not valid UTF-8, now raise `PqcRails::Error`
+  without the value, the key or a `cause`. Before, they raised `JSON::GeneratorError`, whose `invalid_object`
+  held the unencrypted value or key. Keys that can be converted to UTF-8 are stored as UTF-8. While writing
+  with `:marshal`, `session_not_json_safe.pqc_rails` also reports these values, and reports a key that is not
+  valid UTF-8 under a fixed name instead of the key itself.
+- A legacy (v0) session cookie is now rejected on the authentication key and `accept_legacy_cookies_until`
+  checks before the session key is compared with record keys. Before, every such cookie ran that comparison,
+  which reads the encrypted attributes of every model, so any request carrying such a cookie could trigger it.
 
 ### Fixed
 
+- `pqc_rails:status` now compares the previous session keys with the record keys when the current session
+  key is not set. Before, it reported that legacy cookies are read without comparing them.
 - The `TypeError` raised when a key pair, a KEM result or a `PqcRails::EnvelopeCipher` is passed to
   `Marshal.dump` no longer suggests `PqcRails::KeySource.encode`. That method returns a string that contains
   the secret key, so storing its result in a cache, a job argument or a file stores the key there. The message
