@@ -268,11 +268,15 @@ RSpec.describe "秘密の値を持つオブジェクトの表示" do
   end
 
   describe "Marshal" do
-    # Marshal.dumpがTypeErrorになり、メッセージに秘密の値が出ず、KeySource.encodeを案内することを確かめる。
+    # Marshal.dumpがTypeErrorになり、メッセージに秘密の値が出ないことを確かめる。
+    # 案内は鍵の置き場所(credentials・環境変数)と、置き場所だけを書き出すEnvCredentialsを指し、
+    # 秘密鍵をそのまま含む文字列を作るKeySource.encodeは指さない(キャッシュ等に入れると鍵が残るため)。
     def expect_marshal_refused(object, secrets)
       expect { Marshal.dump(object) }.to raise_error(TypeError) { |error|
         secrets.compact.each { |secret| expect_not_to_reveal(error.message, secret) }
-        expect(error.message).to include("PqcRails::KeySource.encode")
+        expect(error.message).to include("Rails credentials or environment variables")
+        expect(error.message).to include("PqcRails::KeySource::EnvCredentials")
+        expect(error.message).not_to include("KeySource.encode")
       }
     end
 

@@ -16,3 +16,4 @@
 | 確かめる前に使う（処理の順番を入れ替える） | 長さの確認より前にコピーする（確認の順番を後ろにずらす） | pqc_rails 7ee3546（長さが足りない時も秘密鍵のコピーを作ってしまった） |
 | 公開してよい一覧を、伏せる一覧にする（一覧に漏れた値が出る） | `return "[FILTERED]" unless PUBLIC_MEMBERS.include?(name)` → `return "[FILTERED]" if SECRET_MEMBERS.include?(name)`（伏せる一覧から1つ抜くと、その秘密が出る。壊し方では、抜いた値が生の値で出るよう表示の行も添える） | pqc_rails 1378750（伏せる秘密を列挙していたため、後から増える秘密のメンバーを伏せられない作りだった。漏れの前に直した） |
 | 例外の原因（cause）を残す | `raise invalid_key_error(raw), cause: nil` → `raise invalid_key_error(raw)`（rescue 中の送出は元の例外を cause に付け、そのメッセージの秘密も報告に出る） | pqc_rails 99da34f（鍵の値の先頭4バイトを長さとして読んだ数が、BlobPacking のエラーのメッセージとして cause から出た） |
+| 案内・説明の文言を、誤った対象を指す形に戻す（危ない使い方へ誘う） | 拒否の例外の案内「鍵は credentials・環境変数に置き、EnvCredentials を持たせる」→「to store a key pair, use PqcRails::KeySource.encode」（`encode` は秘密鍵を含む文字列を作るので、案内どおりキャッシュに入れると鍵が残る）。壊し方は、正しい案内に誤った案内を足す・正しい案内を消す | pqc_rails（0.7.0 の Marshal の拒否の案内が、秘密鍵をそのまま含む KeySource.encode を指していた） |
