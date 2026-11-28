@@ -126,7 +126,9 @@ end
 
 セッションと DB に同じ鍵を設定している場合、更新後は旧形式の Cookie を読みません。`ciphertext_format = :v0` でも Cookie を書けないので、順番に更新する場合は、更新の前にセッションの鍵を DB と別の鍵に変えてください（この時点で既存のセッションは切れます）。この鍵は更新前の版で生成します。認証鍵を持つ鍵は `ciphertext_format = :v0` で使えません。同じ鍵のまま更新すると、期限を設定しても既存のセッションは保てません。
 
-gem を 0.3.0 以前に戻す時は、鍵の設定も元の鍵に戻してください。**新しい鍵は消さずに保管してください。** 更新後に書かれた新しい形式の暗号文は、新しい鍵が無いと復号できません。新しい鍵のまま 0.3.0 以前の版で書いた値は、再度更新すると読めません。その場合は、同じ鍵から認証鍵を除いた鍵（`PqcRails::KeySource.encode(PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key))`）を旧鍵に足すと読めます。Cookie を読むには、あわせて `accept_legacy_cookies_until` の期限内である必要があります。
+gem を 0.3.0 以前に戻す時は、鍵の設定も元の鍵に戻してください。**新しい鍵は消さずに保管してください。** 更新後に書かれた新しい形式の暗号文は、新しい鍵が無いと復号できません。新しい鍵のまま 0.3.0 以前の版で書いた値は、再度更新すると読めません。その場合は、同じ鍵から認証鍵を除いた鍵（`PqcRails::KeySource.encode(PqcRails::HybridKem::Keypair.new(new_keypair.public_key, new_keypair.secret_key))`、`new_keypair` は `PqcRails::KeySource.decode` で戻した新しい鍵）を旧鍵に足すと読めます。Cookie を読むには、あわせて `accept_legacy_cookies_until` の期限内である必要があります。
+
+この鍵を旧鍵に足すと、その鍵宛の旧形式の値を再び受け付けます。旧形式は公開鍵だけで作れ、Cookie の中身は `Marshal.load` に渡るため、0.3.0 以前の鍵と同じ危険がこの鍵にも及びます。足すのは一時的にし、`accept_legacy_records` を有効にしている間に DB の値を再暗号化し、Cookie の期限を短く設定してください。読み直しが済んだら、この鍵を旧鍵から外します。
 
 1. 更新後の版の gem で、新しい鍵を生成する（セッション用・DB 用それぞれ）。0.3.0 以前の版で生成した鍵は認証鍵を持たない。`:ml_kem_768` は、今の設定のアルゴリズムに合わせる
 
