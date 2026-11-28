@@ -274,6 +274,7 @@ RSpec.describe "秘密の値を持つオブジェクトの表示" do
     def expect_marshal_refused(object, secrets)
       expect { Marshal.dump(object) }.to raise_error(TypeError) { |error|
         secrets.compact.each { |secret| expect_not_to_reveal(error.message, secret) }
+        expect(error.message).to include("Do not store it in caches, job arguments or files")
         expect(error.message).to include("Rails credentials or environment variables")
         expect(error.message).to include("PqcRails::KeySource::EnvCredentials")
         expect(error.message).not_to include("KeySource.encode")

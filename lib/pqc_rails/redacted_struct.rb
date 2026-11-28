@@ -16,8 +16,8 @@ module PqcRails
   # to_h・to_aで取り出した値をログやJSONに渡せば、秘密の値はそのまま出る。
   # YAML(to_yaml、Railsのdebugヘルパー)はas_jsonと同じ内容のタグ無しのマップにする。読み戻しても鍵にはならない。
   # Marshalは伏せた形では復元できないため、書き出し自体を拒む(marshal_dumpでTypeError)。
-  # Rails.cache・ジョブの引数・ファイルに鍵が丸ごと残るのを防ぐ。鍵はRails credentials・環境変数に置き、
-  # Marshalが要るオブジェクトには、鍵の置き場所だけを書き出すKeySource::EnvCredentialsを持たせる。
+  # Rails.cache・ジョブの引数・ファイルに鍵が丸ごと残るのを防ぐ。鍵はRails credentials・環境変数に置き、要る時に読む
+  # (KeySource::EnvCredentialsは鍵の置き場所だけを書き出す)。共有秘密・データ鍵は保存する対象にしない。
   # このオブジェクトを内部に持つオブジェクト(KeyProvider::Key・Session::Encryptor等)のMarshalも、ここで止まる。
   module RedactedStruct
     PUBLIC_MEMBERS = %i[public_key ciphertext].freeze
@@ -26,9 +26,9 @@ module PqcRails
     # キャッシュ等に入れると鍵が残るため案内しない。
     def self.marshal_refusal(klass)
       "#{klass.name} holds secret values and cannot be marshaled. " \
-        "Keep keys in Rails credentials or environment variables, not in caches, job arguments or files; " \
-        "an object that must be marshaled can hold a PqcRails::KeySource::EnvCredentials, " \
-        "which marshals only where the keys are stored"
+        "Do not store it in caches, job arguments or files. " \
+        "Keep keys in Rails credentials or environment variables and load them when needed " \
+        "(PqcRails::KeySource::EnvCredentials, for example, marshals only where the keys are stored)"
     end
 
     def marshal_dump
