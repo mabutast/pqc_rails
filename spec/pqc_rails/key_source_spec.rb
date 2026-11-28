@@ -81,6 +81,8 @@ RSpec.describe PqcRails::KeySource do
   describe ".decode の途中のバイト列" do
     it "Base64から戻した鍵の値(公開鍵・秘密鍵・認証鍵を連結したもの)を、取り出した後にゼロで埋める" do
       raw = PqcRails::BlobPacking.pack_all(keypair.public_key, keypair.secret_key, keypair.authentication_key)
+      # encodeのゼロ埋めと区別するため、見張りを付ける前にencodeを済ませる。
+      encoded = described_class.encode(keypair)
       wiped = []
       shared = []
       allow(PqcRails::SecretBuffer).to receive(:wipe).and_wrap_original do |original, *strings|
@@ -89,7 +91,7 @@ RSpec.describe PqcRails::KeySource do
         original.call(*strings)
       end
 
-      decoded = described_class.decode(described_class.encode(keypair))
+      decoded = described_class.decode(encoded)
 
       before, after = wiped.find { |(_, copy)| copy == raw }&.then { |string, copy| [copy, string] }
       expect(before).to eq(raw)
@@ -97,6 +99,24 @@ RSpec.describe PqcRails::KeySource do
       # 共有の状態の文字列に書き込むと、元の領域ではなく新しいコピーが消されるため
       expect(shared).to all(be(false))
       expect(decoded.secret_key).to eq(keypair.secret_key)
+    end
+  end
+
+  describe ".encode の途中のバイト列" do
+    it "連結した鍵の値を、Base64にした後にゼロで埋める" do
+      raw = PqcRails::BlobPacking.pack_all(keypair.public_key, keypair.secret_key, keypair.authentication_key)
+      wiped = []
+      allow(PqcRails::SecretBuffer).to receive(:wipe).and_wrap_original do |original, *strings|
+        wiped.concat(strings.compact.map { |string| [string, string.dup] })
+        original.call(*strings)
+      end
+
+      encoded = described_class.encode(keypair)
+
+      string, copy = wiped.find { |(_, before)| before == raw }
+      expect(copy).to eq(raw)
+      expect(string).to eq("\x00" * raw.bytesize)
+      expect(Base64.strict_decode64(encoded)).to eq(raw)
     end
   end
 

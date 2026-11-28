@@ -277,6 +277,19 @@ RSpec.describe PqcRails::Generators::InstallGenerator do
       expect(reloaded(credentials).config[:pqc_session_key]).to eq(encoded)
     end
 
+    it "認証鍵を持つ今の形式の鍵は、警告せず設定済みとして扱う" do
+      current = PqcRails::KeySource.encode(PqcRails::HybridKem.open(:ml_kem_768, &:generate_keypair))
+      credentials = write_credentials(build_credentials(@destination_root),
+                                      { "pqc_session_key" => current, "pqc_record_key" => current }.to_yaml)
+      allow(Rails).to receive(:application).and_return(double("Rails.application", credentials: credentials))
+
+      output = capture_stdout { described_class.start([], destination_root: @destination_root) }
+
+      expect(output).to include("pqc_session_key is already set", "pqc_record_key is already set")
+      expect(output).not_to include("0.3.0", "not a valid")
+      expect(output).not_to include(current)
+    end
+
     it "不正な鍵は残し、値を出力しない" do
       credentials = write_credentials(build_credentials(@destination_root), "pqc_record_key: not-a-valid-secret\n")
       allow(Rails).to receive(:application).and_return(double("Rails.application", credentials: credentials))

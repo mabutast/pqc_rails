@@ -260,6 +260,17 @@ RSpec.describe PqcRails::StatusCheck do
         expect(legacy_cookie_result.detail).to include("同じ鍵", "読みません")
       end
 
+      it "現行のセッション鍵が未設定でも、旧鍵のセッション鍵がDBと同じなら警告する" do
+        legacy = PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key)
+        ENV.delete("PQC_SESSION_KEY")
+        ENV["PQC_SESSION_PREVIOUS_KEYS"] = PqcRails::KeySource.encode(legacy)
+        ENV["PQC_RECORD_KEY"] = PqcRails::KeySource.encode(legacy)
+        PqcRails.configuration.accept_legacy_cookies_until = Time.now + 3600
+
+        expect(legacy_cookie_result.ok).to be(false)
+        expect(legacy_cookie_result.detail).to include("同じ鍵", "読みません")
+      end
+
       it "現行のセッション鍵がDBと同じでも、期限内に読まないことを警告する" do
         legacy = PqcRails::HybridKem::Keypair.new(keypair.public_key, keypair.secret_key)
         ENV["PQC_SESSION_KEY"] = PqcRails::KeySource.encode(legacy)

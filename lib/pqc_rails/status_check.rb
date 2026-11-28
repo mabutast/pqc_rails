@@ -180,11 +180,18 @@ module PqcRails
 
     # 旧形式のCookieを読むはずの鍵(認証鍵を持たないセッション鍵)が、DBの鍵と同じかどうか。
     # 属性ごとのkey_providerも比べる(モデルはattribute_key_check_errorで読み込み済み)。
+    # 現行のセッション鍵が未設定でも、旧鍵の世代は比べる(未設定のまま旧鍵だけで旧形式のCookieを読みうるため)。
     def legacy_session_key_shared?
-      keypairs = [Session::KeyManager.keypair] + Session::KeyManager.previous_keypairs
+      keypairs = [current_session_keypair, *Session::KeyManager.previous_keypairs].compact
       keypairs.any? { |keypair| keypair.authentication_key.nil? && Session::Encryptor.new(keypair).legacy_write_blocker }
     rescue PqcRails::Error, ArgumentError, TypeError
       false
+    end
+
+    def current_session_keypair
+      Session::KeyManager.keypair
+    rescue PqcRails::MissingKeyError
+      nil
     end
 
     def active_record_encryption_result
