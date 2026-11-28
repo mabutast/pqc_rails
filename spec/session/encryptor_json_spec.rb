@@ -90,6 +90,10 @@ RSpec.describe PqcRails::Session::Encryptor, "session_serializer" do
       events = events_during { encryptor.encrypt(session) }
 
       expect(events).to eq([{ keys: ["utf8bad", "h", PqcRails::Session::JsonPayload::INVALID_KEY_NAME] }])
+
+      two_invalid = { "a\xFF".b => 1, "b\xFE".b => 2 }
+      expect(events_during { encryptor.encrypt(two_invalid) })
+        .to eq([{ keys: [PqcRails::Session::JsonPayload::INVALID_KEY_NAME] }])
     end
   end
 
@@ -151,7 +155,8 @@ RSpec.describe PqcRails::Session::Encryptor, "session_serializer" do
         { "bad" => "value\xFFmust-not-appear".dup.force_encoding(Encoding::UTF_8) },
         { "top\xFFmust-not-appear".b => 1 },
         { "h" => { "k\xFFmust-not-appear".b => "v" } },
-        { "h" => { "k\xFFmust-not-appear".dup.force_encoding(Encoding::UTF_8) => "v" } }
+        { "h" => { "k\xFFmust-not-appear".dup.force_encoding(Encoding::UTF_8) => "v" } },
+        { "sym" => "v\xFFmust-not-appear".b.to_sym }
       ].each do |session|
         with_json do
           expect { encryptor.encrypt(session) }
@@ -160,6 +165,16 @@ RSpec.describe PqcRails::Session::Encryptor, "session_serializer" do
               expect(e.cause).to be_nil
               expect(e.full_message.b).not_to include("must-not-appear")
             }
+        end
+      end
+    end
+
+    it "UTF-8にそろえると同じになるキーは、片方を黙って消さずにPqcRails::Errorにする" do
+      latin = "\xE9".dup.force_encoding(Encoding::ISO_8859_1)
+      [{ latin => 1, "é" => 2 }, { "h" => { latin => 1, "é" => 2 } }].each do |session|
+        with_json do
+          expect { encryptor.encrypt(session) }
+            .to raise_error(PqcRails::Error, /same key/) { |e| expect(e.message).not_to include("é") }
         end
       end
     end

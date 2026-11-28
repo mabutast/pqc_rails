@@ -30,6 +30,9 @@ module PqcRails
           key = utf8_key(key)
           [key, normalize(value, key)]
         end
+        # UTF-8にそろえると同じになるキーは、片方が黙って消えるのでエラーにする。キーは出さない。
+        raise PqcRails::Error, "two session keys become the same key in UTF-8" if normalized.size != data.size
+
         JSON.generate(normalized)
       end
 
@@ -47,7 +50,7 @@ module PqcRails
       def unsafe_keys(data)
         return [] unless data.is_a?(Hash)
 
-        data.filter_map do |key, value|
+        keys = data.filter_map do |key, value|
           next key.to_s unless key.is_a?(String)
 
           begin
@@ -62,6 +65,8 @@ module PqcRails
             key
           end
         end
+        # UTF-8にできないキーが複数あっても、決まった名前は1回だけにする。
+        keys.uniq
       end
 
       def normalize(value, top_key, depth = 1)
@@ -72,20 +77,25 @@ module PqcRails
         case value
         when String then utf8(value, top_key)
         when Integer, true, false, nil then value
-        when Symbol then value.to_s
+        when Symbol then utf8(value.to_s, top_key)
         when Float
           raise PqcRails::Error, "the session value under #{top_key.inspect} is not a finite number" unless value.finite?
 
           value
         when Array then value.map { |item| normalize(item, top_key, depth + 1) }
         when Hash
-          value.to_h do |key, item|
+          normalized = value.to_h do |key, item|
             unless key.is_a?(String)
               raise PqcRails::Error, "the session value under #{top_key.inspect} has a #{key.class} key; use strings"
             end
 
             [utf8_key(key, top_key), normalize(item, top_key, depth + 1)]
           end
+          if normalized.size != value.size
+            raise PqcRails::Error, "the session value under #{top_key.inspect} has two keys that become the same key in UTF-8"
+          end
+
+          normalized
         else
           raise PqcRails::Error,
                 "the session value under #{top_key.inspect} is a #{value.class}, which JSON cannot hold; " \

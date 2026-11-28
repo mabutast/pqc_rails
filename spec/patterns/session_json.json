@@ -150,7 +150,7 @@
           "id": "symbol-raises",
           "kind": "型を外す",
           "file": "lib/pqc_rails/session/json_payload.rb",
-          "find": "        when Symbol then value.to_s\n",
+          "find": "        when Symbol then utf8(value.to_s, top_key)\n",
           "replace": "",
           "result": "killed"
         },
@@ -439,7 +439,7 @@
     },
     {
       "id": "json-encoding-depth",
-      "pattern": "UTF-8 にできない文字列・UTF-8 以外の文字コード・深い入れ子・自分自身を含む値・UTF-8 と名乗る不正なバイト列・UTF-8 でないキー（最上位・入れ子）",
+      "pattern": "UTF-8 にできない文字列・UTF-8 以外の文字コード・深い入れ子・自分自身を含む値・UTF-8 と名乗る不正なバイト列・UTF-8 でないキー（最上位・入れ子）・UTF-8 にできないシンボル・UTF-8 にそろえると同じになるキー",
       "source": "code",
       "source_ref": "レビューの指摘（JSON.generate で初めて落ちる値、unsafe_keys の無限の再帰）。normalize の utf8・MAX_DEPTH。公開済みの版のレビュー（2026-11-28）：UTF-8 と名乗る不正なバイト列とキーが JSON::GeneratorError に落ち、invalid_object に値・キーが残った",
       "tests": [
@@ -466,6 +466,10 @@
         {
           "file": "spec/session/encryptor_json_spec.rb",
           "name": "UTF-8にできるキーはUTF-8で保存する"
+        },
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "UTF-8にそろえると同じになるキーは、片方を黙って消さずにPqcRails::Errorにする"
         }
       ],
       "guarantee": ":json では値を出さない PqcRails::Error（変換できなかったバイトを含む元の例外も原因に残さない）、:marshal では落ちずにキーを知らせる。変換できる文字コードは UTF-8 で保存する",
@@ -532,6 +536,38 @@
           "file": "lib/pqc_rails/session/json_payload.rb",
           "find": "            next INVALID_KEY_NAME\n",
           "replace": "            next key\n",
+          "result": "killed"
+        },
+        {
+          "id": "symbol-not-checked",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "        when Symbol then utf8(value.to_s, top_key)\n",
+          "replace": "        when Symbol then value.to_s\n",
+          "result": "killed"
+        },
+        {
+          "id": "top-key-collision-allowed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "        raise PqcRails::Error, \"two session keys become the same key in UTF-8\" if normalized.size != data.size\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "nested-key-collision-allowed",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "          if normalized.size != value.size\n",
+          "replace": "          if false\n",
+          "result": "killed"
+        },
+        {
+          "id": "invalid-key-name-repeated",
+          "kind": "戻り値を空・nil・固定値にする",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "        keys.uniq\n",
+          "replace": "        keys\n",
           "result": "killed"
         }
       ]

@@ -179,9 +179,9 @@ PqcRails.configure do |config|
 end
 ```
 
-`:json` で書けるのは、UTF-8 の文字列・整数・有限の小数・`true`・`false`・`nil`・配列と、キーが文字列のハッシュです。シンボルの値は文字列で保存します。`Time`・シンボルのキー・独自のオブジェクトをセッションに入れると、保存時に `PqcRails::Error` が発生します。文字列か数値にして入れてください。
+`:json` で書けるのは、UTF-8 の文字列・整数・有限の小数・`true`・`false`・`nil`・配列と、キーが UTF-8 の文字列のハッシュです。UTF-8 にそろえると同じになるキーが2つあるハッシュも、保存時に `PqcRails::Error` が発生します。シンボルの値は文字列で保存します。`Time`・シンボルのキー・独自のオブジェクトをセッションに入れると、保存時に `PqcRails::Error` が発生します。文字列か数値にして入れてください。
 
-`:marshal`（既定）の間は、`:json` で書けない値か、`:json` で書くと文字列に変わる値（シンボル）がセッションにあると、`session_not_json_safe.pqc_rails` のイベントで知らせます。イベントには最上位のキーの名前だけが入り、値は入りません。切り替える前に、このイベントが出ないことを確かめてください。
+`:marshal`（既定）の間は、`:json` で書けない値か、`:json` で書くと文字列に変わる値（シンボル）がセッションにあると、`session_not_json_safe.pqc_rails` のイベントで知らせます。イベントには最上位のキーの名前だけが入り、値は入りません。UTF-8 にできないキーは、キーの代わりに `(a key that is not a valid UTF-8 string)` という名前で入ります。切り替える前に、このイベントが出ないことを確かめてください。
 
 ```ruby
 ActiveSupport::Notifications.subscribe("session_not_json_safe.pqc_rails") do |event|
