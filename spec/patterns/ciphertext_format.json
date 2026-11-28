@@ -502,8 +502,8 @@
           "id": "error-class-runtime",
           "kind": "例外の種類を変える",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "raise PqcRails::Error,\n            \"legacy (v0) session cookies are not accepted",
-          "replace": "raise RuntimeError,\n            \"legacy (v0) session cookies are not accepted",
+          "find": "raise PqcRails::Error,\n              \"legacy (v0) session cookies are not accepted",
+          "replace": "raise RuntimeError,\n              \"legacy (v0) session cookies are not accepted",
           "result": "killed"
         },
         {
@@ -526,7 +526,7 @@
           "id": "check-removed-before-marshal",
           "kind": "確かめる処理を消す",
           "file": "lib/pqc_rails/session/encryptor.rb",
-          "find": "        CiphertextFormat.ensure_legacy_cookie_accepted!(@keypair, shared_with_records: shared_with_records?)\n",
+          "find": "        CiphertextFormat.ensure_legacy_cookie_accepted!(@keypair, shared_with_records: -> { shared_with_records? })\n",
           "replace": "",
           "result": "killed"
         },
@@ -705,7 +705,7 @@
       "id": "legacy-cookie-shared-key",
       "pattern": "セッションの鍵が DB の現行鍵・旧鍵・属性ごとの key_provider の鍵と同じ時の旧形式の Cookie",
       "source": "spec",
-      "source_ref": "README「暗号文の形式」：旧形式には用途の区別が無いので、DB と同じ鍵では旧形式の Cookie を読まない。属性ごとの key_provider は旧形式の Cookie を読む設定の間だけ比べる",
+      "source_ref": "README「暗号文の形式」：旧形式には用途の区別が無いので、DB と同じ鍵では旧形式の Cookie を読まない。属性ごとの key_provider は旧形式の Cookie を読む設定の間だけ比べる。shared_with_records? の中の legacy_cookies_readable? は、呼び出し元（読む時・:v0 で書く時・status）がどれも読む設定の間だけ呼ぶので、外しても動きが変わらない（等価な変異になったので壊し方から外した。後から呼び出し元が増えた時の守りとして残す）",
       "tests": [
         {
           "file": "spec/session/encryptor_spec.rb",
@@ -818,6 +818,14 @@
         {
           "file": "spec/session/encryptor_spec.rb",
           "name": "Rails標準のkey_providerにpqc_railsの鍵ペアとAESの鍵を混ぜた属性があれば、AESの鍵が最後でも拒否する"
+        },
+        {
+          "file": "spec/session/encryptor_spec.rb",
+          "name": "期限切れ・認証鍵で断れる旧形式のCookieでは、DBと同じ鍵かの確認(全モデルの走査)を走らせない"
+        },
+        {
+          "file": "spec/pqc_rails/ciphertext_format_spec.rb",
+          "name": "DBと同じ鍵かの確認(重い処理)は、認証鍵と期限の確認で断れない時だけ呼ぶ"
         }
       ],
       "guarantee": "DB の現行鍵・旧鍵と同じ鍵、旧形式を読む設定の間は読み込まれたモデルの属性ごとの key_provider（previous: を含む）の鍵と同じ鍵では、旧形式の Cookie を Marshal.load の前に拒否し、:v0 でも書かない。属性ごとの鍵を確かめられなければ拒否し（元の例外は接続情報を含みうるので、原因に残さずクラス名だけを出す）、テーブル・接続の無いモデルは比べない。読む設定でない時は集めない。別の鍵なら期限内は読む。status も報告する。公開鍵を返さない独自の key_provider があれば比べられないので拒否し、Rails 標準の key_provider は全部の鍵が AES の鍵の時だけ比べない（pqc_rails の鍵ペアを1つでも入れた時は拒否する）。status は属性ごとの鍵を確かめられない時と、モデルの読み込みが失敗した時に止まらず ok:false を報告する",
@@ -826,15 +834,15 @@
           "id": "shared-check-removed",
           "kind": "確かめる処理を消す",
           "file": "lib/pqc_rails/ciphertext_format.rb",
-          "find": "      if shared_with_records\n",
-          "replace": "      if false\n",
+          "find": "      return unless shared\n",
+          "replace": "      return\n",
           "result": "killed"
         },
         {
           "id": "shared-not-passed",
           "kind": "確かめる処理を消す",
           "file": "lib/pqc_rails/session/encryptor.rb",
-          "find": "shared_with_records: shared_with_records?)",
+          "find": "shared_with_records: -> { shared_with_records? })",
           "replace": "shared_with_records: false)",
           "result": "killed"
         },
@@ -900,14 +908,6 @@
           "file": "lib/pqc_rails/session/encryptor.rb",
           "find": " ||\n          (CiphertextFormat.legacy_cookies_readable? && attribute_record_public_keys.include?(public_key))",
           "replace": "",
-          "result": "killed"
-        },
-        {
-          "id": "attribute-collected-always",
-          "kind": "打ち切りを消す",
-          "file": "lib/pqc_rails/session/encryptor.rb",
-          "find": "(CiphertextFormat.legacy_cookies_readable? && attribute_record_public_keys",
-          "replace": "(attribute_record_public_keys",
           "result": "killed"
         },
         {
@@ -1020,6 +1020,22 @@
           "file": "lib/pqc_rails/session/encryptor.rb",
           "find": "per-attribute key providers (#{e.class})\", cause: nil",
           "replace": "per-attribute key providers (#{e.class})\"",
+          "result": "killed"
+        },
+        {
+          "id": "shared-check-eager",
+          "kind": "確かめる前に使う（処理の順番を入れ替える）",
+          "file": "lib/pqc_rails/session/encryptor.rb",
+          "find": "shared_with_records: -> { shared_with_records? })",
+          "replace": "shared_with_records: shared_with_records?)",
+          "result": "killed"
+        },
+        {
+          "id": "shared-before-deadline",
+          "kind": "確かめる前に使う（処理の順番を入れ替える）",
+          "file": "lib/pqc_rails/ciphertext_format.rb",
+          "find": "      unless legacy_cookies_readable?(now: now)\n",
+          "replace": "      shared_with_records.call if shared_with_records.respond_to?(:call)\n      unless legacy_cookies_readable?(now: now)\n",
           "result": "killed"
         }
       ]

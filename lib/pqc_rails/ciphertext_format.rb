@@ -126,18 +126,21 @@ module PqcRails
     # 旧形式は公開鍵だけで作れ、中身はMarshal.loadに渡るため、受け付けるのは認証鍵を持たない鍵
     # (0.3.0以前に生成した鍵)だけにする。その鍵でも、旧形式を書いている間(順番デプロイ中)か、期限内に限る。
     # 旧形式には用途の区別が無いため、DBと同じ鍵では、DBの旧形式の値をCookieに組み替えられる。その鍵でも読まない。
+    # shared_with_recordsは真偽値か、真偽値を返す呼び出せるもの。DBと同じ鍵かの確認は全モデルの属性をたどる重い処理なので、
+    # 認証鍵と期限の確認で断れない時だけ呼ぶ(旧形式のCookieを送るだけで重い処理を起こさせないため)。
     def ensure_legacy_cookie_accepted!(keypair, shared_with_records: false, now: Time.now)
       unless keypair.authentication_key.nil?
         raise PqcRails::Error, "legacy (v0) session cookies are not read with a key that has an authentication key"
       end
-      if shared_with_records
-        raise PqcRails::Error, "legacy (v0) session cookies are not read with a key also configured for records"
+      unless legacy_cookies_readable?(now: now)
+        raise PqcRails::Error,
+              "legacy (v0) session cookies are not accepted " \
+              "(accept_legacy_cookies_until: #{PqcRails.configuration.accept_legacy_cookies_until.inspect})"
       end
-      return if legacy_cookies_readable?(now: now)
+      shared = shared_with_records.respond_to?(:call) ? shared_with_records.call : shared_with_records
+      return unless shared
 
-      raise PqcRails::Error,
-            "legacy (v0) session cookies are not accepted " \
-            "(accept_legacy_cookies_until: #{PqcRails.configuration.accept_legacy_cookies_until.inspect})"
+      raise PqcRails::Error, "legacy (v0) session cookies are not read with a key also configured for records"
     end
 
     # 旧形式(v0)のCookieを読む設定か。旧形式を書いている間(順番デプロイ中)か、accept_legacy_cookies_untilの期限内。

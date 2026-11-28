@@ -16,6 +16,9 @@ module PqcRails
       # JSONの既定の上限(100段)より先にPqcRails::Errorにする。
       MAX_DEPTH = 64
 
+      # unsafe_keysでUTF-8にできないキーを知らせる時の名前。キーのバイト列そのものは出さない。
+      INVALID_KEY_NAME = "(a key that is not a valid UTF-8 string)"
+
       module_function
 
       def dump(data)
@@ -24,6 +27,7 @@ module PqcRails
         normalized = data.to_h do |key, value|
           raise PqcRails::Error, "session keys must be strings, got #{key.class}" unless key.is_a?(String)
 
+          key = utf8_key(key)
           [key, normalize(value, key)]
         end
         JSON.generate(normalized)
@@ -45,6 +49,12 @@ module PqcRails
 
         data.filter_map do |key, value|
           next key.to_s unless key.is_a?(String)
+
+          begin
+            next key unless utf8_key(key).equal?(key)
+          rescue PqcRails::Error
+            next INVALID_KEY_NAME
+          end
 
           begin
             key unless normalize(value, key) == value
@@ -74,7 +84,7 @@ module PqcRails
               raise PqcRails::Error, "the session value under #{top_key.inspect} has a #{key.class} key; use strings"
             end
 
-            [key, normalize(item, top_key, depth + 1)]
+            [utf8_key(key, top_key), normalize(item, top_key, depth + 1)]
           end
         else
           raise PqcRails::Error,
@@ -84,17 +94,38 @@ module PqcRails
       end
       private_class_method :normalize
 
-      # JSONはUTF-8の文字列だけを書ける。UTF-8に変換できない文字列(バイナリなど)は、値を出さずにエラーにする。
       def utf8(value, top_key)
-        return value if value.encoding == Encoding::UTF_8 && value.valid_encoding?
-        return value if value.ascii_only? && value.valid_encoding?
-
-        value.encode(Encoding::UTF_8)
-      rescue EncodingError
-        # EncodingErrorのメッセージは変換できなかったバイト(セッションの値の一部)を含むので、原因として残さない。
-        raise PqcRails::Error, "the session value under #{top_key.inspect} is not a valid UTF-8 string", cause: nil
+        to_utf8(value) { "the session value under #{top_key.inspect} is not a valid UTF-8 string" }
       end
       private_class_method :utf8
+
+      # キーも値と同じくUTF-8にそろえる。UTF-8にできないキーは、メッセージにキーを出さない。
+      # top_keyは、入れ子のハッシュのキーの時に、それを含む最上位のキー(UTF-8であることを確かめ済み)。
+      def utf8_key(key, top_key = nil)
+        to_utf8(key) do
+          if top_key
+            "the session value under #{top_key.inspect} has a key that is not a valid UTF-8 string"
+          else
+            "a session key is not a valid UTF-8 string"
+          end
+        end
+      end
+      private_class_method :utf8_key
+
+      # JSONはUTF-8の文字列だけを書ける。UTF-8に変換できない文字列(バイナリ、UTF-8と名乗る不正なバイト列)は、
+      # 文字列を出さずにエラーにする。UTF-8と名乗る文字列は、同じ文字コードへのencodeが検査をしないので、変換の後にも確かめる。
+      # EncodingError・JSONのエラーは変換できなかったバイト(セッションの値・キーの一部)を含むので、原因として残さない。
+      def to_utf8(string)
+        return string if string.valid_encoding? && (string.encoding == Encoding::UTF_8 || string.ascii_only?)
+
+        converted = string.encode(Encoding::UTF_8)
+        return converted if converted.valid_encoding?
+
+        raise PqcRails::Error, yield, cause: nil
+      rescue EncodingError
+        raise PqcRails::Error, yield, cause: nil
+      end
+      private_class_method :to_utf8
     end
   end
 end

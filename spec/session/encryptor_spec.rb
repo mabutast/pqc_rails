@@ -209,6 +209,18 @@ RSpec.describe PqcRails::Session::Encryptor do
       expect(Marshal).not_to have_received(:load)
     end
 
+    it "期限切れ・認証鍵で断れる旧形式のCookieでは、DBと同じ鍵かの確認(全モデルの走査)を走らせない" do
+      forged = forge_legacy(keypair.public_key, { "user_id" => 1 })
+      [legacy_encryptor, encryptor].each do |target|
+        allow(target).to receive(:shared_with_records?).and_raise("the record key check must not run")
+      end
+      PqcRails.configuration.accept_legacy_cookies_until = Time.now - 60
+
+      expect { legacy_encryptor.decrypt(forged) }.to raise_error(PqcRails::Error, /not accepted/)
+      PqcRails.configuration.accept_legacy_cookies_until = Time.now + 60
+      expect { encryptor.decrypt(forged) }.to raise_error(PqcRails::Error, /authentication key/)
+    end
+
     it "認証鍵を持つ鍵宛の旧形式のCookieは、期限内でも:v0でもMarshal.loadに渡さず拒否する" do
       forged = forge_legacy(keypair.public_key, { "user_id" => 1 })
       allow(Marshal).to receive(:load).and_call_original

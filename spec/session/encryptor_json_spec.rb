@@ -83,6 +83,14 @@ RSpec.describe PqcRails::Session::Encryptor, "session_serializer" do
 
       expect(events).to eq([{ keys: %w[bin cyclic] }])
     end
+
+    it "UTF-8と名乗る不正なバイト列の値・UTF-8でないキーも、キーのバイト列を出さずに知らせる" do
+      session = { "utf8bad" => "secret\xFF".dup.force_encoding(Encoding::UTF_8), "h" => { "k\xFF".b => "v" },
+                  "top\xFFsecret".b => 1, "ok" => "fine" }
+      events = events_during { encryptor.encrypt(session) }
+
+      expect(events).to eq([{ keys: ["utf8bad", "h", PqcRails::Session::JsonPayload::INVALID_KEY_NAME] }])
+    end
   end
 
   describe ":jsonで書く時" do
@@ -135,6 +143,33 @@ RSpec.describe PqcRails::Session::Encryptor, "session_serializer" do
               expect(e.full_message).not_to include(%q(\\xFF))
             }
         end
+      end
+    end
+
+    it "UTF-8と名乗る不正なバイト列の値・UTF-8でないキーは、値もキーも出さずにPqcRails::Errorにする" do
+      [
+        { "bad" => "value\xFFmust-not-appear".dup.force_encoding(Encoding::UTF_8) },
+        { "top\xFFmust-not-appear".b => 1 },
+        { "h" => { "k\xFFmust-not-appear".b => "v" } },
+        { "h" => { "k\xFFmust-not-appear".dup.force_encoding(Encoding::UTF_8) => "v" } }
+      ].each do |session|
+        with_json do
+          expect { encryptor.encrypt(session) }
+            .to raise_error(PqcRails::Error) { |e|
+              expect(e.message.b).not_to include("must-not-appear")
+              expect(e.cause).to be_nil
+              expect(e.full_message.b).not_to include("must-not-appear")
+            }
+        end
+      end
+    end
+
+    it "UTF-8にできるキーはUTF-8で保存する" do
+      sjis_key = "鍵".encode(Encoding::Shift_JIS)
+
+      with_json do
+        expect(encryptor.decrypt(encryptor.encrypt({ sjis_key => 1, "h" => { "ascii".b => 2 } })))
+          .to eq({ "鍵" => 1, "h" => { "ascii" => 2 } })
       end
     end
 

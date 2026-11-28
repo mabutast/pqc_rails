@@ -439,9 +439,9 @@
     },
     {
       "id": "json-encoding-depth",
-      "pattern": "UTF-8 にできない文字列・UTF-8 以外の文字コード・深い入れ子・自分自身を含む値",
+      "pattern": "UTF-8 にできない文字列・UTF-8 以外の文字コード・深い入れ子・自分自身を含む値・UTF-8 と名乗る不正なバイト列・UTF-8 でないキー（最上位・入れ子）",
       "source": "code",
-      "source_ref": "レビューの指摘（JSON.generate で初めて落ちる値、unsafe_keys の無限の再帰）。normalize の utf8・MAX_DEPTH",
+      "source_ref": "レビューの指摘（JSON.generate で初めて落ちる値、unsafe_keys の無限の再帰）。normalize の utf8・MAX_DEPTH。公開済みの版のレビュー（2026-11-28）：UTF-8 と名乗る不正なバイト列とキーが JSON::GeneratorError に落ち、invalid_object に値・キーが残った",
       "tests": [
         {
           "file": "spec/session/encryptor_json_spec.rb",
@@ -454,6 +454,18 @@
         {
           "file": "spec/session/encryptor_json_spec.rb",
           "name": "UTF-8にできない文字列・自分自身を含む値も、落ちずにキーの名前を知らせる"
+        },
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "UTF-8と名乗る不正なバイト列の値・UTF-8でないキーは、値もキーも出さずにPqcRails::Errorにする"
+        },
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "UTF-8と名乗る不正なバイト列の値・UTF-8でないキーも、キーのバイト列を出さずに知らせる"
+        },
+        {
+          "file": "spec/session/encryptor_json_spec.rb",
+          "name": "UTF-8にできるキーはUTF-8で保存する"
         }
       ],
       "guarantee": ":json では値を出さない PqcRails::Error（変換できなかったバイトを含む元の例外も原因に残さない）、:marshal では落ちずにキーを知らせる。変換できる文字コードは UTF-8 で保存する",
@@ -478,16 +490,48 @@
           "id": "no-encode",
           "kind": "変換をやめる",
           "file": "lib/pqc_rails/session/json_payload.rb",
-          "find": "        value.encode(Encoding::UTF_8)\n",
-          "replace": "        value\n",
+          "find": "        converted = string.encode(Encoding::UTF_8)\n",
+          "replace": "        converted = string\n",
           "result": "killed"
         },
         {
           "id": "utf8-error-cause-kept",
           "kind": "例外の原因（cause）を残す",
           "file": "lib/pqc_rails/session/json_payload.rb",
-          "find": "is not a valid UTF-8 string\", cause: nil",
-          "replace": "is not a valid UTF-8 string\"",
+          "find": "      rescue EncodingError\n        raise PqcRails::Error, yield, cause: nil\n",
+          "replace": "      rescue EncodingError\n        raise PqcRails::Error, yield\n",
+          "result": "killed"
+        },
+        {
+          "id": "no-valid-check-after-encode",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "        return converted if converted.valid_encoding?\n\n        raise PqcRails::Error, yield, cause: nil\n",
+          "replace": "        converted\n",
+          "result": "killed"
+        },
+        {
+          "id": "top-key-not-checked",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "          key = utf8_key(key)\n",
+          "replace": "",
+          "result": "killed"
+        },
+        {
+          "id": "nested-key-not-checked",
+          "kind": "確かめる処理を消す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "[utf8_key(key, top_key), ",
+          "replace": "[key, ",
+          "result": "killed"
+        },
+        {
+          "id": "invalid-key-name-leaks",
+          "kind": "例外の原因（cause）を残す",
+          "file": "lib/pqc_rails/session/json_payload.rb",
+          "find": "            next INVALID_KEY_NAME\n",
+          "replace": "            next key\n",
           "result": "killed"
         }
       ]

@@ -236,6 +236,23 @@ RSpec.describe PqcRails::CiphertextFormat do
       PqcRails.configuration.ciphertext_format = :v1
     end
 
+    it "DBと同じ鍵かの確認(重い処理)は、認証鍵と期限の確認で断れない時だけ呼ぶ" do
+      calls = 0
+      shared = -> { calls += 1; false }
+
+      expect { described_class.ensure_legacy_cookie_accepted!(current_key, shared_with_records: shared, now: deadline) }
+        .to raise_error(PqcRails::Error, /authentication key/)
+      expect { described_class.ensure_legacy_cookie_accepted!(legacy_key, shared_with_records: shared, now: deadline + 1) }
+        .to raise_error(PqcRails::Error, /not accepted/)
+      expect(calls).to eq(0)
+
+      expect { described_class.ensure_legacy_cookie_accepted!(legacy_key, shared_with_records: shared, now: deadline) }
+        .not_to raise_error
+      expect(calls).to eq(1)
+      expect { described_class.ensure_legacy_cookie_accepted!(legacy_key, shared_with_records: -> { true }, now: deadline) }
+        .to raise_error(PqcRails::Error, /records/)
+    end
+
     context "期限が未設定のとき" do
       let(:deadline) { nil }
 

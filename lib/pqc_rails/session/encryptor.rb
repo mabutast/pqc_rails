@@ -120,7 +120,7 @@ module PqcRails
       end
 
       def open_legacy(bytes)
-        CiphertextFormat.ensure_legacy_cookie_accepted!(@keypair, shared_with_records: shared_with_records?)
+        CiphertextFormat.ensure_legacy_cookie_accepted!(@keypair, shared_with_records: -> { shared_with_records? })
         ciphertext, encrypted = BlobPacking.unpack(bytes, exact: true)
 
         HybridKem.open(@pq_alg_name) do |hybrid|
