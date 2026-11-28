@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pages and error reporting services that show the `cause`. When `PqcRails::Session::Encryptor#decrypt` is
   called directly, invalid JSON in a session cookie no longer keeps part of the decrypted cookie in the `cause`.
 
+### Fixed
+
+- The `TypeError` raised when a key pair, a KEM result or a `PqcRails::EnvelopeCipher` is passed to
+  `Marshal.dump` no longer suggests `PqcRails::KeySource.encode`. That method returns a string that contains
+  the secret key, so storing its result in a cache, a job argument or a file stores the key there. The message
+  now says to keep keys in Rails credentials or environment variables and, for an object that must be
+  marshaled, to hold a `PqcRails::KeySource::EnvCredentials`, which marshals only where the keys are stored.
+  Use `PqcRails::KeySource.encode` only to create the value for credentials or an environment variable.
+
 ## [0.7.1] - 2026-11-25
 
 ### Security
