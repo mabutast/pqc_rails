@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A legacy (v0) session cookie is now rejected on the authentication key and `accept_legacy_cookies_until`
   checks before the session key is compared with record keys. Before, every such cookie ran that comparison,
   which reads the encrypted attributes of every model, so any request carrying such a cookie could trigger it.
+- `docs/MIGRATION.md` now describes what to do when a key leaks: re-encrypt the values written with the
+  leaked keys and remove the leaked keys, including previous keys. Rotating the key alone leaves the values
+  written with the leaked keys readable with those keys. This applies to applications that cached records
+  as described in the 0.7.0 security entry.
 
 ### Fixed
 
@@ -68,7 +72,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scheme, after that key provider had read its keys. Caching such a record (`Rails.cache`) stored the
   keys in the cache. `PqcRails::ActiveRecord::KeyProvider` and the default key source now write only
   where the keys come from, and read the keys again after loading. If your application cached such
-  records, update all servers, clear the cache, and rotate the database key. Servers on 0.6.0 or
+  records, update all servers, clear the cache, and rotate the database keys as described in
+  `docs/MIGRATION.md` ("鍵が漏れた場合"): re-encrypt the records written with the leaked keys and
+  remove the leaked keys, including leaked previous keys. Servers on 0.6.0 or
   earlier cannot read key providers cached by 0.7.0, so clear the cache again if you roll back. A
   custom key source passed to a per-attribute `KeyProvider` is written as is, so it must not keep keys
   in a form that `Marshal` writes.
